@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Explorar from "./pages/Dashboard/Explorar";
 import DashboardLayout from "./layouts/DashboardLayout";
+import MisClases from "./pages/Dashboard/MisClases";
 
 function App() {
   return (
@@ -9,7 +10,7 @@ function App() {
         <Route path="/" element={<div>Landing page (próximamente)</div>} />
         <Route element={<DashboardLayout />}>
           <Route path="/explorar" element={<Explorar />} />
-          <Route path="/clases" element={<div>Mis Clases</div>} />
+          <Route path="/clases" element={<MisClases />} />
           <Route path="/perfil" element={<div>Perfil</div>} />
         </Route>
       </Routes>

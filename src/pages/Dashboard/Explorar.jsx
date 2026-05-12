@@ -30,7 +30,7 @@ function Explorar() {
             </span>{" "}
             🌿
           </h1>
-          <p className="text-base text-stone-400 mt-1">
+          <p className="text-base text-stone-600 mt-1">
             Encuentra tu próximo espacio para moverte.
           </p>
         </div>

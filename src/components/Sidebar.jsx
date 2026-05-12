@@ -1,8 +1,8 @@
-import { LayoutDashboard, CalendarDays, User, LogOut } from "lucide-react";
+import { Compass, CalendarDays, User, LogOut } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const navItems = [
-  { icon: LayoutDashboard, label: "Explorar", path: "/explorar" },
+  { icon: Compass, label: "Explorar", path: "/explorar" },
   { icon: CalendarDays, label: "Mis Clases", path: "/clases" },
   { icon: User, label: "Perfil", path: "/perfil" },
 ];

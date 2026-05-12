@@ -1,9 +1,9 @@
-import { LayoutDashboard, CalendarDays, User } from "lucide-react";
+import { Compass, CalendarDays, User } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 function BottomNav() {
   const navItems = [
-    { icon: LayoutDashboard, label: "Explorar", path: "/explorar" },
+    { icon: Compass, label: "Explorar", path: "/explorar" },
     { icon: CalendarDays, label: "Clases", path: "/clases" },
     { icon: User, label: "Perfil", path: "/perfil" },
   ];
