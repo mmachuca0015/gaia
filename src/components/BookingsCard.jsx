@@ -5,7 +5,7 @@ function BookingsCard({ studio_name, instructor, day, time, isPast }) {
     <div className="bg-white rounded-2xl p-5 shadow-sm">
       <div className="flex items-center justify-between mb-1">
         <p className="font-semibold text-stone-800 text-lg">{studio_name}</p>
-        <button className="text-sm text-stone-400 underline hover:text-stone-600 transition-colors">
+        <button className="text-sm text-stone-400 underline hover:text-stone-600 transition-colors cursor-pointer">
           {isPast ? "Ver más" : "Cancelar"}
         </button>
       </div>

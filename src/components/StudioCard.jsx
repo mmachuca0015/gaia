@@ -38,7 +38,7 @@ function Studiocard({
           <span>{neighborhood}</span>
         </div>
 
-        <button className="w-full bg-[#3a5a3a] text-white text-sm py-2.5 rounded-xl hover:bg-[#2e4a2e] transition-colors">
+        <button className="w-full bg-[#3a5a3a] text-white text-sm py-2.5 rounded-xl hover:bg-[#2e4a2e] transition-colors cursor-pointer">
           Ver estudio
         </button>
       </div>

@@ -40,7 +40,7 @@ function MisClases() {
             className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
               activeTab === tab
                 ? "bg-[#3a5a3a] text-white"
-                : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                : "bg-stone-100 text-stone-600 hover:bg-stone-200 cursor-pointer"
             }`}
           >
             {tab}

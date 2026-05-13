@@ -12,6 +12,24 @@ function Explorar() {
 
   const filters = ["Más cerca", "Mejor rating", "Mayor precio", "Menor precio"];
   const [activeFilter, setActiveFilter] = useState("Más cerca");
+  const [search, setSearch] = useState("");
+
+  const sortedStudios = [...studios]
+    .filter((studio) => {
+      const query = search.toLowerCase();
+      return (
+        studio.name.toLowerCase().includes(query) ||
+        studio.neighborhood.toLowerCase().includes(query) ||
+        studio.street.toLowerCase().includes(query)
+      );
+    })
+    .sort((a, b) => {
+      if (a.is_open !== b.is_open) return a.is_open ? -1 : 1;
+      if (activeFilter === "Mejor rating") return b.rating - a.rating;
+      if (activeFilter === "Menor precio") return a.price_from - b.price_from;
+      if (activeFilter === "Mayor precio") return b.price_from - a.price_from;
+      return 0;
+    });
 
   return (
     <div className="p-4 md:p-8">
@@ -45,6 +63,8 @@ function Explorar() {
               type="text"
               placeholder="Buscar estudios..."
               className="w-full md:w-[360px] pl-10 pr-4 py-3 rounded-full bg-white border border-stone-200 text-sm text-stone-600 placeholder:text-stone-400 outline-none focus:border-stone-400 transition-colors"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
             />
           </div>
         </div>
@@ -59,7 +79,7 @@ function Explorar() {
             className={`px-5 py-2 rounded-full text-sm transition-colors ${
               activeFilter === filter
                 ? "bg-[#3a5a3a] text-white"
-                : "bg-white text-stone-600 border border-stone-200 hover:border-stone-400"
+                : "bg-white text-stone-600 border border-stone-200 hover:border-stone-400 cursor-pointer"
             }`}
           >
             {filter}
@@ -69,7 +89,7 @@ function Explorar() {
 
       {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {studios.map((studio) => (
+        {sortedStudios.map((studio) => (
           <div key={studio.id}>
             <StudioCard
               cover_url={studio.cover_url}
