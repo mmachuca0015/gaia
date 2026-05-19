@@ -159,4 +159,23 @@ router.post("/reset-password", async (req, res) => {
   }
 });
 
+//Waitlist
+router.post("/waitlist", async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const result = await pool.query(
+      "INSERT INTO waitlist (email) VALUES ($1)",
+      [email],
+    );
+    res.json({ message: "Email agregado a la lista de espera correctamente" });
+  } catch (err) {
+    if (err.code === "23505") {
+      return res.status(400).json({ error: "Este correo ya está registrado" });
+    }
+    console.error(err);
+    res.status(500).json({ error: "Error del servidor" });
+  }
+});
+
 module.exports = router;

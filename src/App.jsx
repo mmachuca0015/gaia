@@ -5,19 +5,27 @@ import MisClases from "./pages/Dashboard/MisClases";
 import Perfil from "./pages/Dashboard/Perfil";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
+import Landing from "./pages/Landing";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<div>Landing page (próximamente)</div>} />
+        <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/panel-de-control" element={<div>Panel de control</div>} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route element={<DashboardLayout />}>
-          <Route path="/explorar" element={<Explorar />} />
-          <Route path="/clases" element={<MisClases />} />
-          <Route path="/perfil" element={<Perfil />} />
+        <Route element={<ProtectedRoute />}>
+          <Route
+            path="/panel-de-control"
+            element={<div>Panel de control</div>}
+          />
+
+          <Route element={<DashboardLayout />}>
+            <Route path="/explorar" element={<Explorar />} />
+            <Route path="/clases" element={<MisClases />} />
+            <Route path="/perfil" element={<Perfil />} />
+          </Route>
         </Route>
       </Routes>
     </BrowserRouter>
