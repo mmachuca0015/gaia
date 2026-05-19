@@ -16,7 +16,7 @@ function Sidebar() {
           className="text-3xl font-semibold tracking-widest text-[#3a5a3a]"
           style={{ fontFamily: "Cormorant Garamond, serif" }}
         >
-          GAIA
+          PILA
         </h1>
         <p className="text-xs tracking-[0.3em] text-stone-500 mt-0.5">
           WELLNESS

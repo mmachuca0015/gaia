@@ -74,7 +74,7 @@ function Explorar() {
       <div className="flex flex-wrap gap-2 mb-6">
         {filters.map((filter) => (
           <button
-            key={filter.id}
+            key={filter}
             onClick={() => setActiveFilter(filter)}
             className={`px-5 py-2 rounded-full text-sm transition-colors ${
               activeFilter === filter

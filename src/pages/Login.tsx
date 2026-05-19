@@ -1,0 +1,717 @@
+import { useState } from "react";
+import { Dumbbell, Store, ArrowLeft } from "lucide-react";
+import { estados } from "../data/estados.js";
+import { useNavigate } from "react-router-dom";
+
+type Step =
+  | "Iniciar sesión"
+  | "Crear cuenta"
+  | "Registrar usuario"
+  | "Registrar estudio"
+  | "Recuperar contraseña";
+
+function Login() {
+  const [step, setStep] = useState<Step>("Iniciar sesión");
+
+  {
+    /*Formulario de inicio de sesión */
+  }
+  const [loginForm, setLoginForm] = useState({
+    email: "",
+    password: "",
+  });
+
+  {
+    /*Formulario de registro de usuario */
+  }
+  const [registerUserForm, setRegisterUserForm] = useState({
+    name: "",
+    last_name: "",
+    country: "México",
+    state: "",
+    email: "",
+    confirmEmail: "",
+    password: "",
+    confirmPassword: "",
+  });
+
+  {
+    /*Formulario de registro de estudio */
+  }
+  const [registerStudioForm, setRegisterStudioForm] = useState({
+    name: "",
+    last_name: "",
+    studio_name: "",
+    country: "México",
+    state: "",
+    phone: "",
+    email: "",
+    confirmEmail: "",
+    password: "",
+    confirmPassword: "",
+  });
+
+  {
+    /*Formulario de recuperar contraseña */
+  }
+  const [forgotForm, setForgotForm] = useState({ email: "" });
+
+  const navigate = useNavigate();
+
+  const handleLogin = async () => {
+    if (!loginForm.email || !loginForm.password) {
+      alert("Por favor llena todos los campos");
+      return;
+    }
+    const res = await fetch("http://localhost:3001/users/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(loginForm),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      localStorage.setItem("role", data.role);
+      localStorage.setItem("user", JSON.stringify(data));
+      if (data.role === "owner") {
+        navigate("/panel-de-control");
+      } else {
+        navigate("/explorar");
+      }
+    } else {
+      console.log("Error:", data.error);
+    }
+  };
+
+  const handleRegisterUser = async () => {
+    if (
+      !registerUserForm.name ||
+      !registerUserForm.last_name ||
+      !registerUserForm.email ||
+      !registerUserForm.password ||
+      !registerUserForm.state ||
+      !registerUserForm.country ||
+      !registerUserForm.confirmEmail ||
+      !registerUserForm.confirmPassword
+    ) {
+      alert("Por favor llena todos los campos");
+      return;
+    }
+    if (registerUserForm.email !== registerUserForm.confirmEmail) {
+      alert("Los correos no coinciden");
+      return;
+    }
+
+    if (registerUserForm.password !== registerUserForm.confirmPassword) {
+      alert("Las contraseñas no coinciden");
+      return;
+    }
+
+    const res = await fetch("http://localhost:3001/users/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(registerUserForm),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      navigate("/explorar");
+    } else {
+      console.log("Error:", data.error);
+    }
+  };
+
+  const handleRegisterStudio = async () => {
+    if (
+      !registerStudioForm.name ||
+      !registerStudioForm.last_name ||
+      !registerStudioForm.email ||
+      !registerStudioForm.password ||
+      !registerStudioForm.state ||
+      !registerStudioForm.country ||
+      !registerUserForm.confirmEmail ||
+      !registerUserForm.confirmPassword ||
+      !registerStudioForm.studio_name ||
+      !registerStudioForm.phone
+    ) {
+      alert("Por favor llena todos los campos");
+      return;
+    }
+
+    if (registerStudioForm.email !== registerStudioForm.confirmEmail) {
+      alert("Los correos no coinciden");
+      return;
+    }
+
+    if (registerStudioForm.password !== registerStudioForm.confirmPassword) {
+      alert("Las contraseñas no coinciden");
+      return;
+    }
+    const res = await fetch("http://localhost:3001/studios/register-studio", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(registerStudioForm),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      navigate("/panel-de-control");
+    } else {
+      console.log("Error:", data.error);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    console.log(forgotForm);
+    const res = await fetch("http://localhost:3001/users/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(forgotForm),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      alert("Te enviamos un email para recuperar tu contraseña");
+    } else {
+      console.log("Error:", data.error);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#f6eee2] flex items-center justify-center p-4">
+      <div
+        className={`bg-white rounded-3xl p-8 w-full ${step === "Registrar estudio" ? "max-w-3xl" : "max-w-sm"} shadow-sm`}
+      >
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <h1
+            className="text-3xl font-semibold tracking-widest text-[#2c3a2c]"
+            style={{ fontFamily: "Cormorant Garamond, serif" }}
+          >
+            PILA
+          </h1>
+          <p className="text-xs tracking-[0.3em] text-stone-400 mt-0.5">
+            WELLNESS
+          </p>
+        </div>
+
+        {/* Switch tabs */}
+        <div className="relative flex bg-[#f0ece4] rounded-xl p-1 mb-6">
+          <div
+            className="absolute top-1 left-1 h-[calc(100%-8px)] w-[calc(50%-4px)] bg-[#3a5a3a] rounded-lg transition-transform duration-300"
+            style={{
+              transform:
+                step === "Iniciar sesión" || step === "Recuperar contraseña"
+                  ? "translateX(0)"
+                  : "translateX(100%)",
+            }}
+          />
+          <button
+            onClick={() => setStep("Iniciar sesión")}
+            className={`flex-1 py-2.5 text-sm font-medium relative z-10 transition-colors duration-300 cursor-pointer ${
+              step !== "Crear cuenta" &&
+              step !== "Registrar usuario" &&
+              step !== "Registrar estudio"
+                ? "text-white"
+                : "text-stone-400"
+            }`}
+          >
+            Iniciar sesión
+          </button>
+          <button
+            onClick={() => setStep("Crear cuenta")}
+            className={`flex-1 py-2.5 text-sm font-medium relative z-10 transition-colors duration-300 cursor-pointer ${
+              step === "Crear cuenta" ||
+              step === "Registrar usuario" ||
+              step === "Registrar estudio"
+                ? "text-white"
+                : "text-stone-400"
+            }`}
+          >
+            Crear cuenta
+          </button>
+        </div>
+
+        {/* Formulario iniciar sesión */}
+        {step === "Iniciar sesión" && (
+          <div className="flex flex-col gap-4">
+            <div>
+              <label className="text-xs text-stone-400 block mb-1.5">
+                Correo electrónico
+              </label>
+              <input
+                type="email"
+                placeholder="correo@ejemplo.com"
+                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                value={loginForm.email}
+                onChange={(e) =>
+                  setLoginForm({ ...loginForm, email: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <label className="text-xs text-stone-400 block mb-1.5">
+                Contraseña
+              </label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                value={loginForm.password}
+                onChange={(e) =>
+                  setLoginForm({ ...loginForm, password: e.target.value })
+                }
+              />
+            </div>
+            <button
+              onClick={handleLogin}
+              className="w-full bg-[#3a5a3a] text-white py-3 rounded-xl text-sm font-medium hover:bg-[#2e4a2e] transition-colors mt-2 cursor-pointer"
+            >
+              Iniciar sesión
+            </button>
+            <p
+              onClick={() => setStep("Recuperar contraseña")}
+              className="text-center text-xs text-stone-400 cursor-pointer hover:text-stone-600 transition-colors"
+            >
+              ¿Olvidaste tu contraseña?
+            </p>
+          </div>
+        )}
+
+        {/* Botones crear cuenta */}
+        {step === "Crear cuenta" && (
+          <div className="flex flex-col gap-4">
+            <div className="mb-2">
+              <p className="text-lg font-semibold text-stone-800">
+                ¿Cómo quieres usar PILA?
+              </p>
+              <p className="text-sm text-stone-400">Elige tu tipo de cuenta</p>
+            </div>
+            <button
+              onClick={() => setStep("Registrar usuario")}
+              className="flex flex-col items-center gap-2 p-5 border border-stone-200 rounded-2xl hover:border-[#3a5a3a] hover:bg-[#f5f9f5] transition-all cursor-pointer"
+            >
+              <Dumbbell size={24} className="text-[#3a5a3a]" />
+              <p className="font-medium text-stone-800">Soy usuario</p>
+              <p className="text-xs text-stone-400">
+                Quiero reservar clases de pilates
+              </p>
+            </button>
+            <button
+              onClick={() => setStep("Registrar estudio")}
+              className="flex flex-col items-center gap-2 p-5 border border-stone-200 rounded-2xl hover:border-[#3a5a3a] hover:bg-[#f5f9f5] transition-all cursor-pointer"
+            >
+              <Store size={24} className="text-[#3a5a3a]" />
+              <p className="font-medium text-stone-800">Soy dueño de estudio</p>
+              <p className="text-xs text-stone-400">
+                Quiero publicar mi estudio en PILA
+              </p>
+            </button>
+          </div>
+        )}
+
+        {/*Formulario registrar usuario*/}
+        {step === "Registrar usuario" && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-3 mb-2">
+              <ArrowLeft
+                size={20}
+                onClick={() => setStep("Crear cuenta")}
+                className="text-[#3a5a3a] cursor-pointer"
+              />
+              <p className="font-semibold text-stone-800">Nuevo usuario</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-stone-400 block mb-1.5">
+                  Nombre
+                </label>
+                <input
+                  type="text"
+                  placeholder="Valeria"
+                  className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                  value={registerUserForm.name}
+                  onChange={(e) =>
+                    setRegisterUserForm({
+                      ...registerUserForm,
+                      name: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="text-xs text-stone-400 block mb-1.5">
+                  Apellido
+                </label>
+                <input
+                  type="text"
+                  placeholder="Martínez"
+                  className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                  value={registerUserForm.last_name}
+                  onChange={(e) =>
+                    setRegisterUserForm({
+                      ...registerUserForm,
+                      last_name: e.target.value,
+                    })
+                  }
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-stone-400 block mb-1.5">
+                País
+              </label>
+              <select className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors text-stone-600">
+                <option value="México">México</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs text-stone-400 block mb-1.5">
+                Estado
+              </label>
+              <select
+                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors text-stone-600"
+                value={registerUserForm.state}
+                onChange={(e) =>
+                  setRegisterUserForm({
+                    ...registerUserForm,
+                    state: e.target.value,
+                  })
+                }
+              >
+                <option value="">Selecciona un estado</option>
+                {estados.map((estado) => (
+                  <option key={estado} value={estado}>
+                    {estado}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs text-stone-400 block mb-1.5">
+                Correo electrónico
+              </label>
+              <input
+                type="email"
+                placeholder="correo@ejemplo.com"
+                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                value={registerUserForm.email}
+                onChange={(e) =>
+                  setRegisterUserForm({
+                    ...registerUserForm,
+                    email: e.target.value,
+                  })
+                }
+              />
+            </div>
+
+            <div>
+              <label className="text-xs text-stone-400 block mb-1.5">
+                Confirmar correo electrónico
+              </label>
+              <input
+                type="email"
+                placeholder="correo@ejemplo.com"
+                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                value={registerUserForm.confirmEmail}
+                onChange={(e) =>
+                  setRegisterUserForm({
+                    ...registerUserForm,
+                    confirmEmail: e.target.value,
+                  })
+                }
+              />
+            </div>
+
+            <div>
+              <label className="text-xs text-stone-400 block mb-1.5">
+                Contraseña
+              </label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                value={registerUserForm.password}
+                onChange={(e) =>
+                  setRegisterUserForm({
+                    ...registerUserForm,
+                    password: e.target.value,
+                  })
+                }
+              />
+            </div>
+
+            <div>
+              <label className="text-xs text-stone-400 block mb-1.5">
+                Confirmar contraseña
+              </label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                value={registerUserForm.confirmPassword}
+                onChange={(e) =>
+                  setRegisterUserForm({
+                    ...registerUserForm,
+                    confirmPassword: e.target.value,
+                  })
+                }
+              />
+            </div>
+
+            <button
+              onClick={handleRegisterUser}
+              className="w-full bg-[#3a5a3a] text-white py-3 rounded-xl text-sm font-medium hover:bg-[#2e4a2e] transition-colors mt-2 cursor-pointer"
+            >
+              Crear cuenta
+            </button>
+          </div>
+        )}
+
+        {/*Formulario registrar estudio*/}
+        {step === "Registrar estudio" && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-3 mb-2">
+              <ArrowLeft
+                size={20}
+                onClick={() => setStep("Crear cuenta")}
+                className="text-[#3a5a3a] cursor-pointer"
+              />
+              <p className="font-semibold text-stone-800">Nuevo estudio</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+              {/* Columna izquierda */}
+              <div className="flex flex-col gap-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-stone-400 block mb-1.5">
+                      Nombre
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Carlos"
+                      className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                      value={registerStudioForm.name}
+                      onChange={(e) =>
+                        setRegisterStudioForm({
+                          ...registerStudioForm,
+                          name: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-stone-400 block mb-1.5">
+                      Apellido
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="García"
+                      className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                      value={registerStudioForm.last_name}
+                      onChange={(e) =>
+                        setRegisterStudioForm({
+                          ...registerStudioForm,
+                          last_name: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-stone-400 block mb-1.5">
+                    Nombre del estudio
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Mi estudio"
+                    className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                    value={registerStudioForm.studio_name}
+                    onChange={(e) =>
+                      setRegisterStudioForm({
+                        ...registerStudioForm,
+                        studio_name: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-stone-400 block mb-1.5">
+                      País
+                    </label>
+                    <select className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors text-stone-600">
+                      <option value="México">México</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-stone-400 block mb-1.5">
+                      Estado
+                    </label>
+                    <select
+                      className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors text-stone-600"
+                      value={registerStudioForm.state}
+                      onChange={(e) =>
+                        setRegisterStudioForm({
+                          ...registerStudioForm,
+                          state: e.target.value,
+                        })
+                      }
+                    >
+                      <option value="">Selecciona</option>
+                      {estados.map((estado) => (
+                        <option key={estado} value={estado}>
+                          {estado}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-stone-400 block mb-1.5">
+                    Teléfono
+                  </label>
+                  <input
+                    type="tel"
+                    placeholder="33 1234 5678"
+                    className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                    value={registerStudioForm.phone}
+                    onChange={(e) =>
+                      setRegisterStudioForm({
+                        ...registerStudioForm,
+                        phone: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+
+              {/* Columna derecha */}
+              <div className="flex flex-col gap-4">
+                <div>
+                  <label className="text-xs text-stone-400 block mb-1.5">
+                    Correo electrónico
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="correo@ejemplo.com"
+                    className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                    value={registerStudioForm.email}
+                    onChange={(e) =>
+                      setRegisterStudioForm({
+                        ...registerStudioForm,
+                        email: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-stone-400 block mb-1.5">
+                    Confirmar correo
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="correo@ejemplo.com"
+                    className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                    value={registerStudioForm.confirmEmail}
+                    onChange={(e) =>
+                      setRegisterStudioForm({
+                        ...registerStudioForm,
+                        confirmEmail: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-stone-400 block mb-1.5">
+                    Contraseña
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                    value={registerStudioForm.password}
+                    onChange={(e) =>
+                      setRegisterStudioForm({
+                        ...registerStudioForm,
+                        password: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-stone-400 block mb-1.5">
+                    Confirmar contraseña
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                    value={registerStudioForm.confirmPassword}
+                    onChange={(e) =>
+                      setRegisterStudioForm({
+                        ...registerStudioForm,
+                        confirmPassword: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={handleRegisterStudio}
+              className="block mx-auto bg-[#3a5a3a] text-white py-3 px-30 rounded-xl text-sm font-medium hover:bg-[#2e4a2e] transition-colors mt-auto cursor-pointer"
+            >
+              Crear estudio
+            </button>
+          </div>
+        )}
+
+        {/* Recuperar contraseña */}
+        {step === "Recuperar contraseña" && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-3 mb-2">
+              <ArrowLeft
+                size={20}
+                onClick={() => setStep("Iniciar sesión")}
+                className="text-[#3a5a3a] cursor-pointer"
+              />
+              <p className="font-semibold text-stone-800">
+                Recuperar contraseña
+              </p>
+            </div>
+            <div>
+              <label className="text-xs text-stone-400 block mb-1.5">
+                Correo electrónico
+              </label>
+              <input
+                type="email"
+                placeholder="correo@ejemplo.com"
+                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                value={forgotForm.email}
+                onChange={(e) =>
+                  setForgotForm({
+                    ...forgotForm,
+                    email: e.target.value,
+                  })
+                }
+              />
+            </div>
+            <button
+              onClick={handleForgotPassword}
+              className="w-full bg-[#3a5a3a] text-white py-3 rounded-xl text-sm font-medium hover:bg-[#2e4a2e] transition-colors mt-2 cursor-pointer"
+            >
+              Enviar
+            </button>
+            <p className="text-center text-xs text-stone-400">
+              Te enviaremos un enlace para restablecer tu contraseña
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default Login;
