@@ -56,8 +56,7 @@ function Explorar() {
               style={{ fontFamily: "Cormorant Garamond, serif" }}
             >
               {user.name}
-            </span>{" "}
-            🌿
+            </span>
           </h1>
           <p className="text-base text-stone-600 mt-1">
             Encuentra tu próximo espacio para moverte.

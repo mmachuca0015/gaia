@@ -178,4 +178,66 @@ router.post("/waitlist", async (req, res) => {
   }
 });
 
+//Obtenr usuario
+router.get("/:id", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM users WHERE id = $1", [
+      req.params.id,
+    ]);
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al obtener usuario" });
+  }
+});
+
+//verificar contraseña
+router.post("/verify-password", async (req, res) => {
+  try {
+    const { typedPassword, userId } = req.body;
+    const result = await pool.query(
+      "SELECT password FROM users WHERE id = $1",
+      [userId],
+    );
+    const password = result.rows[0].password;
+    const isValid = await bcrypt.compare(typedPassword, password);
+    res.json({ isValid });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al verificar contraseña" });
+  }
+});
+
+router.post("/change-email", async (req, res) => {
+  try {
+    const { newEmail, userId } = req.body;
+    const result = await pool.query(
+      "UPDATE users SET email = $1 WHERE id = $2",
+      [newEmail, userId],
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res
+      .status(500)
+      .json({ error: "Error al actualizar el correo electrónico." });
+  }
+});
+
+//Cambiar contraseña
+router.post("/change-password", async (req, res) => {
+  try {
+    const { newPassword, userId } = req.body;
+    const hashNewPassword = await bcrypt.hash(newPassword, 10);
+    const result = await pool.query(
+      "UPDATE users SET password = $1 WHERE id = $2",
+      [hashNewPassword, userId],
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al actualizar la contraseña" });
+  }
+});
+
 module.exports = router;

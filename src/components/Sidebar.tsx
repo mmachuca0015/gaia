@@ -1,5 +1,5 @@
 import { Compass, CalendarDays, User, LogOut, Heart, Bell } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 
 const navItems = [
   { icon: Compass, label: "Explorar", path: "/explorar" },
@@ -10,6 +10,7 @@ const navItems = [
 ];
 
 function Sidebar() {
+  const navigate = useNavigate();
   return (
     <aside className="w-64 h-screen bg-[#f9f4ec] flex flex-col px-4 py-8">
       {/* Logo */}
@@ -47,8 +48,12 @@ function Sidebar() {
 
       <div className="mt-auto px-3">
         <button
+          onClick={() => {
+            localStorage.clear();
+            navigate("/login");
+          }}
           className="flex items-center gap-3 w-full px-3 py-2.5 rounded-full text-sm font-medium transition-colors border 
-                border-stone-300 text-stone-400 hover:border-[#3a5a3a] hover:text-[#3a5a3a]"
+                border-stone-300 text-stone-400 hover:border-[#3a5a3a] hover:text-[#3a5a3a] cursor-pointer"
         >
           <LogOut size={18} />
           Cerrar Sesión

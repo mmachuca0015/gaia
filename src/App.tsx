@@ -10,6 +10,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import EstudioDetalle from "./pages/Dashboard/EstudioDetalle";
 import AgregarTarjeta from "./pages/Dashboard/AgregarTarjeta";
 import Favoritos from "./pages/Dashboard/Favoritos";
+import Privacidad from "./pages/Dashboard/Privacidad";
 
 function App() {
   return (
@@ -32,6 +33,7 @@ function App() {
             <Route path="/studios/:id" element={<EstudioDetalle />} />
             <Route path="/agregar-tarjeta" element={<AgregarTarjeta />} />
             <Route path="/notificaciones" element={<div>Notificaciones</div>} />
+            <Route path="/privacidad" element={<Privacidad />} />
           </Route>
         </Route>
       </Routes>

@@ -18,21 +18,22 @@ function Perfil() {
 
   const navigate = useNavigate();
 
+  const localUser = JSON.parse(localStorage.getItem("user") || "{}");
+
   const [user, setUser] = useState<User | null>(null);
   useEffect(() => {
-    fetch("http://localhost:3001/users")
+    fetch(`http://localhost:3001/users/${localUser.id}`)
       .then((res) => res.json())
-      .then((data) => setUser(data[0]));
+      .then((data) => setUser(data));
   }, []);
 
   const menuItems = [
-    { icon: Lock, label: "Privacidad", path: "perfil/privacidad" },
+    { icon: Lock, label: "Privacidad", path: "/privacidad" },
     {
       icon: CreditCard,
       label: "Agregar tarjeta",
       path: "/agregar-tarjeta",
     },
-    { icon: Bell, label: "Notificaciones", path: "perfil/notificaciones" },
     { icon: CircleQuestionMark, label: "Ayuda", path: "perfil/ayuda" },
   ];
 
