@@ -1,6 +1,20 @@
 import { Calendar, Clock } from "lucide-react";
 
-function BookingsCard({ studio_name, instructor, day, time, isPast }) {
+type BookingsCardProps = {
+  studio_name: string;
+  instructor: string;
+  day: string;
+  time: string;
+  isPast?: boolean;
+};
+
+function BookingsCard({
+  studio_name,
+  instructor,
+  day,
+  time,
+  isPast = false,
+}: BookingsCardProps) {
   return (
     <div className="bg-white rounded-2xl p-5 shadow-sm">
       <div className="flex items-center justify-between mb-1">

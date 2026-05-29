@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Lock,
   CreditCard,
@@ -9,7 +10,15 @@ import {
 } from "lucide-react";
 
 function Perfil() {
-  const [user, setUser] = useState(null);
+  type User = {
+    name: string;
+    last_name: string;
+    email: string;
+  };
+
+  const navigate = useNavigate();
+
+  const [user, setUser] = useState<User | null>(null);
   useEffect(() => {
     fetch("http://localhost:3001/users")
       .then((res) => res.json())
@@ -20,8 +29,8 @@ function Perfil() {
     { icon: Lock, label: "Privacidad", path: "perfil/privacidad" },
     {
       icon: CreditCard,
-      label: "Agregar método de pago",
-      path: "perfil/metodo-de-pago",
+      label: "Agregar tarjeta",
+      path: "/agregar-tarjeta",
     },
     { icon: Bell, label: "Notificaciones", path: "perfil/notificaciones" },
     { icon: CircleQuestionMark, label: "Ayuda", path: "perfil/ayuda" },
@@ -62,6 +71,7 @@ function Perfil() {
         {menuItems.map((item, index) => (
           <div
             key={item.label}
+            onClick={() => navigate(item.path)}
             className={`group flex items-center gap-3 px-5 py-4 hover:bg-[#3a5a3a] cursor-pointer transition-colors ${
               index !== menuItems.length - 1 ? "border-b border-stone-200" : ""
             }`}

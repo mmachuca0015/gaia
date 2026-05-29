@@ -3,7 +3,17 @@ import StudioCard from "../../components/StudioCard";
 import { Search } from "lucide-react";
 
 function Explorar() {
-  const [studios, setStudios] = useState([]);
+  type Studio = {
+    id: number;
+    name: string;
+    street: string;
+    cover_url: string;
+    is_open: boolean;
+    rating: number;
+    price_from: number;
+    neighborhood: string;
+  };
+  const [studios, setStudios] = useState<Studio[]>([]);
   useEffect(() => {
     fetch("http://localhost:3001/studios")
       .then((res) => res.json())
@@ -92,6 +102,7 @@ function Explorar() {
         {sortedStudios.map((studio) => (
           <div key={studio.id}>
             <StudioCard
+              id={studio.id}
               cover_url={studio.cover_url}
               is_open={studio.is_open}
               name={studio.name}

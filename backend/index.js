@@ -5,6 +5,7 @@ require("dotenv").config();
 const studiosRouter = require("./routes/studios");
 const bookingsRouter = require("./routes/bookings");
 const userRouter = require("./routes/users");
+const paymentsRouter = require("./routes/payments");
 
 const app = express();
 app.use(cors());
@@ -13,6 +14,7 @@ app.use(express.json());
 app.use("/studios", studiosRouter);
 app.use("/bookings", bookingsRouter);
 app.use("/users", userRouter);
+app.use("/payments", paymentsRouter);
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {

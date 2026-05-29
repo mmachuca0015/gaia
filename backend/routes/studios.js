@@ -46,4 +46,105 @@ router.post("/register-studio", async (req, res) => {
   }
 });
 
+//Ver estudio por ID
+router.get("/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query("SELECT * FROM studios WHERE id = $1", [
+      id,
+    ]);
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al obtener estudio" });
+  }
+});
+
+//Ver clases de un estudio
+router.get("/:id/clases", async (req, res) => {
+  const { id } = req.params;
+  const { day } = req.query;
+
+  try {
+    const result = await pool.query(
+      `
+      SELECT
+        classes.id AS class_id,
+        schedules.id AS schedule_id,
+        classes.name,
+        classes.instructor,
+        classes.capacity,
+        classes.price,
+        classes.studio_id,
+        schedules.day,
+        schedules.time,
+        schedules.available_spots
+      FROM classes
+      JOIN schedules ON classes.id = schedules.class_id
+      WHERE classes.studio_id = $1 AND schedules.day = $2
+      ORDER BY schedules.time ASC`,
+      [id, day],
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error al obtener clases" });
+  }
+});
+
+//Agregar estudio a favoritos
+router.post("/favorites/:id", async (req, res) => {
+  try {
+    const { userId } = req.body;
+    const result = await pool.query(
+      "INSERT INTO favorites (user_id, studio_id) VALUES ($1, $2) RETURNING *",
+      [userId, req.params.id],
+    );
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error al agregar estudio a favoritos" });
+  }
+});
+
+router.delete("/favorites/:id", async (req, res) => {
+  try {
+    const { userId } = req.body;
+    const result = await pool.query(
+      "DELETE FROM favorites WHERE user_id = $1 and studio_id = $2",
+      [userId, req.params.id],
+    );
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error al eliminar estudio de favoritos" });
+  }
+});
+
+router.get("/favorites/:userId", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `
+      SELECT
+      favorites.id,
+      favorites.user_id,
+      favorites.studio_id,
+      studios.name,
+      studios.cover_url,
+      studios.neighborhood,
+      studios.rating,
+      studios.price_from, studios.is_open
+      FROM favorites
+      JOIN studios ON studios.id = favorites.studio_id
+      WHERE favorites.user_id = $1
+      `,
+      [req.params.userId],
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error al obtener estudios favoritos" });
+  }
+});
+
 module.exports = router;

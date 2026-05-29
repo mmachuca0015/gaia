@@ -3,7 +3,17 @@ import BookingsCard from "../../components/BookingsCard";
 import { CalendarDays, Astroid } from "lucide-react";
 
 function MisClases() {
-  const [bookings, setBookings] = useState([]);
+  type Booking = {
+    status: string;
+    studio_name: string;
+    id: number;
+    day: string;
+    time: string;
+    instructor: string;
+    location: string;
+  };
+  const [bookings, setBookings] = useState<Booking[]>([]);
+
   useEffect(() => {
     fetch("http://localhost:3001/bookings")
       .then((res) => res.json())

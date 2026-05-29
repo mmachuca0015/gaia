@@ -1,10 +1,12 @@
-import { Compass, CalendarDays, User, LogOut } from "lucide-react";
+import { Compass, CalendarDays, User, LogOut, Heart, Bell } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const navItems = [
   { icon: Compass, label: "Explorar", path: "/explorar" },
   { icon: CalendarDays, label: "Mis Clases", path: "/clases" },
   { icon: User, label: "Perfil", path: "/perfil" },
+  { icon: Heart, label: "Favoritos", path: "/favoritos" },
+  { icon: Bell, label: "Notificaciones", path: "/notificaciones" },
 ];
 
 function Sidebar() {

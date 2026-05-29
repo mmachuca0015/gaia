@@ -1,13 +1,27 @@
 import { Star } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+
+type StudioCardProps = {
+  id: number;
+  cover_url: string;
+  is_open: boolean;
+  name: string;
+  rating: number;
+  price_from: number;
+  neighborhood: string;
+};
+
 function Studiocard({
+  id,
   cover_url,
   is_open,
   name,
   rating,
   price_from,
   neighborhood,
-  distance,
-}) {
+}: StudioCardProps) {
+  const navigate = useNavigate();
+
   return (
     <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
       <div className="relative">
@@ -38,7 +52,10 @@ function Studiocard({
           <span>{neighborhood}</span>
         </div>
 
-        <button className="w-full bg-[#3a5a3a] text-white text-sm py-2.5 rounded-xl hover:bg-[#2e4a2e] transition-colors cursor-pointer">
+        <button
+          onClick={() => navigate(`/studios/${id}`)}
+          className="w-full bg-[#3a5a3a] text-white text-sm py-2.5 rounded-xl hover:bg-[#2e4a2e] transition-colors cursor-pointer"
+        >
           Ver estudio
         </button>
       </div>
