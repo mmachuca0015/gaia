@@ -113,6 +113,18 @@ function EstudioDetalle() {
     });
   };
 
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    fetch(`http://localhost:3001/studios/favorites/${user.id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        const isFav = data.some(
+          (fav: { studio_id: number }) => fav.studio_id === Number(id),
+        );
+        setIsFavorite(isFav);
+      });
+  }, [id]);
+
   if (!studio) return null;
 
   return (
@@ -126,7 +138,7 @@ function EstudioDetalle() {
       <button className="absolute top-4 left-4 bg-white rounded-full p-2">
         <ArrowLeft
           className="cursor-pointer hover:text-[#2e4a2e]"
-          onClick={() => navigate("/explorar")}
+          onClick={() => navigate(-1)}
           size={18}
         />
       </button>

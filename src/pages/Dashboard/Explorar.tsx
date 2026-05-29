@@ -3,6 +3,7 @@ import StudioCard from "../../components/StudioCard";
 import { Search } from "lucide-react";
 
 function Explorar() {
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
   type Studio = {
     id: number;
     name: string;
@@ -54,7 +55,7 @@ function Explorar() {
               className="italic text-[#3a5a3a]"
               style={{ fontFamily: "Cormorant Garamond, serif" }}
             >
-              Valeria
+              {user.name}
             </span>{" "}
             🌿
           </h1>

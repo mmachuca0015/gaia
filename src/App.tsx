@@ -9,6 +9,7 @@ import Landing from "./pages/Landing";
 import ProtectedRoute from "./components/ProtectedRoute";
 import EstudioDetalle from "./pages/Dashboard/EstudioDetalle";
 import AgregarTarjeta from "./pages/Dashboard/AgregarTarjeta";
+import Favoritos from "./pages/Dashboard/Favoritos";
 
 function App() {
   return (
@@ -27,9 +28,10 @@ function App() {
             <Route path="/explorar" element={<Explorar />} />
             <Route path="/clases" element={<MisClases />} />
             <Route path="/perfil" element={<Perfil />} />
-            <Route path="/favoritos" element={<div>Favoritos</div>} />
+            <Route path="/favoritos" element={<Favoritos />} />
             <Route path="/studios/:id" element={<EstudioDetalle />} />
             <Route path="/agregar-tarjeta" element={<AgregarTarjeta />} />
+            <Route path="/notificaciones" element={<div>Notificaciones</div>} />
           </Route>
         </Route>
       </Routes>
