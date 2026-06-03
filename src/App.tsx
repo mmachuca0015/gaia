@@ -11,6 +11,10 @@ import EstudioDetalle from "./pages/Dashboard/EstudioDetalle";
 import AgregarTarjeta from "./pages/Dashboard/AgregarTarjeta";
 import Favoritos from "./pages/Dashboard/Favoritos";
 import Privacidad from "./pages/Dashboard/Privacidad";
+import OwnerLayout from "./layouts/OwnerLayout";
+import PanelControl from "./pages/Owner/PanelControl";
+import OwnerClases from "./pages/Owner/OwnerClases";
+import OwnerEstudio from "./pages/Owner/OwnerEstudio";
 
 function App() {
   return (
@@ -20,10 +24,11 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route element={<ProtectedRoute />}>
-          <Route
-            path="/panel-de-control"
-            element={<div>Panel de control</div>}
-          />
+          <Route element={<OwnerLayout />}>
+            <Route path="/panel-de-control" element={<PanelControl />} />
+            <Route path="/owner/clases" element={<OwnerClases />} />
+            <Route path="/owner/estudio" element={<OwnerEstudio />} />
+          </Route>
 
           <Route element={<DashboardLayout />}>
             <Route path="/explorar" element={<Explorar />} />

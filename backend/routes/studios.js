@@ -147,4 +147,46 @@ router.get("/favorites/:userId", async (req, res) => {
   }
 });
 
+// Obtener estudio por owner_id
+router.get("/owner/:ownerId", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM studios WHERE owner_id = $1",
+      [req.params.ownerId],
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al obtener estudio" });
+  }
+});
+
+//Obtener las clases de hoy
+router.get("/:id/clases-hoy", async (req, res) => {
+  try {
+    const today = new Date().getDay();
+    const result = await pool.query(
+      `
+      SELECT
+        classes.id AS class_id,
+        schedules.id AS schedule_id,
+        classes.name,
+        classes.instructor,
+        classes.price,
+        schedules.time,
+        schedules.available_spots,
+        classes.capacity
+      FROM classes
+      JOIN schedules ON classes.id = schedules.class_id
+      WHERE classes.studio_id = $1 AND schedules.day = $2
+      ORDER BY schedules.time ASC`,
+      [req.params.id, today],
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al obtener clases de hoy" });
+  }
+});
+
 module.exports = router;
