@@ -30,12 +30,10 @@ function PanelControl() {
 
   const [studio, setStudio] = useState<Studio | null>(null);
   useEffect(() => {
-    console.log("owner.id:", owner.id);
     fetch(`http://localhost:3001/studios/owner/${owner.id}`)
       .then((res) => res.json())
       .then((data) => {
         setStudio(data);
-        console.log(data);
       });
   }, []);
 

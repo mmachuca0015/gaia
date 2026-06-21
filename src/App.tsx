@@ -15,6 +15,8 @@ import OwnerLayout from "./layouts/OwnerLayout";
 import PanelControl from "./pages/Owner/PanelControl";
 import OwnerClases from "./pages/Owner/OwnerClases";
 import OwnerEstudio from "./pages/Owner/OwnerEstudio";
+import OwnerInstructores from "./pages/Owner/OwnerInstructors";
+import OwnerEstudioGeneral from "./pages/Owner/OwnerEstudioGeneral";
 
 function App() {
   return (
@@ -27,7 +29,12 @@ function App() {
           <Route element={<OwnerLayout />}>
             <Route path="/panel-de-control" element={<PanelControl />} />
             <Route path="/owner/clases" element={<OwnerClases />} />
+            <Route path="/owner/instructores" element={<OwnerInstructores />} />
             <Route path="/owner/estudio" element={<OwnerEstudio />} />
+            <Route
+              path="/owner/estudio/general"
+              element={<OwnerEstudioGeneral />}
+            />
           </Route>
 
           <Route element={<DashboardLayout />}>

@@ -1,4 +1,10 @@
-import { LayoutDashboard, CalendarDays, Store, LogOut } from "lucide-react";
+import {
+  LayoutDashboard,
+  CalendarDays,
+  Store,
+  LogOut,
+  Users,
+} from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 
 function OwnerSidebar() {
@@ -10,8 +16,9 @@ function OwnerSidebar() {
       label: "Panel de Control",
       path: "/panel-de-control",
     },
-    { icon: CalendarDays, label: "Clases", path: "/clases" },
-    { icon: Store, label: "Estudio", path: "/estudio" },
+    { icon: CalendarDays, label: "Clases", path: "/owner/clases" },
+    { icon: Users, label: "Instructores", path: "/owner/instructores" },
+    { icon: Store, label: "Estudio", path: "/owner/estudio" },
   ];
 
   return (
