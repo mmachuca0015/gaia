@@ -20,3 +20,23 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en puerto ${PORT}`);
 });
+
+const cron = require("node-cron");
+
+// Corre cada hora
+cron.schedule("0 * * * *", async () => {
+  try {
+    await pool.query(`
+      UPDATE bookings SET status = 'pasada'
+      WHERE status = 'activa'
+      AND schedule_id IN (
+        SELECT schedules.id FROM schedules
+        WHERE schedules.day = EXTRACT(DOW FROM NOW())
+        AND schedules.time < NOW()::time
+      )
+    `);
+    console.log("Bookings actualizadas");
+  } catch (err) {
+    console.error("Error en cron:", err);
+  }
+});

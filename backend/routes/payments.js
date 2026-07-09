@@ -2,6 +2,7 @@ const express = require("express");
 const pool = require("../db");
 const router = express.Router();
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const resend = require("resend");
 
 router.post("/create-payment-intent", async (req, res) => {
   const { amount } = req.body;
@@ -112,6 +113,13 @@ router.post("/charge", async (req, res) => {
   const { userId, scheduleId, amount } = req.body;
 
   try {
+    // Obtener stripe_account_id del estudio
+    const studioResult = await pool.query(
+      "SELECT stripe_account_id FROM studios WHERE id = (SELECT studio_id FROM classes WHERE id = (SELECT class_id FROM schedules WHERE id = $1))",
+      [scheduleId],
+    );
+    const stripeAccountId = studioResult.rows[0]?.stripe_account_id;
+
     // Obtener stripe_customer_id del usuario
     const userResult = await pool.query(
       "SELECT stripe_customer_id FROM users WHERE id = $1",
@@ -126,6 +134,9 @@ router.post("/charge", async (req, res) => {
     });
     const paymentMethodId = paymentMethods.data[0].id;
 
+    // Calcular comisión de PILA
+    const pilaCommission = Math.round(amount * 100 * 0.036);
+
     // Cobrar al customer
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amount * 100,
@@ -134,6 +145,10 @@ router.post("/charge", async (req, res) => {
       payment_method: paymentMethodId,
       confirm: true,
       off_session: true,
+      transfer_data: {
+        destination: stripeAccountId,
+        amount: amount * 100 - pilaCommission,
+      },
     });
 
     // Crear booking en la base de datos
@@ -142,6 +157,61 @@ router.post("/charge", async (req, res) => {
       [userId, scheduleId],
     );
 
+    // Obtener datos del usuario y la clase
+    const emailData = await pool.query(
+      `
+  SELECT 
+    users.name,
+    users.email,
+    classes.name AS class_name,
+    COALESCE(instructors.name || ' ' || instructors.last_name, classes.instructor) AS instructor,
+    CASE schedules.day
+      WHEN 0 THEN 'Domingo'
+      WHEN 1 THEN 'Lunes'
+      WHEN 2 THEN 'Martes'
+      WHEN 3 THEN 'Miércoles'
+      WHEN 4 THEN 'Jueves'
+      WHEN 5 THEN 'Viernes'
+      WHEN 6 THEN 'Sábado'
+    END AS day,
+    schedules.time,
+    studios.name AS studio_name,
+    classes.price
+  FROM users
+  JOIN bookings ON bookings.user_id = users.id
+  JOIN schedules ON bookings.schedule_id = schedules.id
+  JOIN classes ON schedules.class_id = classes.id
+  JOIN studios ON classes.studio_id = studios.id
+  LEFT JOIN instructors ON classes.instructor_id = instructors.id
+  WHERE users.id = $1
+  ORDER BY bookings.created_at DESC
+  LIMIT 1
+`,
+      [userId],
+    );
+
+    const booking = emailData.rows[0];
+
+    await resend.emails.send({
+      from: "PILA <onboarding@resend.dev>",
+      to: booking.email,
+      subject: "¡Reserva confirmada!",
+      html: `
+    <h2>¡Hola ${booking.name}!</h2>
+    <p>Tu reserva ha sido confirmada.</p>
+    <p><strong>Clase:</strong> ${booking.class_name}</p>
+    <p><strong>Instructor:</strong> ${booking.instructor}</p>
+    <p><strong>Estudio:</strong> ${booking.studio_name}</p>
+    <p><strong>Día:</strong> ${booking.day}</p>
+    <p><strong>Hora:</strong> ${booking.time.slice(0, 5)}</p>
+    <p><strong>Total pagado:</strong> $${booking.price} MXN</p>
+    <br>
+    <p>¡Nos vemos en clase!</p>
+    <p>El equipo de PILA</p>
+  `,
+    });
+
+    // Restar lugar disponible
     await pool.query(
       "UPDATE schedules SET available_spots = available_spots - 1 WHERE id = $1",
       [scheduleId],
@@ -151,6 +221,40 @@ router.post("/charge", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Error al procesar el pago" });
+  }
+});
+
+router.post("/create-connect-account", async (req, res) => {
+  const { studioId } = req.body;
+  try {
+    // Crear cuenta de Stripe Connect
+    const account = await stripe.accounts.create({
+      type: "express",
+      country: "MX",
+      capabilities: {
+        card_payments: { requested: true },
+        transfers: { requested: true },
+      },
+    });
+
+    // Guardar el account_id en la base de datos
+    await pool.query(
+      "UPDATE studios SET stripe_account_id = $1 WHERE id = $2",
+      [account.id, studioId],
+    );
+
+    // Generar link de onboarding
+    const accountLink = await stripe.accountLinks.create({
+      account: account.id,
+      refresh_url: "http://localhost:5173/owner/estudio/pagos",
+      return_url: "http://localhost:5173/owner/estudio/pagos",
+      type: "account_onboarding",
+    });
+
+    res.json({ url: accountLink.url });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al crear cuenta de Stripe" });
   }
 });
 

@@ -20,11 +20,11 @@ function OwnerEstudio() {
       path: "/owner/estudio/pagos",
     },
     { icon: Lock, label: "Seguridad", path: "/owner/estudio/seguridad" },
-    {
-      icon: CircleQuestionMark,
-      label: "Preguntas frecuentes",
-      path: "/owner/estudio/preguntas-frecuentes",
-    },
+    //   {
+    //     icon: CircleQuestionMark,
+    //     label: "Preguntas frecuentes",
+    //     path: "/owner/estudio/preguntas-frecuentes",
+    //   },
   ];
 
   //Obtener datos del estudio

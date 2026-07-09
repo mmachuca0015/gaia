@@ -32,32 +32,35 @@ function PanelControl() {
   useEffect(() => {
     fetch(`http://localhost:3001/studios/owner/${owner.id}`)
       .then((res) => res.json())
-      .then((data) => {
-        setStudio(data);
-      });
+      .then((data) => setStudio(data));
   }, []);
 
+  const [ingresos, setIngresos] = useState({ total: 0, reservas: 0 });
   const [activeFilter, setActiveFilter] = useState<
     "hoy" | "semana" | "mes" | "semestral"
   >("hoy");
-  const chartData = {
-    hoy: {
-      labels: ["8am", "10am", "12pm", "2pm", "4pm", "6pm"],
-      data: [320, 320, 0, 0, 320, 320],
-    },
-    semana: {
-      labels: ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"],
-      data: [960, 640, 1280, 320, 960, 1600, 480],
-    },
-    mes: {
-      labels: ["S1", "S2", "S3", "S4"],
-      data: [8960, 11200, 9600, 12800],
-    },
-    semestral: {
-      labels: ["Ene", "Feb", "Mar", "Abr", "May", "Jun"],
-      data: [32000, 28000, 38400, 41600, 35200, 44800],
-    },
-  };
+
+  useEffect(() => {
+    if (!studio?.id) return;
+    fetch(
+      `http://localhost:3001/studios/${studio.id}/ingresos?period=${activeFilter}`,
+    )
+      .then((res) => res.json())
+      .then((data) => setIngresos(data));
+  }, [studio, activeFilter]);
+
+  const [graficaData, setGraficaData] = useState<
+    { periodo: string; total: number }[]
+  >([]);
+
+  useEffect(() => {
+    if (!studio?.id) return;
+    fetch(
+      `http://localhost:3001/studios/${studio.id}/ingresos-grafica?period=${activeFilter}`,
+    )
+      .then((res) => res.json())
+      .then((data) => setGraficaData(data));
+  }, [studio, activeFilter]);
 
   //Obtener clases del día de hoy
   type TodayClass = {
@@ -84,6 +87,15 @@ function PanelControl() {
     console.log(studio);
   }, [studio]);
 
+  const [actividad, setActividad] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!studio?.id) return;
+    fetch(`http://localhost:3001/studios/${studio.id}/actividad-reciente`)
+      .then((res) => res.json())
+      .then((data) => setActividad(data));
+  }, [studio]);
+
   return (
     <div>
       <div className="p-4 md:p-8">
@@ -107,14 +119,14 @@ function PanelControl() {
           {/* Columna izquierda */}
           <div className="flex flex-col gap-4">
             {/* Ingresos y clases de hoy, calificación*/}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div className="bg-white rounded-2xl p-5 text-center">
                 <p className="text-xl text-stone-600 mb-1">Ingresos hoy</p>
                 <p
                   className="text-5xl font-semibold text-stone-800"
                   style={{ fontFamily: "Cormorant Garamond, serif" }}
                 >
-                  $1,280
+                  ${Number(ingresos.total || 0).toLocaleString()}
                 </p>
               </div>
               <div className="bg-white rounded-2xl p-5 text-center">
@@ -123,13 +135,14 @@ function PanelControl() {
                   className="text-5xl font-semibold text-stone-800"
                   style={{ fontFamily: "Cormorant Garamond, serif" }}
                 >
-                  3
+                  {todayClasses.length}
                 </p>
                 <p className="text-md text-stone-600 mt-3">
-                  2 con lugares disponibles
+                  {todayClasses.filter((c) => c.available_spots > 0).length} con
+                  lugares disponibles
                 </p>
               </div>
-              <div className="bg-white rounded-2xl p-5 text-center">
+              {/* <div className="bg-white rounded-2xl p-5 text-center">
                 <p className="text-xl text-stone-600 mb-1">Calificación</p>
                 <div className="flex justify-center items-center gap-2">
                   <p
@@ -141,7 +154,7 @@ function PanelControl() {
                   <Star size={25} className="text-[#3a5a3a] fill-[#3a5a3a]" />
                 </div>
                 <p className="text-md text-stone-600 mt-1">128 reseñas</p>
-              </div>
+              </div> */}
             </div>
             {/* Ingresos */}
             <div className="bg-white rounded-2xl p-5">
@@ -180,10 +193,7 @@ function PanelControl() {
                   className="text-5xl font-semibold text-stone-800"
                   style={{ fontFamily: "Cormorant Garamond, serif" }}
                 >
-                  $
-                  {chartData[activeFilter].data
-                    .reduce((a, b) => a + b, 0)
-                    .toLocaleString()}
+                  ${Number(ingresos.total || 0).toLocaleString()}
                 </p>
               </div>
 
@@ -191,10 +201,10 @@ function PanelControl() {
               <div style={{ height: "300px", width: "100%" }}>
                 <Line
                   data={{
-                    labels: chartData[activeFilter].labels,
+                    labels: graficaData.map((d) => String(d.periodo)),
                     datasets: [
                       {
-                        data: chartData[activeFilter].data,
+                        data: graficaData.map((d) => Number(d.total)),
                         borderColor: "#3a5a3a",
                         backgroundColor: "rgba(58,90,58,0.08)",
                         fill: true,
@@ -268,7 +278,7 @@ function PanelControl() {
                     >
                       {clase.available_spots === 0
                         ? "Lleno"
-                        : `${clase.capacity - clase.available_spots}/${clase.capacity} lugares`}
+                        : `${clase.available_spots}/${clase.capacity} lugares`}
                     </span>
                   </div>
                 ))}
@@ -277,73 +287,46 @@ function PanelControl() {
           </div>
           {/* Columna derecha */}
           <div className="bg-white rounded-2xl p-5 h-fit">
-            <p className="text-xl font-semibold text-stone-800 mb-4">
+            <p className="font-semibold text-stone-800 border-b border-stone-100 pb-4 mb-4">
               Actividad reciente
             </p>
             <ul className="flex flex-col gap-4">
-              <li className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-[#e8f0e8] flex items-center justify-center flex-shrink-0">
-                  <CalendarCheck size={15} className="text-[#3a5a3a]" />
-                </div>
-                <div>
-                  <p className="text-md text-stone-800">
-                    <span className="font-medium">Valeria M.</span> reservó
-                    Reformer Power
-                  </p>
-                  <p className="text-md text-stone-600">Sábado · 07:30</p>
-                  <p className="text-md text-stone-400">hace 5 min</p>
-                </div>
-              </li>
-              <li className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-[#faeeda] flex items-center justify-center flex-shrink-0">
-                  <Heart size={15} className="text-amber-700" />
-                </div>
-                <div>
-                  <p className="text-md text-stone-800">
-                    <span className="font-medium">Carlos R.</span> agregó tu
-                    estudio a favoritos
-                  </p>
-                  <p className="text-md text-stone-400">hace 18 min</p>
-                </div>
-              </li>
-              <li className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-[#e8f0e8] flex items-center justify-center flex-shrink-0">
-                  <CalendarCheck size={15} className="text-[#3a5a3a]" />
-                </div>
-                <div>
-                  <p className="text-md text-stone-800">
-                    <span className="font-medium">Ana P.</span> reservó Barre
-                    Classic
-                  </p>
-                  <p className="text-md text-stone-600">Sábado · 10:00</p>
-                  <p className="text-md text-stone-400">hace 32 min</p>
-                </div>
-              </li>
-              <li className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-[#e8f0e8] flex items-center justify-center flex-shrink-0">
-                  <CalendarCheck size={15} className="text-[#3a5a3a]" />
-                </div>
-                <div>
-                  <p className="text-md text-stone-800">
-                    <span className="font-medium">María L.</span> reservó Mat
-                    Flow
-                  </p>
-                  <p className="text-md text-stone-600">Sábado · 18:00</p>
-                  <p className="text-md text-stone-400">hace 1 hora</p>
-                </div>
-              </li>
-              <li className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-[#faeeda] flex items-center justify-center flex-shrink-0">
-                  <Star size={15} className="text-amber-700" />
-                </div>
-                <div>
-                  <p className="text-md text-stone-800">
-                    <span className="font-medium">Sofía H.</span> dejó una
-                    reseña de 5 estrellas
-                  </p>
-                  <p className="text-md text-stone-400">hace 2 horas</p>
-                </div>
-              </li>
+              {actividad.map((item, index) => (
+                <li
+                  key={index}
+                  className="flex items-start gap-3 border-b border-stone-100 last:border-0 pb-4"
+                >
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      item.tipo === "reserva" ? "bg-[#e8f0e8]" : "bg-[#faeeda]"
+                    }`}
+                  >
+                    {item.tipo === "reserva" ? (
+                      <CalendarCheck size={15} className="text-[#3a5a3a]" />
+                    ) : (
+                      <Heart size={15} className="text-amber-700" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-md text-stone-800">
+                      <span className="font-medium">
+                        {item.name} {item.last_name}
+                      </span>
+                      {item.tipo === "reserva"
+                        ? ` reservó ${item.class_name}`
+                        : ` agregó tu estudio a favoritos`}
+                    </p>
+                    <p className="text-md text-stone-400">
+                      {new Date(item.created_at).toLocaleDateString("es-MX", {
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
+                </li>
+              ))}
             </ul>
           </div>
         </div>

@@ -17,6 +17,8 @@ import OwnerClases from "./pages/Owner/OwnerClases";
 import OwnerEstudio from "./pages/Owner/OwnerEstudio";
 import OwnerInstructores from "./pages/Owner/OwnerInstructors";
 import OwnerEstudioGeneral from "./pages/Owner/OwnerEstudioGeneral";
+import OwnerEstudioPagos from "./pages/Owner/OwnerEstudioPagos";
+import OwnerEstudioSeguridad from "./pages/Owner/OwnerEstudioSeguridad";
 
 function App() {
   return (
@@ -34,6 +36,14 @@ function App() {
             <Route
               path="/owner/estudio/general"
               element={<OwnerEstudioGeneral />}
+            />
+            <Route
+              path="/owner/estudio/pagos"
+              element={<OwnerEstudioPagos />}
+            />
+            <Route
+              path="/owner/estudio/seguridad"
+              element={<OwnerEstudioSeguridad />}
             />
           </Route>
 

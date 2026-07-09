@@ -462,4 +462,140 @@ longitude = CASE WHEN $14::float IS NOT NULL AND $14::float != 0 THEN $14::float
   }
 });
 
+router.get("/:id/ingresos", async (req, res) => {
+  const { id } = req.params;
+  const { period } = req.query;
+
+  let dateFilter = "";
+  if (period === "hoy") dateFilter = "AND bookings.created_at >= CURRENT_DATE";
+  else if (period === "semana")
+    dateFilter = "AND bookings.created_at >= CURRENT_DATE - INTERVAL '7 days'";
+  else if (period === "mes")
+    dateFilter = "AND bookings.created_at >= CURRENT_DATE - INTERVAL '1 month'";
+  else if (period === "semestral")
+    dateFilter =
+      "AND bookings.created_at >= CURRENT_DATE - INTERVAL '6 months'";
+
+  try {
+    const result = await pool.query(
+      `
+      SELECT 
+        SUM(classes.price) AS total,
+        COUNT(bookings.id) AS reservas
+      FROM bookings
+      JOIN schedules ON bookings.schedule_id = schedules.id
+      JOIN classes ON schedules.class_id = classes.id
+      WHERE classes.studio_id = $1
+      AND bookings.status = 'activa'
+      ${dateFilter}
+    `,
+      [id],
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al obtener ingresos" });
+  }
+});
+
+router.get("/:id/ingresos-grafica", async (req, res) => {
+  const { id } = req.params;
+  const { period } = req.query;
+
+  let groupBy = "";
+  let dateFilter = "";
+
+  if (period === "hoy") {
+    groupBy = "EXTRACT(HOUR FROM bookings.created_at)";
+    dateFilter = "AND bookings.created_at >= CURRENT_DATE";
+  } else if (period === "semana") {
+    groupBy = "DATE(bookings.created_at)";
+    dateFilter = "AND bookings.created_at >= CURRENT_DATE - INTERVAL '7 days'";
+  } else if (period === "mes") {
+    groupBy = "DATE_TRUNC('week', bookings.created_at)";
+    dateFilter = "AND bookings.created_at >= CURRENT_DATE - INTERVAL '1 month'";
+  } else if (period === "semestral") {
+    groupBy = "DATE_TRUNC('month', bookings.created_at)";
+    dateFilter =
+      "AND bookings.created_at >= CURRENT_DATE - INTERVAL '6 months'";
+  }
+
+  try {
+    const result = await pool.query(
+      `
+      SELECT 
+        ${groupBy} AS periodo,
+        SUM(classes.price) AS total
+      FROM bookings
+      JOIN schedules ON bookings.schedule_id = schedules.id
+      JOIN classes ON schedules.class_id = classes.id
+      WHERE classes.studio_id = $1
+      AND bookings.status = 'activa'
+      ${dateFilter}
+      GROUP BY periodo
+      ORDER BY periodo ASC
+    `,
+      [id],
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al obtener datos de gráfica" });
+  }
+});
+
+router.get("/:id/actividad-reciente", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const reservas = await pool.query(
+      `
+      SELECT 
+        users.name,
+        users.last_name,
+        classes.name AS class_name,
+        schedules.day,
+        schedules.time,
+        bookings.created_at,
+        'reserva' AS tipo
+      FROM bookings
+      JOIN schedules ON bookings.schedule_id = schedules.id
+      JOIN classes ON schedules.class_id = classes.id
+      JOIN users ON bookings.user_id = users.id
+      WHERE classes.studio_id = $1
+      ORDER BY bookings.created_at DESC
+      LIMIT 5
+    `,
+      [id],
+    );
+
+    const favoritos = await pool.query(
+      `
+      SELECT 
+        users.name,
+        users.last_name,
+        favorites.created_at,
+        'favorito' AS tipo
+      FROM favorites
+      JOIN users ON favorites.user_id = users.id
+      WHERE favorites.studio_id = $1
+      ORDER BY favorites.created_at DESC
+      LIMIT 5
+    `,
+      [id],
+    );
+
+    const actividad = [...reservas.rows, ...favoritos.rows]
+      .sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      )
+      .slice(0, 8);
+
+    res.json(actividad);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al obtener actividad reciente" });
+  }
+});
+
 module.exports = router;

@@ -6,7 +6,7 @@ const navItems = [
   { icon: CalendarDays, label: "Mis Clases", path: "/clases" },
   { icon: User, label: "Perfil", path: "/perfil" },
   { icon: Heart, label: "Favoritos", path: "/favoritos" },
-  { icon: Bell, label: "Notificaciones", path: "/notificaciones" },
+  // { icon: Bell, label: "Notificaciones", path: "/notificaciones" },
 ];
 
 function Sidebar() {

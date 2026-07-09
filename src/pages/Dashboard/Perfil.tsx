@@ -34,11 +34,11 @@ function Perfil() {
       label: "Agregar tarjeta",
       path: "/agregar-tarjeta",
     },
-    {
-      icon: CircleQuestionMark,
-      label: "Preguntas frecuentes",
-      path: "/preguntas-frecuentes",
-    },
+    // {
+    //   icon: CircleQuestionMark,
+    //   label: "Preguntas frecuentes",
+    //   path: "/preguntas-frecuentes",
+    // },
   ];
 
   const initials = user ? `${user.name[0]}${user.last_name[0]}` : "";

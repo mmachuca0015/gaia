@@ -240,4 +240,67 @@ router.post("/change-password", async (req, res) => {
   }
 });
 
+router.get("/studio-owner/:id", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT id, name, last_name, email FROM studio_owners WHERE id = $1",
+      [req.params.id],
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al obtener dueño" });
+  }
+});
+
+// Verificar contraseña del dueño
+router.post("/verify-owner-password", async (req, res) => {
+  try {
+    const { typedPassword, userId } = req.body;
+    const result = await pool.query(
+      "SELECT password FROM studio_owners WHERE id = $1",
+      [userId],
+    );
+    const isValid = await bcrypt.compare(
+      typedPassword,
+      result.rows[0].password,
+    );
+    res.json({ isValid });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al verificar contraseña" });
+  }
+});
+
+// Cambiar correo del dueño
+router.post("/change-owner-email", async (req, res) => {
+  try {
+    const { newEmail, userId } = req.body;
+    await pool.query("UPDATE studio_owners SET email = $1 WHERE id = $2", [
+      newEmail,
+      userId,
+    ]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al actualizar correo" });
+  }
+});
+
+// Cambiar contraseña del dueño
+router.post("/change-owner-password", async (req, res) => {
+  try {
+    const { newPassword, userId } = req.body;
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await pool.query("UPDATE studio_owners SET password = $1 WHERE id = $2", [
+      hashedPassword,
+      userId,
+    ]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al actualizar contraseña" });
+  }
+});
+
 module.exports = router;

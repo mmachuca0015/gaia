@@ -164,10 +164,10 @@ function EstudioDetalle() {
           {studio.name}
         </h1>
         <div className="flex items-center gap-3 mt-1 text-sm">
-          <div className="flex items-center gap-1">
+          {/* <div className="flex items-center gap-1">
             <Star size={14} className="fill-white" />
             <span>{studio.rating}</span>
-          </div>
+          </div> */}
           <div className="flex items-center gap-1">
             <MapPin size={14} />
             <span>0.8 km</span>
