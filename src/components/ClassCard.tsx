@@ -10,6 +10,8 @@ type ClassCardProps = {
   price: number;
   schedule_id: number;
   onReservaExitosa: () => void;
+  classDate: string;
+  alreadyBooked: boolean;
 };
 
 function ClassCard({
@@ -20,6 +22,8 @@ function ClassCard({
   price,
   schedule_id,
   onReservaExitosa,
+  classDate,
+  alreadyBooked,
 }: ClassCardProps) {
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(":");
@@ -58,6 +62,7 @@ function ClassCard({
         userId: user.id,
         scheduleId: schedule_id,
         amount: price,
+        classDate: classDate,
       }),
     });
 
@@ -113,10 +118,14 @@ function ClassCard({
       {/* Botón */}
       <button
         onClick={handleReservar}
-        disabled={availablePlaces === 0}
-        className="bg-[#3a5a3a] text-white text-md px-4 py-2.5 rounded-xl hover:bg-[#2e4a2e] transition-colors cursor-pointer whitespace-nowrap"
+        disabled={availablePlaces === 0 || alreadyBooked}
+        className={`... ${availablePlaces === 0 || alreadyBooked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
       >
-        {availablePlaces === 0 ? "Lleno" : "Reservar ahora"}
+        {availablePlaces === 0
+          ? "Lleno"
+          : alreadyBooked
+            ? "Ya reservaste"
+            : "Reservar ahora"}
       </button>
 
       {/* Popup para agregar tarjeta */}

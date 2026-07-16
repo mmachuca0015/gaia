@@ -3,10 +3,13 @@ const router = express.Router();
 const pool = require("../db");
 
 router.get("/", async (req, res) => {
+  const { userId } = req.query;
   try {
-    const result = await pool.query(`
+    const result = await pool.query(
+      `
       SELECT
         bookings.id,
+        bookings.schedule_id,
         bookings.status,
         studios.name AS studio_name,
         COALESCE(instructors.name || ' ' || instructors.last_name, classes.instructor) AS instructor,
@@ -25,9 +28,11 @@ router.get("/", async (req, res) => {
       JOIN classes ON schedules.class_id = classes.id
       JOIN studios ON classes.studio_id = studios.id
       LEFT JOIN instructors ON classes.instructor_id = instructors.id
-      WHERE bookings.user_id = 1
+      WHERE bookings.user_id = $1
       ORDER BY bookings.id ASC
-    `);
+    `,
+      [userId],
+    );
     res.json(result.rows);
   } catch (err) {
     console.error(err);

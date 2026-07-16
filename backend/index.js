@@ -22,8 +22,8 @@ app.listen(PORT, () => {
 });
 
 const cron = require("node-cron");
+const pool = require("./db");
 
-// Corre cada hora
 cron.schedule("0 * * * *", async () => {
   try {
     await pool.query(`

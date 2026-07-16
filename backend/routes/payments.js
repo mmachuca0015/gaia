@@ -2,7 +2,8 @@ const express = require("express");
 const pool = require("../db");
 const router = express.Router();
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-const resend = require("resend");
+const { Resend } = require("resend");
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 router.post("/create-payment-intent", async (req, res) => {
   const { amount } = req.body;
@@ -110,7 +111,7 @@ router.delete("/card/:customerId", async (req, res) => {
 });
 
 router.post("/charge", async (req, res) => {
-  const { userId, scheduleId, amount } = req.body;
+  const { userId, scheduleId, amount, classDate } = req.body;
 
   try {
     // Obtener stripe_account_id del estudio
@@ -126,6 +127,17 @@ router.post("/charge", async (req, res) => {
       [userId],
     );
     const customerId = userResult.rows[0].stripe_customer_id;
+
+    const existingBooking = await pool.query(
+      "SELECT id FROM bookings WHERE user_id = $1 AND schedule_id = $2 AND class_date = $3 AND status = 'activa'",
+      [userId, scheduleId, classDate],
+    );
+
+    if (existingBooking.rows.length > 0) {
+      return res
+        .status(400)
+        .json({ error: "Ya tienes una reserva para esta clase" });
+    }
 
     // Obtener el payment method del customer
     const paymentMethods = await stripe.paymentMethods.list({
@@ -153,8 +165,14 @@ router.post("/charge", async (req, res) => {
 
     // Crear booking en la base de datos
     await pool.query(
-      "INSERT INTO bookings (user_id, schedule_id, status) VALUES ($1, $2, 'activa')",
-      [userId, scheduleId],
+      "INSERT INTO bookings (user_id, schedule_id, status, class_date) VALUES ($1, $2, 'activa', $3)",
+      [userId, scheduleId, classDate],
+    );
+
+    // Restar lugar disponible
+    await pool.query(
+      "UPDATE schedules SET available_spots = available_spots - 1 WHERE id = $1",
+      [scheduleId],
     );
 
     // Obtener datos del usuario y la clase
@@ -192,11 +210,12 @@ router.post("/charge", async (req, res) => {
 
     const booking = emailData.rows[0];
 
-    await resend.emails.send({
-      from: "PILA <onboarding@resend.dev>",
-      to: booking.email,
-      subject: "¡Reserva confirmada!",
-      html: `
+    try {
+      await resend.emails.send({
+        from: "PILA <onboarding@resend.dev>",
+        to: booking.email,
+        subject: "¡Reserva confirmada!",
+        html: `
     <h2>¡Hola ${booking.name}!</h2>
     <p>Tu reserva ha sido confirmada.</p>
     <p><strong>Clase:</strong> ${booking.class_name}</p>
@@ -209,13 +228,10 @@ router.post("/charge", async (req, res) => {
     <p>¡Nos vemos en clase!</p>
     <p>El equipo de PILA</p>
   `,
-    });
-
-    // Restar lugar disponible
-    await pool.query(
-      "UPDATE schedules SET available_spots = available_spots - 1 WHERE id = $1",
-      [scheduleId],
-    );
+      });
+    } catch (error) {
+      console.error("Error enviando email:", error);
+    }
 
     res.json({ message: "Pago exitoso", paymentIntentId: paymentIntent.id });
   } catch (err) {

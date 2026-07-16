@@ -125,7 +125,28 @@ function EstudioDetalle() {
       });
   }, [id]);
 
+  const getSelectedDate = () => {
+    const today = new Date();
+    const date = new Date(today);
+    date.setDate(
+      today.getDate() - today.getDay() + selectedDay + weekOffset * 7,
+    );
+    return date.toISOString().split("T")[0];
+  };
+
+  const [userBookings, setUserBookings] = useState<number[]>([]);
+
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    fetch(`http://localhost:3001/bookings?userId=${user.id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setUserBookings(data.map((b: any) => b.schedule_id));
+      });
+  }, []);
+
   if (!studio) return null;
+  console.log(userBookings);
 
   return (
     <div className="relative h-72 w-full">
@@ -246,6 +267,8 @@ function EstudioDetalle() {
                 price={classItem.price}
                 schedule_id={classItem.schedule_id}
                 onReservaExitosa={() => fetchClases()}
+                classDate={getSelectedDate() ?? ""}
+                alreadyBooked={userBookings.includes(classItem.schedule_id)}
               />
             ))}
           </div>

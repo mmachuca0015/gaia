@@ -14,8 +14,9 @@ function MisClases() {
   };
   const [bookings, setBookings] = useState<Booking[]>([]);
 
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
   useEffect(() => {
-    fetch("http://localhost:3001/bookings")
+    fetch(`http://localhost:3001/bookings?userId=${user.id}`)
       .then((res) => res.json())
       .then((data) => setBookings(data));
   }, []);

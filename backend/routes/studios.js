@@ -598,4 +598,68 @@ router.get("/:id/actividad-reciente", async (req, res) => {
   }
 });
 
+router.get("/:id/reservas", async (req, res) => {
+  const { id } = req.params;
+  const { type } = req.query; // 'proximas' o 'pasadas'
+
+  try {
+    const result = await pool.query(
+      `
+      SELECT 
+        schedules.id AS schedule_id,
+        classes.name AS class_name,
+        COALESCE(instructors.name || ' ' || instructors.last_name, classes.instructor) AS instructor,
+        classes.capacity,
+        schedules.time,
+        bookings.class_date,
+        COUNT(bookings.id) AS reservas_count,
+        classes.capacity - COUNT(bookings.id) AS available_spots
+      FROM schedules
+      JOIN classes ON schedules.class_id = classes.id
+      LEFT JOIN instructors ON classes.instructor_id = instructors.id
+      JOIN bookings ON bookings.schedule_id = schedules.id
+      WHERE classes.studio_id = $1
+      AND bookings.status = $2
+      AND bookings.class_date ${type === "proximas" ? ">= CURRENT_DATE" : "< CURRENT_DATE AND bookings.class_date >= CURRENT_DATE - INTERVAL '1 month'"}
+      GROUP BY schedules.id, classes.name, instructors.name, instructors.last_name, classes.instructor, classes.capacity, schedules.time, bookings.class_date
+      ORDER BY bookings.class_date ASC
+    `,
+      [id, type === "proximas" ? "activa" : "pasada"],
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al obtener reservas" });
+  }
+});
+
+router.get("/:id/reservas/:scheduleId/usuarios", async (req, res) => {
+  const { scheduleId } = req.params;
+  const { classDate } = req.query;
+
+  try {
+    const result = await pool.query(
+      `
+      SELECT 
+        users.name,
+        users.last_name,
+        users.email
+      FROM bookings
+      JOIN users ON bookings.user_id = users.id
+      WHERE bookings.schedule_id = $1
+      AND bookings.class_date = $2
+      AND bookings.status = 'activa'
+      ORDER BY users.name ASC
+    `,
+      [scheduleId, classDate],
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al obtener usuarios" });
+  }
+});
+
 module.exports = router;

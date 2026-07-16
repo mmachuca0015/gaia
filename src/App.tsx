@@ -19,6 +19,7 @@ import OwnerInstructores from "./pages/Owner/OwnerInstructors";
 import OwnerEstudioGeneral from "./pages/Owner/OwnerEstudioGeneral";
 import OwnerEstudioPagos from "./pages/Owner/OwnerEstudioPagos";
 import OwnerEstudioSeguridad from "./pages/Owner/OwnerEstudioSeguridad";
+import OwnerReservas from "./pages/Owner/OwnerReservas";
 
 function App() {
   return (
@@ -45,6 +46,7 @@ function App() {
               path="/owner/estudio/seguridad"
               element={<OwnerEstudioSeguridad />}
             />
+            <Route path="/owner/reservas" element={<OwnerReservas />} />
           </Route>
 
           <Route element={<DashboardLayout />}>
