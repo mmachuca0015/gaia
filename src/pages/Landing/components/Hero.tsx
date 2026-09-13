@@ -1,58 +1,66 @@
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
+import { ShieldCheck, Zap, CreditCard } from "lucide-react";
+import UserAppPreview from "./previews/UserAppPreview";
+
+const trust = [
+  { icon: Zap, text: "Reserva en menos de 30 segundos" },
+  { icon: ShieldCheck, text: "Sesiones seguras, sin contraseñas expuestas" },
+  { icon: CreditCard, text: "Pagos protegidos con Stripe" },
+];
 
 function Hero() {
-  const navigate = useNavigate();
-
   return (
-    <section className="relative min-h-screen bg-[#f6eee2] flex flex-col items-center justify-center text-center px-6 overflow-hidden">
-      {/* Ilustración de círculos en el fondo */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10">
-        <div className="w-[800px] h-[800px] rounded-full border border-stone-400" />
-        <div className="absolute w-[600px] h-[600px] rounded-full border border-stone-400" />
-        <div className="absolute w-[400px] h-[400px] rounded-full border border-stone-400" />
-        <div className="absolute w-[900px] h-[500px] rounded-full border border-stone-400 rotate-45" />
-        <div className="absolute w-[700px] h-[400px] rounded-full border border-stone-400 -rotate-45" />
-      </div>
-
-      {/* Contenido */}
-      <div className="relative z-10 max-w-3xl">
-        <p className="text-xs tracking-[0.3em] text-stone-500 mb-4">
-          PILA · WELLNESS
-        </p>
-
-        <span className="inline-block border border-stone-400 text-stone-500 text-xs tracking-widest px-4 py-1.5 rounded-full mb-8">
-          · PRÓXIMAMENTE
+    <section id="top" className="bg-paper pt-20 pb-16 px-6">
+      <div className="max-w-5xl mx-auto text-center">
+        <span className="inline-block border border-line text-slate-500 text-[11px] tracking-[0.2em] px-4 py-1.5 rounded-full mb-8">
+          MARKETPLACE DE ESTUDIOS
         </span>
 
         <h1
-          className="text-5xl md:text-7xl font-semibold text-stone-800 leading-tight mb-6"
+          className="text-5xl md:text-7xl font-semibold text-ink leading-[1.05] mb-6"
           style={{ fontFamily: "Cormorant Garamond, serif" }}
         >
-          El estudio de pilates{" "}
-          <span className="italic text-[#3a5a3a]">que se adapta</span> a ti
+          Reserva tu clase favorita
+          <br />
+          <span className="italic">en tu estudio favorito</span>
         </h1>
 
-        <p className="text-base md:text-lg text-stone-500 mb-10 max-w-xl mx-auto">
-          Muy pronto podrás explorar estudios, reservar clases y cuidar tu
-          cuerpo — todo en un solo lugar.
+        <p className="text-base md:text-lg text-slate-500 max-w-2xl mx-auto mb-10 leading-relaxed">
+          wellco es la plataforma que conecta estudios de ejercicio con quienes
+          quieren moverse. Encuentra, reserva y paga en segundos — y si tienes un
+          estudio, gestiónalo completo desde un solo panel.
         </p>
 
-        <button
-          onClick={() =>
-            document
-              .getElementById("waitlist")
-              ?.scrollIntoView({ behavior: "smooth" })
-          }
-          className="bg-[#3a5a3a] text-white px-8 py-4 rounded-full text-sm font-medium hover:bg-[#2e4a2e] transition-colors cursor-pointer"
-        >
-          Quiero ser de los primeros
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">
+          {/* Los dos botones parten la audiencia: cada quien entra por su lado. */}
+          <Link
+            to="/login"
+            className="bg-ink text-white px-8 py-4 rounded-full text-sm font-medium hover:bg-ink-soft transition-colors"
+          >
+            Soy atleta
+          </Link>
+          <a
+            href="#estudios"
+            className="border border-ink text-ink px-8 py-4 rounded-full text-sm font-medium hover:bg-ink hover:text-white transition-colors"
+          >
+            Soy dueño de estudio
+          </a>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-slate-400">
+          {trust.map(({ icon: Icon, text }) => (
+            <span key={text} className="flex items-center gap-1.5">
+              <Icon size={13} />
+              {text}
+            </span>
+          ))}
+        </div>
       </div>
 
-      {/* Scroll */}
-      <p className="absolute bottom-8 text-xs tracking-[0.3em] text-stone-400">
-        SCROLL
-      </p>
+      {/* Render de la app */}
+      <div className="max-w-5xl mx-auto mt-16">
+        <UserAppPreview />
+      </div>
     </section>
   );
 }

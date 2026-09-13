@@ -181,27 +181,27 @@ function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f6eee2] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#f4f7fa] flex items-center justify-center p-4">
       <div
         className={`bg-white rounded-3xl p-8 w-full ${step === "Registrar estudio" ? "max-w-3xl" : "max-w-sm"} shadow-sm`}
       >
         {/* Logo */}
         <div className="text-center mb-8">
           <h1
-            className="text-3xl font-semibold tracking-widest text-[#2c3a2c]"
+            className="text-3xl font-semibold tracking-widest text-[#1b2c44]"
             style={{ fontFamily: "Cormorant Garamond, serif" }}
           >
-            PILA
+            wellco
           </h1>
-          <p className="text-xs tracking-[0.3em] text-stone-400 mt-0.5">
+          <p className="text-xs tracking-[0.3em] text-slate-400 mt-0.5">
             WELLNESS
           </p>
         </div>
 
         {/* Switch tabs */}
-        <div className="relative flex bg-[#f0ece4] rounded-xl p-1 mb-6">
+        <div className="relative flex bg-[#eef2f7] rounded-xl p-1 mb-6">
           <div
-            className="absolute top-1 left-1 h-[calc(100%-8px)] w-[calc(50%-4px)] bg-[#3a5a3a] rounded-lg transition-transform duration-300"
+            className="absolute top-1 left-1 h-[calc(100%-8px)] w-[calc(50%-4px)] bg-[#1b2c44] rounded-lg transition-transform duration-300"
             style={{
               transform:
                 step === "Iniciar sesión" || step === "Recuperar contraseña"
@@ -216,7 +216,7 @@ function Login() {
               step !== "Registrar usuario" &&
               step !== "Registrar estudio"
                 ? "text-white"
-                : "text-stone-400"
+                : "text-slate-400"
             }`}
           >
             Iniciar sesión
@@ -228,7 +228,7 @@ function Login() {
               step === "Registrar usuario" ||
               step === "Registrar estudio"
                 ? "text-white"
-                : "text-stone-400"
+                : "text-slate-400"
             }`}
           >
             Crear cuenta
@@ -239,13 +239,13 @@ function Login() {
         {step === "Iniciar sesión" && (
           <div className="flex flex-col gap-4">
             <div>
-              <label className="text-xs text-stone-400 block mb-1.5">
+              <label className="text-xs text-slate-400 block mb-1.5">
                 Correo electrónico
               </label>
               <input
                 type="email"
                 placeholder="correo@ejemplo.com"
-                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                 value={loginForm.email}
                 onChange={(e) =>
                   setLoginForm({ ...loginForm, email: e.target.value })
@@ -253,13 +253,13 @@ function Login() {
               />
             </div>
             <div>
-              <label className="text-xs text-stone-400 block mb-1.5">
+              <label className="text-xs text-slate-400 block mb-1.5">
                 Contraseña
               </label>
               <input
                 type="password"
                 placeholder="••••••••"
-                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                 value={loginForm.password}
                 onChange={(e) =>
                   setLoginForm({ ...loginForm, password: e.target.value })
@@ -268,13 +268,13 @@ function Login() {
             </div>
             <button
               onClick={handleLogin}
-              className="w-full bg-[#3a5a3a] text-white py-3 rounded-xl text-sm font-medium hover:bg-[#2e4a2e] transition-colors mt-2 cursor-pointer"
+              className="w-full bg-[#1b2c44] text-white py-3 rounded-xl text-sm font-medium hover:bg-[#33506f] transition-colors mt-2 cursor-pointer"
             >
               Iniciar sesión
             </button>
             <p
               onClick={() => setStep("Recuperar contraseña")}
-              className="text-center text-xs text-stone-400 cursor-pointer hover:text-stone-600 transition-colors"
+              className="text-center text-xs text-slate-400 cursor-pointer hover:text-slate-600 transition-colors"
             >
               ¿Olvidaste tu contraseña?
             </p>
@@ -285,29 +285,29 @@ function Login() {
         {step === "Crear cuenta" && (
           <div className="flex flex-col gap-4">
             <div className="mb-2">
-              <p className="text-lg font-semibold text-stone-800">
-                ¿Cómo quieres usar PILA?
+              <p className="text-lg font-semibold text-slate-800">
+                ¿Cómo quieres usar wellco?
               </p>
-              <p className="text-sm text-stone-400">Elige tu tipo de cuenta</p>
+              <p className="text-sm text-slate-400">Elige tu tipo de cuenta</p>
             </div>
             <button
               onClick={() => setStep("Registrar usuario")}
-              className="flex flex-col items-center gap-2 p-5 border border-stone-200 rounded-2xl hover:border-[#3a5a3a] hover:bg-[#f5f9f5] transition-all cursor-pointer"
+              className="flex flex-col items-center gap-2 p-5 border border-slate-200 rounded-2xl hover:border-[#1b2c44] hover:bg-[#f4f7fa] transition-all cursor-pointer"
             >
-              <Dumbbell size={24} className="text-[#3a5a3a]" />
-              <p className="font-medium text-stone-800">Soy usuario</p>
-              <p className="text-xs text-stone-400">
+              <Dumbbell size={24} className="text-[#1b2c44]" />
+              <p className="font-medium text-slate-800">Soy usuario</p>
+              <p className="text-xs text-slate-400">
                 Quiero reservar clases de pilates
               </p>
             </button>
             <button
               onClick={() => setStep("Registrar estudio")}
-              className="flex flex-col items-center gap-2 p-5 border border-stone-200 rounded-2xl hover:border-[#3a5a3a] hover:bg-[#f5f9f5] transition-all cursor-pointer"
+              className="flex flex-col items-center gap-2 p-5 border border-slate-200 rounded-2xl hover:border-[#1b2c44] hover:bg-[#f4f7fa] transition-all cursor-pointer"
             >
-              <Store size={24} className="text-[#3a5a3a]" />
-              <p className="font-medium text-stone-800">Soy dueño de estudio</p>
-              <p className="text-xs text-stone-400">
-                Quiero publicar mi estudio en PILA
+              <Store size={24} className="text-[#1b2c44]" />
+              <p className="font-medium text-slate-800">Soy dueño de estudio</p>
+              <p className="text-xs text-slate-400">
+                Quiero publicar mi estudio en wellco
               </p>
             </button>
           </div>
@@ -320,20 +320,20 @@ function Login() {
               <ArrowLeft
                 size={20}
                 onClick={() => setStep("Crear cuenta")}
-                className="text-[#3a5a3a] cursor-pointer"
+                className="text-[#1b2c44] cursor-pointer"
               />
-              <p className="font-semibold text-stone-800">Nuevo usuario</p>
+              <p className="font-semibold text-slate-800">Nuevo usuario</p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-stone-400 block mb-1.5">
+                <label className="text-xs text-slate-400 block mb-1.5">
                   Nombre
                 </label>
                 <input
                   type="text"
                   placeholder="Valeria"
-                  className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                   value={registerUserForm.name}
                   onChange={(e) =>
                     setRegisterUserForm({
@@ -344,13 +344,13 @@ function Login() {
                 />
               </div>
               <div>
-                <label className="text-xs text-stone-400 block mb-1.5">
+                <label className="text-xs text-slate-400 block mb-1.5">
                   Apellido
                 </label>
                 <input
                   type="text"
                   placeholder="Martínez"
-                  className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                   value={registerUserForm.last_name}
                   onChange={(e) =>
                     setRegisterUserForm({
@@ -363,20 +363,20 @@ function Login() {
             </div>
 
             <div>
-              <label className="text-xs text-stone-400 block mb-1.5">
+              <label className="text-xs text-slate-400 block mb-1.5">
                 País
               </label>
-              <select className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors text-stone-600">
+              <select className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors text-slate-600">
                 <option value="México">México</option>
               </select>
             </div>
 
             <div>
-              <label className="text-xs text-stone-400 block mb-1.5">
+              <label className="text-xs text-slate-400 block mb-1.5">
                 Estado
               </label>
               <select
-                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors text-stone-600"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors text-slate-600"
                 value={registerUserForm.state}
                 onChange={(e) =>
                   setRegisterUserForm({
@@ -395,13 +395,13 @@ function Login() {
             </div>
 
             <div>
-              <label className="text-xs text-stone-400 block mb-1.5">
+              <label className="text-xs text-slate-400 block mb-1.5">
                 Correo electrónico
               </label>
               <input
                 type="email"
                 placeholder="correo@ejemplo.com"
-                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                 value={registerUserForm.email}
                 onChange={(e) =>
                   setRegisterUserForm({
@@ -413,13 +413,13 @@ function Login() {
             </div>
 
             <div>
-              <label className="text-xs text-stone-400 block mb-1.5">
+              <label className="text-xs text-slate-400 block mb-1.5">
                 Confirmar correo electrónico
               </label>
               <input
                 type="email"
                 placeholder="correo@ejemplo.com"
-                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                 value={registerUserForm.confirmEmail}
                 onChange={(e) =>
                   setRegisterUserForm({
@@ -431,13 +431,13 @@ function Login() {
             </div>
 
             <div>
-              <label className="text-xs text-stone-400 block mb-1.5">
+              <label className="text-xs text-slate-400 block mb-1.5">
                 Contraseña
               </label>
               <input
                 type="password"
                 placeholder="••••••••"
-                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                 value={registerUserForm.password}
                 onChange={(e) =>
                   setRegisterUserForm({
@@ -449,13 +449,13 @@ function Login() {
             </div>
 
             <div>
-              <label className="text-xs text-stone-400 block mb-1.5">
+              <label className="text-xs text-slate-400 block mb-1.5">
                 Confirmar contraseña
               </label>
               <input
                 type="password"
                 placeholder="••••••••"
-                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                 value={registerUserForm.confirmPassword}
                 onChange={(e) =>
                   setRegisterUserForm({
@@ -468,7 +468,7 @@ function Login() {
 
             <button
               onClick={handleRegisterUser}
-              className="w-full bg-[#3a5a3a] text-white py-3 rounded-xl text-sm font-medium hover:bg-[#2e4a2e] transition-colors mt-2 cursor-pointer"
+              className="w-full bg-[#1b2c44] text-white py-3 rounded-xl text-sm font-medium hover:bg-[#33506f] transition-colors mt-2 cursor-pointer"
             >
               Crear cuenta
             </button>
@@ -482,9 +482,9 @@ function Login() {
               <ArrowLeft
                 size={20}
                 onClick={() => setStep("Crear cuenta")}
-                className="text-[#3a5a3a] cursor-pointer"
+                className="text-[#1b2c44] cursor-pointer"
               />
-              <p className="font-semibold text-stone-800">Nuevo estudio</p>
+              <p className="font-semibold text-slate-800">Nuevo estudio</p>
             </div>
 
             <div className="grid grid-cols-2 gap-x-6 gap-y-4">
@@ -492,13 +492,13 @@ function Login() {
               <div className="flex flex-col gap-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-stone-400 block mb-1.5">
+                    <label className="text-xs text-slate-400 block mb-1.5">
                       Nombre
                     </label>
                     <input
                       type="text"
                       placeholder="Carlos"
-                      className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                       value={registerStudioForm.name}
                       onChange={(e) =>
                         setRegisterStudioForm({
@@ -509,13 +509,13 @@ function Login() {
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-stone-400 block mb-1.5">
+                    <label className="text-xs text-slate-400 block mb-1.5">
                       Apellido
                     </label>
                     <input
                       type="text"
                       placeholder="García"
-                      className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                       value={registerStudioForm.last_name}
                       onChange={(e) =>
                         setRegisterStudioForm({
@@ -527,13 +527,13 @@ function Login() {
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs text-stone-400 block mb-1.5">
+                  <label className="text-xs text-slate-400 block mb-1.5">
                     Nombre del estudio
                   </label>
                   <input
                     type="text"
                     placeholder="Mi estudio"
-                    className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                     value={registerStudioForm.studio_name}
                     onChange={(e) =>
                       setRegisterStudioForm({
@@ -545,19 +545,19 @@ function Login() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-stone-400 block mb-1.5">
+                    <label className="text-xs text-slate-400 block mb-1.5">
                       País
                     </label>
-                    <select className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors text-stone-600">
+                    <select className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors text-slate-600">
                       <option value="México">México</option>
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-stone-400 block mb-1.5">
+                    <label className="text-xs text-slate-400 block mb-1.5">
                       Estado
                     </label>
                     <select
-                      className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors text-stone-600"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors text-slate-600"
                       value={registerStudioForm.state}
                       onChange={(e) =>
                         setRegisterStudioForm({
@@ -576,13 +576,13 @@ function Login() {
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs text-stone-400 block mb-1.5">
+                  <label className="text-xs text-slate-400 block mb-1.5">
                     Teléfono
                   </label>
                   <input
                     type="tel"
                     placeholder="33 1234 5678"
-                    className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                     value={registerStudioForm.phone}
                     onChange={(e) =>
                       setRegisterStudioForm({
@@ -597,13 +597,13 @@ function Login() {
               {/* Columna derecha */}
               <div className="flex flex-col gap-4">
                 <div>
-                  <label className="text-xs text-stone-400 block mb-1.5">
+                  <label className="text-xs text-slate-400 block mb-1.5">
                     Correo electrónico
                   </label>
                   <input
                     type="email"
                     placeholder="correo@ejemplo.com"
-                    className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                     value={registerStudioForm.email}
                     onChange={(e) =>
                       setRegisterStudioForm({
@@ -614,13 +614,13 @@ function Login() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-stone-400 block mb-1.5">
+                  <label className="text-xs text-slate-400 block mb-1.5">
                     Confirmar correo
                   </label>
                   <input
                     type="email"
                     placeholder="correo@ejemplo.com"
-                    className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                     value={registerStudioForm.confirmEmail}
                     onChange={(e) =>
                       setRegisterStudioForm({
@@ -631,13 +631,13 @@ function Login() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-stone-400 block mb-1.5">
+                  <label className="text-xs text-slate-400 block mb-1.5">
                     Contraseña
                   </label>
                   <input
                     type="password"
                     placeholder="••••••••"
-                    className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                     value={registerStudioForm.password}
                     onChange={(e) =>
                       setRegisterStudioForm({
@@ -648,13 +648,13 @@ function Login() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-stone-400 block mb-1.5">
+                  <label className="text-xs text-slate-400 block mb-1.5">
                     Confirmar contraseña
                   </label>
                   <input
                     type="password"
                     placeholder="••••••••"
-                    className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                     value={registerStudioForm.confirmPassword}
                     onChange={(e) =>
                       setRegisterStudioForm({
@@ -668,7 +668,7 @@ function Login() {
             </div>
             <button
               onClick={handleRegisterStudio}
-              className="block mx-auto bg-[#3a5a3a] text-white py-3 px-30 rounded-xl text-sm font-medium hover:bg-[#2e4a2e] transition-colors mt-auto cursor-pointer"
+              className="block mx-auto bg-[#1b2c44] text-white py-3 px-30 rounded-xl text-sm font-medium hover:bg-[#33506f] transition-colors mt-auto cursor-pointer"
             >
               Crear estudio
             </button>
@@ -682,20 +682,20 @@ function Login() {
               <ArrowLeft
                 size={20}
                 onClick={() => setStep("Iniciar sesión")}
-                className="text-[#3a5a3a] cursor-pointer"
+                className="text-[#1b2c44] cursor-pointer"
               />
-              <p className="font-semibold text-stone-800">
+              <p className="font-semibold text-slate-800">
                 Recuperar contraseña
               </p>
             </div>
             <div>
-              <label className="text-xs text-stone-400 block mb-1.5">
+              <label className="text-xs text-slate-400 block mb-1.5">
                 Correo electrónico
               </label>
               <input
                 type="email"
                 placeholder="correo@ejemplo.com"
-                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                 value={forgotForm.email}
                 onChange={(e) =>
                   setForgotForm({
@@ -707,11 +707,11 @@ function Login() {
             </div>
             <button
               onClick={handleForgotPassword}
-              className="w-full bg-[#3a5a3a] text-white py-3 rounded-xl text-sm font-medium hover:bg-[#2e4a2e] transition-colors mt-2 cursor-pointer"
+              className="w-full bg-[#1b2c44] text-white py-3 rounded-xl text-sm font-medium hover:bg-[#33506f] transition-colors mt-2 cursor-pointer"
             >
               Enviar
             </button>
-            <p className="text-center text-xs text-stone-400">
+            <p className="text-center text-xs text-slate-400">
               Te enviaremos un enlace para restablecer tu contraseña
             </p>
           </div>

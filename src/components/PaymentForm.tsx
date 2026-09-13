@@ -51,7 +51,7 @@ function PaymentForm({ onSuccess }: { onSuccess: () => void }) {
       <PaymentElement />
       <button
         onClick={handleSaveCard}
-        className="bg-[#3a5a3a] text-white py-2.5 rounded-xl text-sm font-medium hover:bg-[#2e4a2e] transition-colors cursor-pointer"
+        className="bg-[#1b2c44] text-white py-2.5 rounded-xl text-sm font-medium hover:bg-[#33506f] transition-colors cursor-pointer"
       >
         Guardar tarjeta
       </button>

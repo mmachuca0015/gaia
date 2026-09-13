@@ -2,7 +2,7 @@ import { Outlet } from "react-router-dom";
 import OwnerSidebar from "../components/OwnerSidebar";
 function OwnerLayout() {
   return (
-    <div className="flex h-screen bg-[#f6eee2]">
+    <div className="flex h-screen bg-[#f4f7fa]">
       <div className="hidden lg:block">
         <OwnerSidebar />
       </div>

@@ -151,7 +151,7 @@ function EstudioDetalle() {
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
       <button className="absolute top-4 left-4 bg-white rounded-full p-2">
         <ArrowLeft
-          className="cursor-pointer hover:text-[#2e4a2e]"
+          className="cursor-pointer hover:text-[#33506f]"
           onClick={() => navigate(-1)}
           size={18}
         />
@@ -167,7 +167,7 @@ function EstudioDetalle() {
             }
             setIsFavorite(!isFavorite);
           }}
-          className={`cursor-pointer transition-colors hover:text-[#2e4a2e] ${isFavorite ? "fill-[#3a5a3a] text-[#3a5a3a]" : "text-stone-400"}`}
+          className={`cursor-pointer transition-colors hover:text-[#33506f] ${isFavorite ? "fill-[#1b2c44] text-[#1b2c44]" : "text-slate-400"}`}
         />
       </button>
       <div className="absolute bottom-4 left-6 text-white">
@@ -197,8 +197,8 @@ function EstudioDetalle() {
             onClick={() => setStep(tab as Step)}
             className={`px-5 py-2 rounded-full text-sm transition-colors cursor-pointer ${
               step === tab
-                ? "bg-[#3a5a3a] text-white"
-                : "bg-white text-stone-600 border border-stone-200 hover:border-stone-400 cursor-pointer"
+                ? "bg-[#1b2c44] text-white"
+                : "bg-white text-slate-600 border border-slate-200 hover:border-slate-400 cursor-pointer"
             }`}
           >
             {tab}
@@ -213,11 +213,11 @@ function EstudioDetalle() {
             {weekOffset > 0 && (
               <button
                 onClick={() => setWeekOffset(weekOffset - 1)}
-                className="p-2 rounded-full hover:bg-stone-100 transition-colors"
+                className="p-2 rounded-full hover:bg-slate-100 transition-colors"
               >
                 <ChevronLeft
                   size={18}
-                  className="text-stone-400 hover:cursor-pointer"
+                  className="text-slate-400 hover:cursor-pointer"
                 />
               </button>
             )}
@@ -227,10 +227,10 @@ function EstudioDetalle() {
                 <button
                   key={day.dayIndex}
                   onClick={() => setSelectedDay(day.dayIndex)}
-                  className={`flex flex-col items-center px-3 py-2 rounded-xl min-w-[52px] transition-colors border border-stone-200 hover:border-stone-400 cursor-pointer ${
+                  className={`flex flex-col items-center px-3 py-2 rounded-xl min-w-[52px] transition-colors border border-slate-200 hover:border-slate-400 cursor-pointer ${
                     selectedDay === day.dayIndex
-                      ? "bg-[#3a5a3a] text-white"
-                      : "bg-white text-stone-600"
+                      ? "bg-[#1b2c44] text-white"
+                      : "bg-white text-slate-600"
                   }`}
                 >
                   <span className="text-xs font-medium">{day.name}</span>
@@ -241,11 +241,11 @@ function EstudioDetalle() {
 
             <button
               onClick={() => setWeekOffset(weekOffset + 1)}
-              className="p-2 rounded-full hover:bg-stone-100 transition-colors"
+              className="p-2 rounded-full hover:bg-slate-100 transition-colors"
             >
               <ChevronRight
                 size={18}
-                className="text-stone-400 hover:cursor-pointer"
+                className="text-slate-400 hover:cursor-pointer"
               />
             </button>
           </div>
@@ -273,10 +273,10 @@ function EstudioDetalle() {
         <div className="max-w-3xl bg-white rounded-2xl p-6 mx-auto px-6 py-4 flex flex-col gap-2">
           {/* Descripción */}
           <div className="bg-white rounded-2xl p-6">
-            <h2 className="text-stone-600 text-2xl font-semibold mb-2">
-              Sobre <span className="text-[#3a5a3a] italic">{studio.name}</span>
+            <h2 className="text-slate-600 text-2xl font-semibold mb-2">
+              Sobre <span className="text-[#1b2c44]">{studio.name}</span>
             </h2>
-            <p className="text-lg text-stone-600 leading-relaxed">
+            <p className="text-lg text-slate-600 leading-relaxed">
               {studio.description}
             </p>
           </div>
@@ -286,18 +286,18 @@ function EstudioDetalle() {
             <div className="flex items-start gap-3">
               <MapPin
                 size={18}
-                className="text-[#3a5a3a] mt-0.5 flex-shrink-0"
+                className="text-[#1b2c44] mt-0.5 flex-shrink-0"
               />
               <div>
-                <p className="font-medium text-lg text-stone-800 mb-1">
+                <p className="font-medium text-lg text-slate-800 mb-1">
                   Dirección
                 </p>
-                <p className=" text-stone-500 text-md">
+                <p className=" text-slate-500 text-md">
                   {studio.street} #{studio.ext_number}
                   {studio.int_number ? `, ${studio.int_number}` : ""},{" "}
                   {studio.neighborhood}
                 </p>
-                <p className="text-stone-500 text-md">
+                <p className="text-slate-500 text-md">
                   {studio.city}, {studio.state}, {studio.country}
                 </p>
               </div>
@@ -306,13 +306,13 @@ function EstudioDetalle() {
             <div className="flex items-start gap-3">
               <Phone
                 size={18}
-                className="text-[#3a5a3a] mt-0.5 flex-shrink-0"
+                className="text-[#1b2c44] mt-0.5 flex-shrink-0"
               />
               <div>
-                <p className="text-lg font-medium text-stone-800 mb-1">
+                <p className="text-lg font-medium text-slate-800 mb-1">
                   Teléfono
                 </p>
-                <p className="text-stone-500 text-md">{studio.phone}</p>
+                <p className="text-slate-500 text-md">{studio.phone}</p>
               </div>
             </div>
           </div>

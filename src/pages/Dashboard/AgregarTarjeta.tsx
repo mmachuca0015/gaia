@@ -60,13 +60,13 @@ function AgregarTarjeta() {
         <ChevronLeft
           size={22}
           onClick={() => navigate("/perfil")}
-          className="text-[#3a5a3a] cursor-pointer"
+          className="text-[#1b2c44] cursor-pointer"
         />
         <h1
-          className="text-4xl md:text-6xl font-semibold text-stone-800"
+          className="text-4xl md:text-6xl font-semibold text-slate-800"
           style={{ fontFamily: "Cormorant Garamond, serif" }}
         >
-          Agregar <span className="italic text-[#3a5a3a]">tarjeta</span>
+          Agregar <span className="text-[#1b2c44]">tarjeta</span>
         </h1>
       </div>
 
@@ -74,9 +74,9 @@ function AgregarTarjeta() {
         {hasCard ? (
           <div className="bg-white rounded-2xl p-6 flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <CreditCard size={26} className="text-stone-600" />
+              <CreditCard size={26} className="text-slate-600" />
               <div>
-                <p className="text-md text-stone-600">
+                <p className="text-md text-slate-600">
                   {cardData
                     ? `${cardData.brand.charAt(0).toUpperCase() + cardData.brand.slice(1)} •••• ${cardData.last4}`
                     : ""}
@@ -94,7 +94,7 @@ function AgregarTarjeta() {
           <div className="bg-white rounded-2xl p-10 flex flex-col items-center gap-4 text-center">
             {showForm ? (
               <div className="w-full flex flex-col gap-4">
-                <div className="border border-stone-200 rounded-xl p-4 bg-stone-50">
+                <div className="border border-slate-200 rounded-xl p-4 bg-slate-50">
                   {showForm && clientSecret && (
                     <Elements
                       stripe={loadStripe(
@@ -123,20 +123,20 @@ function AgregarTarjeta() {
                 </div>
                 <button
                   onClick={() => setShowForm(false)}
-                  className="text-sm text-stone-400 cursor-pointer hover:text-stone-600"
+                  className="text-sm text-slate-400 cursor-pointer hover:text-slate-600"
                 >
                   Cancelar
                 </button>
               </div>
             ) : (
               <>
-                <CreditCard size={36} className="text-stone-400" />
-                <p className="text-stone-600 text-md">
+                <CreditCard size={36} className="text-slate-400" />
+                <p className="text-slate-600 text-md">
                   Aún no has agregado una tarjeta
                 </p>
                 <button
                   onClick={() => setShowForm(true)}
-                  className="bg-[#3a5a3a] text-white px-6 py-2.5 rounded-xl text-md font-medium hover:bg-[#2e4a2e] transition-colors cursor-pointer mt-2"
+                  className="bg-[#1b2c44] text-white px-6 py-2.5 rounded-xl text-md font-medium hover:bg-[#33506f] transition-colors cursor-pointer mt-2"
                 >
                   Agregar tarjeta
                 </button>

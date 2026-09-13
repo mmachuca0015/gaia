@@ -56,27 +56,27 @@ function AdminEstudios() {
     <div className="p-4 md:p-8">
       <div className="mb-8">
         <h1
-          className="text-4xl md:text-6xl font-semibold text-stone-800"
+          className="text-4xl md:text-6xl font-semibold text-slate-800"
           style={{ fontFamily: "Cormorant Garamond, serif" }}
         >
           Estudios{" "}
           <span
-            className="italic text-[#3a5a3a]"
+            className="text-[#1b2c44]"
             style={{ fontFamily: "Cormorant Garamond, serif" }}
           >
             App
           </span>
         </h1>
-        <p className="text-stone-600 mt-2">{total} estudios registrados</p>
+        <p className="text-slate-600 mt-2">{total} estudios registrados</p>
       </div>
 
       <div className="bg-white rounded-2xl overflow-hidden">
         {loading ? (
-          <div className="p-10 text-center text-stone-500">Cargando...</div>
+          <div className="p-10 text-center text-slate-500">Cargando...</div>
         ) : studios.length === 0 ? (
           <div className="p-10 flex flex-col items-center gap-4 text-center">
-            <Store size={36} className="text-stone-300" />
-            <p className="text-stone-600 font-medium">
+            <Store size={36} className="text-slate-300" />
+            <p className="text-slate-600 font-medium">
               No hay estudios registrados
             </p>
           </div>
@@ -85,29 +85,29 @@ function AdminEstudios() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-stone-100">
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-stone-600">
+                  <tr className="border-b border-slate-100">
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-slate-600">
                       Nombre
                     </th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-stone-600">
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-slate-600">
                       Apellido
                     </th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-stone-600">
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-slate-600">
                       Estudio
                     </th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-stone-600">
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-slate-600">
                       Correo
                     </th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-stone-600">
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-slate-600">
                       País
                     </th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-stone-600">
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-slate-600">
                       Ciudad
                     </th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-stone-600">
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-slate-600">
                       Plan
                     </th>
-                    <th className="text-right px-6 py-4 text-sm font-semibold text-stone-600">
+                    <th className="text-right px-6 py-4 text-sm font-semibold text-slate-600">
                       &nbsp;
                     </th>
                   </tr>
@@ -116,34 +116,34 @@ function AdminEstudios() {
                   {studios.map((studio) => (
                     <tr
                       key={studio.id}
-                      className="border-b border-stone-50 last:border-0 hover:bg-stone-50/50 transition-colors"
+                      className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors"
                     >
-                      <td className="px-6 py-4 text-stone-800 font-medium">
+                      <td className="px-6 py-4 text-slate-800 font-medium">
                         {studio.name}
                       </td>
-                      <td className="px-6 py-4 text-stone-800 font-medium">
+                      <td className="px-6 py-4 text-slate-800 font-medium">
                         {studio.last_name}
                       </td>
-                      <td className="px-6 py-4 text-stone-800">
+                      <td className="px-6 py-4 text-slate-800">
                         {studio.studio_name}
                       </td>
-                      <td className="px-6 py-4 text-stone-600">
+                      <td className="px-6 py-4 text-slate-600">
                         {studio.email}
                       </td>
-                      <td className="px-6 py-4 text-stone-600">
+                      <td className="px-6 py-4 text-slate-600">
                         {studio.country}
                       </td>
-                      <td className="px-6 py-4 text-stone-600">
+                      <td className="px-6 py-4 text-slate-600">
                         {studio.city ?? "—"}
                       </td>
-                      <td className="px-6 py-4 text-stone-600">
+                      <td className="px-6 py-4 text-slate-600">
                         {studio.plan}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <button
                           type="button"
                           disabled={loadingDetails === studio.id}
-                          className="text-sm text-[#3a5a3a] font-medium cursor-pointer hover:underline disabled:opacity-50 disabled:cursor-wait"
+                          className="text-sm text-[#1b2c44] font-medium cursor-pointer hover:underline disabled:opacity-50 disabled:cursor-wait"
                           onClick={() => handleShowDetails(studio.id)}
                         >
                           {loadingDetails === studio.id
@@ -158,15 +158,15 @@ function AdminEstudios() {
             </div>
 
             {totalPages > 1 && (
-              <div className="flex items-center justify-between px-6 py-4 border-t border-stone-100">
-                <p className="text-sm text-stone-500">
+              <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100">
+                <p className="text-sm text-slate-500">
                   Página {page} de {totalPages}
                 </p>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page === 1}
-                    className="flex items-center gap-1 px-4 py-1.5 rounded-full text-sm transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed border border-stone-200 text-stone-600 hover:border-stone-400"
+                    className="flex items-center gap-1 px-4 py-1.5 rounded-full text-sm transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed border border-slate-200 text-slate-600 hover:border-slate-400"
                   >
                     <ChevronLeft size={16} />
                     Anterior
@@ -174,7 +174,7 @@ function AdminEstudios() {
                   <button
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                     disabled={page === totalPages}
-                    className="flex items-center gap-1 px-4 py-1.5 rounded-full text-sm transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed border border-stone-200 text-stone-600 hover:border-stone-400"
+                    className="flex items-center gap-1 px-4 py-1.5 rounded-full text-sm transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed border border-slate-200 text-slate-600 hover:border-slate-400"
                   >
                     Siguiente
                     <ChevronRight size={16} />

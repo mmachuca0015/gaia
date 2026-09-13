@@ -80,24 +80,24 @@ function ClassCard({
       {/* Hora */}
       <div className="min-w-[52px] text-center">
         <p
-          className="text-4xl font-semibold text-stone-800"
+          className="text-4xl font-semibold text-slate-800"
           style={{ fontFamily: "Cormorant Garamond, serif" }}
         >
           {formattedTime}
         </p>
-        <p className="text-md font-semibold text-stone-800">{ampm}</p>
+        <p className="text-md font-semibold text-slate-800">{ampm}</p>
       </div>
 
       {/* Divisor */}
-      <div className="w-px h-16 bg-stone-100" />
+      <div className="w-px h-16 bg-slate-100" />
 
       {/* Info */}
       <div className="flex-1">
         <div className="flex items-center gap-2 mb-1">
-          <p className="font-semibold text-2xl text-stone-800">{name}</p>
+          <p className="font-semibold text-2xl text-slate-800">{name}</p>
         </div>
-        <p className="text-md text-stone-600 mb-1">con {instructor}</p>
-        <div className="flex items-center gap-3 text-md text-stone-600">
+        <p className="text-md text-slate-600 mb-1">con {instructor}</p>
+        <div className="flex items-center gap-3 text-md text-slate-600">
           <div className="flex items-center gap-1">
             {availablePlaces === 0 ? (
               <span className="text-red-400 font-medium text-sm">Lleno</span>
@@ -108,7 +108,7 @@ function ClassCard({
               </div>
             )}
           </div>
-          <span className="font-medium bg-stone-200 text-stone-500 px-2 py-0.5 rounded-full">
+          <span className="font-medium bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full">
             ${price}
           </span>
         </div>
@@ -131,20 +131,20 @@ function ClassCard({
       {showPopup && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-8 max-w-sm w-full mx-4 flex flex-col gap-4 text-center">
-            <p className="font-semibold text-stone-800">
+            <p className="font-semibold text-slate-800">
               Para reservar una clase debes agregar una tarjeta
             </p>
-            <p className="text-sm text-stone-600">¿Quieres agregarla ahora?</p>
+            <p className="text-sm text-slate-600">¿Quieres agregarla ahora?</p>
             <div className="flex gap-3 mt-2">
               <button
                 onClick={() => setShowPopup(false)}
-                className="flex-1 border border-stone-200 text-stone-600 py-2.5 rounded-xl text-sm hover:bg-stone-50 transition-colors cursor-pointer"
+                className="flex-1 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-sm hover:bg-slate-50 transition-colors cursor-pointer"
               >
                 Más tarde
               </button>
               <button
                 onClick={() => navigate("/agregar-tarjeta")}
-                className="flex-1 bg-[#3a5a3a] text-white py-2.5 rounded-xl text-sm hover:bg-[#2e4a2e] transition-colors cursor-pointer"
+                className="flex-1 bg-[#1b2c44] text-white py-2.5 rounded-xl text-sm hover:bg-[#33506f] transition-colors cursor-pointer"
               >
                 Aceptar
               </button>
@@ -157,22 +157,22 @@ function ClassCard({
       {showConfirmPopUp && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-8 max-w-sm w-full mx-4 flex flex-col gap-4 text-center">
-            <p className="font-semibold text-stone-800">Confirmar reserva</p>
-            <p className="text-sm text-stone-600">
+            <p className="font-semibold text-slate-800">Confirmar reserva</p>
+            <p className="text-sm text-slate-600">
               Si das click en aceptar confirmas el pago de{" "}
-              <span className="font-semibold text-stone-800">${price}</span>{" "}
+              <span className="font-semibold text-slate-800">${price}</span>{" "}
               para reservar tu lugar en la clase.
             </p>
             <div className="flex gap-3 mt-2">
               <button
                 onClick={() => setShowConfirmPopUp(false)}
-                className="flex-1 border border-stone-200 text-stone-600 py-2.5 rounded-xl text-sm hover:bg-stone-50 transition-colors cursor-pointer"
+                className="flex-1 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-sm hover:bg-slate-50 transition-colors cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 onClick={handlePagar}
-                className="flex-1 bg-[#3a5a3a] text-white py-2.5 rounded-xl text-sm hover:bg-[#2e4a2e] transition-colors cursor-pointer"
+                className="flex-1 bg-[#1b2c44] text-white py-2.5 rounded-xl text-sm hover:bg-[#33506f] transition-colors cursor-pointer"
               >
                 Aceptar
               </button>

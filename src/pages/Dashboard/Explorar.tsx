@@ -48,18 +48,18 @@ function Explorar() {
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
         <div>
           <h1
-            className="text-4xl md:text-6xl font-semibold text-stone-800"
+            className="text-4xl md:text-6xl font-semibold text-slate-800"
             style={{ fontFamily: "Cormorant Garamond, serif" }}
           >
             Hola,{" "}
             <span
-              className="italic text-[#3a5a3a]"
+              className="text-[#1b2c44]"
               style={{ fontFamily: "Cormorant Garamond, serif" }}
             >
               {user.name}
             </span>
           </h1>
-          <p className="text-base text-stone-600 mt-1">
+          <p className="text-base text-slate-600 mt-1">
             Encuentra tu próximo espacio para moverte.
           </p>
         </div>
@@ -68,12 +68,12 @@ function Explorar() {
           <div className="relative">
             <Search
               size={16}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400"
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
             />
             <input
               type="text"
               placeholder="Buscar estudios..."
-              className="w-full md:w-[360px] pl-10 pr-4 py-3 rounded-full bg-white border border-stone-200 text-sm text-stone-600 placeholder:text-stone-400 outline-none focus:border-stone-400 transition-colors"
+              className="w-full md:w-[360px] pl-10 pr-4 py-3 rounded-full bg-white border border-slate-200 text-sm text-slate-600 placeholder:text-slate-400 outline-none focus:border-slate-400 transition-colors"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -89,8 +89,8 @@ function Explorar() {
             onClick={() => setActiveFilter(filter)}
             className={`px-5 py-2 rounded-full text-sm transition-colors ${
               activeFilter === filter
-                ? "bg-[#3a5a3a] text-white"
-                : "bg-white text-stone-600 border border-stone-200 hover:border-stone-400 cursor-pointer"
+                ? "bg-[#1b2c44] text-white"
+                : "bg-white text-slate-600 border border-slate-200 hover:border-slate-400 cursor-pointer"
             }`}
           >
             {filter}

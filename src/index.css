@@ -1,9 +1,15 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Jost:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,600&family=Jost:wght@300;400;500&display=swap');
 @import "tailwindcss";
 
-:root {
-  --gaia-green: #3a5a3a;
-  --gaia-cream: #f0ece4;
-  --gaia-text: #2c2c2c;
-  --gaia-muted: #8a8a7a;
+/* Paleta azul apagada de wellco. Toda la app usa estos tokens. */
+@theme {
+  --color-ink: #1b2c44;
+  --color-ink-soft: #33506f;
+  --color-paper: #ffffff;
+  --color-surface: #f4f7fa;
+  --color-line: #e0e7ef;
+}
+
+html {
+  scroll-behavior: smooth;
 }

@@ -37,30 +37,30 @@ function ResetPassword() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f6eee2] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#f4f7fa] flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl p-8 w-full max-w-sm  shadow-sm">
         {/* Logo */}
         <div className="text-center mb-8">
           <h1
-            className="text-3xl font-semibold tracking-widest text-[#2c3a2c]"
+            className="text-3xl font-semibold tracking-widest text-[#1b2c44]"
             style={{ fontFamily: "Cormorant Garamond, serif" }}
           >
-            PILA
+            wellco
           </h1>
-          <p className="text-xs tracking-[0.3em] text-stone-400 mt-0.5">
+          <p className="text-xs tracking-[0.3em] text-slate-400 mt-0.5">
             WELLNESS
           </p>
         </div>
-        <h1 className="text-lg font-semibold text-center mb-8 text-stone-800 mt-1">
+        <h1 className="text-lg font-semibold text-center mb-8 text-slate-800 mt-1">
           Restablecer contraseña
         </h1>
         <div className="flex flex-col gap-4">
           <div>
-            <label className="text-xs text-stone-400 block mb-1.5" htmlFor="">
+            <label className="text-xs text-slate-400 block mb-1.5" htmlFor="">
               Nueva contraseña
             </label>
             <input
-              className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
               type="password"
               placeholder="••••••••"
               onChange={(e) =>
@@ -69,11 +69,11 @@ function ResetPassword() {
             />
           </div>
           <div>
-            <label className="text-xs text-stone-400 block mb-1.5" htmlFor="">
+            <label className="text-xs text-slate-400 block mb-1.5" htmlFor="">
               Confirmar contraseña
             </label>
             <input
-              className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-sm outline-none focus:border-stone-400 transition-colors"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
               type="password"
               placeholder="••••••••"
               onChange={(e) =>
@@ -82,7 +82,7 @@ function ResetPassword() {
             />
           </div>
           <button
-            className="w-full bg-[#3a5a3a] text-white py-3 rounded-xl text-sm font-medium hover:bg-[#2e4a2e] transition-colors mt-2 cursor-pointer"
+            className="w-full bg-[#1b2c44] text-white py-3 rounded-xl text-sm font-medium hover:bg-[#33506f] transition-colors mt-2 cursor-pointer"
             onClick={handleResetPassword}
           >
             Restablecer contraseña

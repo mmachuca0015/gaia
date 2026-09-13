@@ -18,23 +18,23 @@ function ClassManagementCard({
   onDelete,
 }: ClassManagementCardProps) {
   return (
-    <div className="bg-white rounded-2xl p-5 border border-stone-100">
+    <div className="bg-white rounded-2xl p-5 border border-slate-100">
       <div className="mb-3">
-        <p className="font-medium text-stone-800">{name}</p>
-        <p className="text-md text-stone-600">con {instructor_name}</p>
+        <p className="font-medium text-slate-800">{name}</p>
+        <p className="text-md text-slate-600">con {instructor_name}</p>
       </div>
       <div className="flex gap-2 mb-4">
-        <span className="text-md bg-[#e8f0e8] text-[#3a5a3a] px-3 py-1 rounded-full">
+        <span className="text-md bg-[#e8eef7] text-[#1b2c44] px-3 py-1 rounded-full">
           {capacity} lugares
         </span>
-        <span className="text-md bg-stone-100 text-stone-600 px-3 py-1 rounded-full">
+        <span className="text-md bg-slate-100 text-slate-600 px-3 py-1 rounded-full">
           ${price}
         </span>
       </div>
       <div className="flex gap-2">
         <button
           onClick={onEdit}
-          className="text-md px-4 py-1.5 rounded-xl border border-stone-200 text-stone-600 hover:bg-stone-50 transition-colors cursor-pointer"
+          className="text-md px-4 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
         >
           Editar
         </button>

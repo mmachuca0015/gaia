@@ -93,12 +93,12 @@ function OwnerInstructors() {
       <div className="p-4 md:p-8">
         <div className="flex items-center justify-between mb-8">
           <h1
-            className="text-4xl md:text-6xl font-semibold text-stone-800"
+            className="text-4xl md:text-6xl font-semibold text-slate-800"
             style={{ fontFamily: "Cormorant Garamond, serif" }}
           >
             Mis{" "}
             <span
-              className="italic text-[#3a5a3a]"
+              className="text-[#1b2c44]"
               style={{ fontFamily: "Cormorant Garamond, serif" }}
             >
               Instructores
@@ -106,7 +106,7 @@ function OwnerInstructors() {
           </h1>
           <button
             onClick={() => setShowInstructorForm(true)}
-            className="flex items-center gap-2 bg-[#3a5a3a] text-white px-5 py-2.5 rounded-xl text-md font-medium hover:bg-[#2e4a2e] transition-colors cursor-pointer"
+            className="flex items-center gap-2 bg-[#1b2c44] text-white px-5 py-2.5 rounded-xl text-md font-medium hover:bg-[#33506f] transition-colors cursor-pointer"
           >
             <Plus size={20} />
             Agregar Instructor
@@ -131,12 +131,12 @@ function OwnerInstructors() {
         {showInstructorForm && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl p-8 w-full max-w-sm mx-4 flex flex-col gap-4">
-              <p className="font-semibold text-stone-800 text-lg text-center">
+              <p className="font-semibold text-slate-800 text-lg text-center">
                 Agregar instructor
               </p>
 
               <div>
-                <label className="text-md text-stone-600 block mb-1.5">
+                <label className="text-md text-slate-600 block mb-1.5">
                   Nombre
                 </label>
                 <input
@@ -149,12 +149,12 @@ function OwnerInstructors() {
                   }
                   type="text"
                   placeholder="Mariana"
-                  className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-md outline-none focus:border-stone-400 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none focus:border-slate-400 transition-colors"
                 />
               </div>
 
               <div>
-                <label className="text-md text-stone-600 block mb-1.5">
+                <label className="text-md text-slate-600 block mb-1.5">
                   Apellido
                 </label>
                 <input
@@ -167,20 +167,20 @@ function OwnerInstructors() {
                   }
                   type="text"
                   placeholder="Cervantes"
-                  className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-md outline-none focus:border-stone-400 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none focus:border-slate-400 transition-colors"
                 />
               </div>
 
               <div className="flex gap-3 mt-2">
                 <button
                   onClick={() => setShowInstructorForm(false)}
-                  className="flex-1 border border-stone-200 text-stone-600 py-2.5 rounded-xl text-md hover:bg-stone-50 transition-colors cursor-pointer"
+                  className="flex-1 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-md hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleAddInstructor}
-                  className="flex-1 bg-[#3a5a3a] text-white py-2.5 rounded-xl text-md hover:bg-[#2e4a2e] transition-colors cursor-pointer"
+                  className="flex-1 bg-[#1b2c44] text-white py-2.5 rounded-xl text-md hover:bg-[#33506f] transition-colors cursor-pointer"
                 >
                   Agregar
                 </button>
@@ -193,16 +193,16 @@ function OwnerInstructors() {
         {deleteInstructorId && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl p-8 w-full max-w-sm mx-4 flex flex-col gap-4 text-center">
-              <p className="font-semibold text-stone-800 text-lg">
+              <p className="font-semibold text-slate-800 text-lg">
                 ¿Eliminar instructor?
               </p>
-              <p className="text-md text-stone-600">
+              <p className="text-md text-slate-600">
                 Esta acción no se puede deshacer.
               </p>
               <div className="flex gap-3 mt-2">
                 <button
                   onClick={() => setDeleteInstructorId(null)}
-                  className="flex-1 border border-stone-200 text-stone-600 py-2.5 rounded-xl text-md hover:bg-stone-50 transition-colors cursor-pointer"
+                  className="flex-1 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-md hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>

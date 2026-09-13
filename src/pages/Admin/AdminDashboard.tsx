@@ -44,12 +44,12 @@ function AdminDashboard() {
     <div className="p-4 md:p-8">
       <div className="mb-8">
         <h1
-          className="text-4xl md:text-6xl font-semibold text-stone-800"
+          className="text-4xl md:text-6xl font-semibold text-slate-800"
           style={{ fontFamily: "Cormorant Garamond, serif" }}
         >
           Dashboard{" "}
           <span
-            className="italic text-[#3a5a3a]"
+            className="text-[#1b2c44]"
             style={{ fontFamily: "Cormorant Garamond, serif" }}
           >
             Admin
@@ -60,50 +60,50 @@ function AdminDashboard() {
       {/* Métricas */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div className="bg-white rounded-2xl p-5">
-          <p className="text-md text-stone-600 mb-1">Total transacciones</p>
+          <p className="text-md text-slate-600 mb-1">Total transacciones</p>
           <p
-            className="text-3xl font-semibold text-stone-800"
+            className="text-3xl font-semibold text-slate-800"
             style={{ fontFamily: "Cormorant Garamond, serif" }}
           >
             {metrics?.transactions.total || 0}
           </p>
-          <p className="text-md text-stone-600 mt-1">
+          <p className="text-md text-slate-600 mt-1">
             ${Number(metrics?.transactions.total_amount || 0).toLocaleString()}{" "}
             MXN
           </p>
         </div>
 
         <div className="bg-white rounded-2xl p-5">
-          <p className="text-md text-stone-600 mb-1">Mi comisión</p>
+          <p className="text-md text-slate-600 mb-1">Mi comisión</p>
           <p
-            className="text-3xl font-semibold text-stone-800"
+            className="text-3xl font-semibold text-slate-800"
             style={{ fontFamily: "Cormorant Garamond, serif" }}
           >
             ${Number(metrics?.commission.commission || 0).toFixed(2)}
           </p>
-          <p className="text-md text-stone-600 mt-1">3.6% por reserva</p>
+          <p className="text-md text-slate-600 mt-1">3.6% por reserva</p>
         </div>
 
         <div className="bg-white rounded-2xl p-5">
-          <p className="text-md text-stone-600 mb-1">Estudios nuevos</p>
+          <p className="text-md text-slate-600 mb-1">Estudios nuevos</p>
           <p
-            className="text-3xl font-semibold text-stone-800"
+            className="text-3xl font-semibold text-slate-800"
             style={{ fontFamily: "Cormorant Garamond, serif" }}
           >
             {metrics?.newStudios.total || 0}
           </p>
-          <p className="text-md text-stone-600 mt-1">Últimos 30 días</p>
+          <p className="text-md text-slate-600 mt-1">Últimos 30 días</p>
         </div>
 
         <div className="bg-white rounded-2xl p-5">
-          <p className="text-md text-stone-600 mb-1">Usuarios nuevos</p>
+          <p className="text-md text-slate-600 mb-1">Usuarios nuevos</p>
           <p
-            className="text-3xl font-semibold text-stone-800"
+            className="text-3xl font-semibold text-slate-800"
             style={{ fontFamily: "Cormorant Garamond, serif" }}
           >
             {metrics?.newUsers.total || 0}
           </p>
-          <p className="text-md text-stone-600 mt-1">Últimos 30 días</p>
+          <p className="text-md text-slate-600 mt-1">Últimos 30 días</p>
         </div>
       </div>
 
@@ -115,8 +115,8 @@ function AdminDashboard() {
             onClick={() => setActiveFilter(filter)}
             className={`px-4 py-1.5 rounded-full text-md transition-colors cursor-pointer ${
               activeFilter === filter
-                ? "bg-[#3a5a3a] text-white"
-                : "border border-stone-200 text-stone-600 hover:border-stone-400"
+                ? "bg-[#1b2c44] text-white"
+                : "border border-slate-200 text-slate-600 hover:border-slate-400"
             }`}
           >
             {filter === "hoy"
@@ -133,7 +133,7 @@ function AdminDashboard() {
       {/* Gráficas */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-white rounded-2xl p-5">
-          <p className="font-semibold text-stone-800 mb-4">Transacciones</p>
+          <p className="font-semibold text-slate-800 mb-4">Transacciones</p>
           <Line
             data={{
               labels:
@@ -145,7 +145,7 @@ function AdminDashboard() {
                   data:
                     chartData?.transactions.map((d: any) => Number(d.amount)) ||
                     [],
-                  borderColor: "#3a5a3a",
+                  borderColor: "#1b2c44",
                   backgroundColor: "rgba(58,90,58,0.08)",
                   fill: true,
                   tension: 0.4,
@@ -161,7 +161,7 @@ function AdminDashboard() {
         </div>
 
         <div className="bg-white rounded-2xl p-5">
-          <p className="font-semibold text-stone-800 mb-4">Mi comisión</p>
+          <p className="font-semibold text-slate-800 mb-4">Mi comisión</p>
           <Line
             data={{
               labels:
@@ -173,7 +173,7 @@ function AdminDashboard() {
                     chartData?.transactions.map(
                       (d: any) => Number(d.amount) * 0.036,
                     ) || [],
-                  borderColor: "#3a5a3a",
+                  borderColor: "#1b2c44",
                   backgroundColor: "rgba(58,90,58,0.08)",
                   fill: true,
                   tension: 0.4,
@@ -190,14 +190,14 @@ function AdminDashboard() {
 
         {/* Gráficas */}
         <div className="bg-white rounded-2xl p-5">
-          <p className="font-semibold text-stone-800 mb-4">Usuarios nuevos</p>
+          <p className="font-semibold text-slate-800 mb-4">Usuarios nuevos</p>
           <Line
             data={{
               labels: chartData?.users.map((d: any) => String(d.periodo)) || [],
               datasets: [
                 {
                   data: chartData?.users.map((d: any) => Number(d.total)) || [],
-                  borderColor: "#3a5a3a",
+                  borderColor: "#1b2c44",
                   backgroundColor: "rgba(58,90,58,0.08)",
                   fill: true,
                   tension: 0.4,
@@ -213,7 +213,7 @@ function AdminDashboard() {
         </div>
 
         <div className="bg-white rounded-2xl p-5">
-          <p className="font-semibold text-stone-800 mb-4">Estudios nuevos</p>
+          <p className="font-semibold text-slate-800 mb-4">Estudios nuevos</p>
           <Line
             data={{
               labels:
@@ -222,7 +222,7 @@ function AdminDashboard() {
                 {
                   data:
                     chartData?.studios.map((d: any) => Number(d.total)) || [],
-                  borderColor: "#3a5a3a",
+                  borderColor: "#1b2c44",
                   backgroundColor: "rgba(58,90,58,0.08)",
                   fill: true,
                   tension: 0.4,

@@ -29,18 +29,18 @@ function MisClases() {
     <div className="p-4 md:p-8">
       <div>
         <h1
-          className="text-4xl md:text-6xl font-semibold text-stone-800"
+          className="text-4xl md:text-6xl font-semibold text-slate-800"
           style={{ fontFamily: "Cormorant Garamond, serif" }}
         >
           Mis{" "}
           <span
-            className="italic text-[#3a5a3a]"
+            className="text-[#1b2c44]"
             style={{ fontFamily: "Cormorant Garamond, serif" }}
           >
             Clases
           </span>
         </h1>
-        <p className="text-base text-stone-600 mt-1">Tus próximas reservas</p>
+        <p className="text-base text-slate-600 mt-1">Tus próximas reservas</p>
       </div>
 
       {/* Tabs */}
@@ -51,8 +51,8 @@ function MisClases() {
             onClick={() => setActiveTab(tab)}
             className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
               activeTab === tab
-                ? "bg-[#3a5a3a] text-white"
-                : "bg-stone-100 text-stone-600 hover:bg-stone-200 cursor-pointer"
+                ? "bg-[#1b2c44] text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200 cursor-pointer"
             }`}
           >
             {tab}
@@ -66,9 +66,9 @@ function MisClases() {
           (bookings.filter((booking) => booking.status === "activa").length ===
           0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
-              <Astroid size={40} className="text-stone-600 mb-4" />
-              <p className="text-stone-600 font-medium">Sin clases por aquí</p>
-              <p className="text-stone-400 text-sm mt-1">
+              <Astroid size={40} className="text-slate-600 mb-4" />
+              <p className="text-slate-600 font-medium">Sin clases por aquí</p>
+              <p className="text-slate-400 text-sm mt-1">
                 Aquí podrás ver tus clases agendadas
               </p>
             </div>
@@ -91,9 +91,9 @@ function MisClases() {
           (bookings.filter((booking) => booking.status === "pasada").length ===
           0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
-              <CalendarDays size={40} className="text-stone-600 mb-4" />
-              <p className="text-stone-600 font-medium">Sin clases por aquí</p>
-              <p className="text-stone-400 text-sm mt-1">
+              <CalendarDays size={40} className="text-slate-600 mb-4" />
+              <p className="text-slate-600 font-medium">Sin clases por aquí</p>
+              <p className="text-slate-400 text-sm mt-1">
                 Aquí podrás ver el historial de tus clases agendadas
               </p>
             </div>

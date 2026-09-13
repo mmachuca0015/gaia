@@ -130,18 +130,18 @@ function AdminStudioModal({
 
   return (
     <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm"
+      className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label={`Detalles de ${studio.name}`}
     >
       <div
-        className="bg-[#f9f4ec] w-full max-w-5xl max-h-[90vh] rounded-3xl overflow-hidden flex flex-col"
+        className="bg-[#ffffff] w-full max-w-5xl max-h-[90vh] rounded-3xl overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Portada */}
-        <div className="relative h-40 shrink-0 bg-[#3a5a3a]">
+        <div className="relative h-40 shrink-0 bg-[#1b2c44]">
           {studio.cover_url && (
             <img
               src={studio.cover_url}
@@ -149,13 +149,13 @@ function AdminStudioModal({
               className="w-full h-full object-cover"
             />
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-stone-900/80 to-stone-900/10" />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-slate-900/10" />
 
           <button
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/90 text-stone-700 flex items-center justify-center transition-colors cursor-pointer hover:bg-white"
+            className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/90 text-slate-700 flex items-center justify-center transition-colors cursor-pointer hover:bg-white"
           >
             <X size={18} />
           </button>
@@ -182,10 +182,10 @@ function AdminStudioModal({
                     {Number(studio.rating).toFixed(1)}
                   </span>
                 )}
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/90 text-stone-700">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/90 text-slate-700">
                   {studio.is_active ? "Activo" : "Inactivo"}
                 </span>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/90 text-stone-700">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/90 text-slate-700">
                   {studio.is_open ? "Abierto" : "Cerrado"}
                 </span>
               </div>
@@ -197,15 +197,15 @@ function AdminStudioModal({
         <div className="overflow-y-auto p-6 grid gap-6 lg:grid-cols-3">
           {/* Clases */}
           <section className="lg:col-span-2 order-2 lg:order-1">
-            <h3 className="text-sm font-semibold text-stone-600 mb-3 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
               Clases
-              <span className="text-stone-400 font-normal">
+              <span className="text-slate-400 font-normal">
                 ({classes.length})
               </span>
             </h3>
 
             {classes.length === 0 ? (
-              <div className="bg-white rounded-2xl p-8 text-center text-stone-500 text-sm">
+              <div className="bg-white rounded-2xl p-8 text-center text-slate-500 text-sm">
                 Este estudio todavía no tiene clases
               </div>
             ) : (
@@ -220,26 +220,26 @@ function AdminStudioModal({
                     <div key={clase.id} className="bg-white rounded-2xl p-5">
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
-                          <p className="text-stone-800 font-medium">
+                          <p className="text-slate-800 font-medium">
                             {clase.name}
                           </p>
-                          <p className="text-sm text-stone-500 mt-0.5">
+                          <p className="text-sm text-slate-500 mt-0.5">
                             {clase.instructor ?? "Sin instructor asignado"}
                           </p>
                         </div>
-                        <p className="text-lg font-semibold text-[#3a5a3a] whitespace-nowrap">
+                        <p className="text-lg font-semibold text-[#1b2c44] whitespace-nowrap">
                           {formatPrice(clase.price)}
                         </p>
                       </div>
 
                       <div className="flex items-center gap-2 mt-4">
-                        <Users size={14} className="text-stone-400 shrink-0" />
-                        <span className="text-sm text-stone-600 whitespace-nowrap">
+                        <Users size={14} className="text-slate-400 shrink-0" />
+                        <span className="text-sm text-slate-600 whitespace-nowrap">
                           {alumnos} / {clase.capacity} alumnos
                         </span>
-                        <div className="flex-1 h-1.5 bg-stone-100 rounded-full overflow-hidden ml-1">
+                        <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden ml-1">
                           <div
-                            className="h-full bg-[#3a5a3a] rounded-full"
+                            className="h-full bg-[#1b2c44] rounded-full"
                             style={{ width: `${ocupacion}%` }}
                           />
                         </div>
@@ -247,7 +247,7 @@ function AdminStudioModal({
 
                       <div className="flex flex-wrap gap-2 mt-3">
                         {clase.horarios.length === 0 ? (
-                          <span className="text-xs text-stone-400">
+                          <span className="text-xs text-slate-400">
                             Sin horarios asignados
                           </span>
                         ) : (
@@ -259,9 +259,9 @@ function AdminStudioModal({
                             .map((horario) => (
                               <span
                                 key={`${horario.day}-${horario.time}`}
-                                className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-[#f1ece2] text-stone-600"
+                                className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-[#eef2f7] text-slate-600"
                               >
-                                <Clock size={12} className="text-stone-400" />
+                                <Clock size={12} className="text-slate-400" />
                                 {DAYS[horario.day]} · {formatTime(horario.time)}
                               </span>
                             ))
@@ -277,12 +277,12 @@ function AdminStudioModal({
           {/* Información general, mapa e instructores */}
           <aside className="flex flex-col gap-6 order-1 lg:order-2">
             <section>
-              <h3 className="text-sm font-semibold text-stone-600 mb-3">
+              <h3 className="text-sm font-semibold text-slate-600 mb-3">
                 Información general
               </h3>
               <div className="bg-white rounded-2xl p-5 flex flex-col gap-4">
                 {studio.description && (
-                  <p className="text-sm text-stone-600 leading-relaxed">
+                  <p className="text-sm text-slate-600 leading-relaxed">
                     {studio.description}
                   </p>
                 )}
@@ -290,34 +290,34 @@ function AdminStudioModal({
                 <div className="flex gap-3">
                   <MapPin
                     size={16}
-                    className="text-stone-400 shrink-0 mt-0.5"
+                    className="text-slate-400 shrink-0 mt-0.5"
                   />
-                  <div className="text-sm text-stone-600">
+                  <div className="text-sm text-slate-600">
                     {addressLine && <p>{addressLine}</p>}
                     {areaLine && <p>{areaLine}</p>}
                     {regionLine && <p>{regionLine}</p>}
                     {!addressLine && !areaLine && !regionLine && (
-                      <p className="text-stone-400">Sin dirección registrada</p>
+                      <p className="text-slate-400">Sin dirección registrada</p>
                     )}
                   </div>
                 </div>
 
                 {studio.phone && (
-                  <div className="flex items-center gap-3 text-sm text-stone-600">
-                    <Phone size={16} className="text-stone-400 shrink-0" />
+                  <div className="flex items-center gap-3 text-sm text-slate-600">
+                    <Phone size={16} className="text-slate-400 shrink-0" />
                     {studio.phone}
                   </div>
                 )}
 
                 {studio.email && (
-                  <div className="flex items-center gap-3 text-sm text-stone-600 break-all">
-                    <Mail size={16} className="text-stone-400 shrink-0" />
+                  <div className="flex items-center gap-3 text-sm text-slate-600 break-all">
+                    <Mail size={16} className="text-slate-400 shrink-0" />
                     {studio.email}
                   </div>
                 )}
 
-                <div className="flex items-center gap-3 text-sm text-stone-600 pt-1 border-t border-stone-100">
-                  <CalendarDays size={16} className="text-stone-400 shrink-0" />
+                <div className="flex items-center gap-3 text-sm text-slate-600 pt-1 border-t border-slate-100">
+                  <CalendarDays size={16} className="text-slate-400 shrink-0" />
                   <span className="pt-3">
                     Dado de alta el {formatDate(studio.created_at)}
                   </span>
@@ -327,7 +327,7 @@ function AdminStudioModal({
 
             {hasMap && (
               <section>
-                <h3 className="text-sm font-semibold text-stone-600 mb-3">
+                <h3 className="text-sm font-semibold text-slate-600 mb-3">
                   Ubicación
                 </h3>
                 <MapContainer
@@ -344,15 +344,15 @@ function AdminStudioModal({
             )}
 
             <section>
-              <h3 className="text-sm font-semibold text-stone-600 mb-3 flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
                 Instructores
-                <span className="text-stone-400 font-normal">
+                <span className="text-slate-400 font-normal">
                   ({instructors.length})
                 </span>
               </h3>
 
               {instructors.length === 0 ? (
-                <div className="bg-white rounded-2xl p-6 text-center text-stone-500 text-sm">
+                <div className="bg-white rounded-2xl p-6 text-center text-slate-500 text-sm">
                   Sin instructores registrados
                 </div>
               ) : (
@@ -360,17 +360,17 @@ function AdminStudioModal({
                   {instructors.map((instructor) => (
                     <div
                       key={instructor.id}
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-stone-50 transition-colors"
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors"
                     >
-                      <span className="w-9 h-9 rounded-full bg-[#3a5a3a]/10 text-[#3a5a3a] text-xs font-medium flex items-center justify-center shrink-0">
+                      <span className="w-9 h-9 rounded-full bg-[#1b2c44]/10 text-[#1b2c44] text-xs font-medium flex items-center justify-center shrink-0">
                         {instructor.name[0]}
                         {instructor.last_name?.[0]}
                       </span>
                       <div className="min-w-0">
-                        <p className="text-sm text-stone-800 font-medium truncate">
+                        <p className="text-sm text-slate-800 font-medium truncate">
                           {instructor.name} {instructor.last_name}
                         </p>
-                        <p className="text-xs text-stone-500">
+                        <p className="text-xs text-slate-500">
                           Desde {formatDate(instructor.created_at)}
                         </p>
                       </div>

@@ -34,8 +34,8 @@ function ProtectedRoute({ allow }: Props) {
 
   if (checking) {
     return (
-      <div className="min-h-screen bg-[#f6eee2] flex items-center justify-center">
-        <p className="text-sm text-stone-400">Cargando…</p>
+      <div className="min-h-screen bg-[#f4f7fa] flex items-center justify-center">
+        <p className="text-sm text-slate-400">Cargando…</p>
       </div>
     );
   }

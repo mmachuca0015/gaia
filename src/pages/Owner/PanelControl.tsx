@@ -98,12 +98,12 @@ function PanelControl() {
       <div className="p-4 md:p-8">
         <div className="mb-8">
           <h1
-            className="text-4xl md:text-6xl font-semibold text-stone-800"
+            className="text-4xl md:text-6xl font-semibold text-slate-800"
             style={{ fontFamily: "Cormorant Garamond, serif" }}
           >
             Hola,{" "}
             <span
-              className="italic text-[#3a5a3a]"
+              className="text-[#1b2c44]"
               style={{ fontFamily: "Cormorant Garamond, serif" }}
             >
               {studio?.name}
@@ -118,46 +118,46 @@ function PanelControl() {
             {/* Ingresos y clases de hoy, calificación*/}
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-white rounded-2xl p-5 text-center">
-                <p className="text-xl text-stone-600 mb-1">Ingresos hoy</p>
+                <p className="text-xl text-slate-600 mb-1">Ingresos hoy</p>
                 <p
-                  className="text-5xl font-semibold text-stone-800"
+                  className="text-5xl font-semibold text-slate-800"
                   style={{ fontFamily: "Cormorant Garamond, serif" }}
                 >
                   ${Number(ingresos.total || 0).toLocaleString()}
                 </p>
               </div>
               <div className="bg-white rounded-2xl p-5 text-center">
-                <p className="text-xl text-stone-600 mb-1">Clases hoy</p>
+                <p className="text-xl text-slate-600 mb-1">Clases hoy</p>
                 <p
-                  className="text-5xl font-semibold text-stone-800"
+                  className="text-5xl font-semibold text-slate-800"
                   style={{ fontFamily: "Cormorant Garamond, serif" }}
                 >
                   {todayClasses.length}
                 </p>
-                <p className="text-md text-stone-600 mt-3">
+                <p className="text-md text-slate-600 mt-3">
                   {todayClasses.filter((c) => c.available_spots > 0).length} con
                   lugares disponibles
                 </p>
               </div>
               {/* <div className="bg-white rounded-2xl p-5 text-center">
-                <p className="text-xl text-stone-600 mb-1">Calificación</p>
+                <p className="text-xl text-slate-600 mb-1">Calificación</p>
                 <div className="flex justify-center items-center gap-2">
                   <p
-                    className="text-5xl font-semibold text-stone-800"
+                    className="text-5xl font-semibold text-slate-800"
                     style={{ fontFamily: "Cormorant Garamond, serif" }}
                   >
                     4.9
                   </p>
-                  <Star size={25} className="text-[#3a5a3a] fill-[#3a5a3a]" />
+                  <Star size={25} className="text-[#1b2c44] fill-[#1b2c44]" />
                 </div>
-                <p className="text-md text-stone-600 mt-1">128 reseñas</p>
+                <p className="text-md text-slate-600 mt-1">128 reseñas</p>
               </div> */}
             </div>
             {/* Ingresos */}
             <div className="bg-white rounded-2xl p-5">
               {/* Filtros */}
               <div className="flex items-center justify-between mb-4">
-                <p className="font-semibold text-stone-800">Ingresos</p>
+                <p className="font-semibold text-slate-800">Ingresos</p>
                 <div className="flex gap-2">
                   {(["hoy", "semana", "mes", "semestral"] as const).map(
                     (filter) => (
@@ -166,8 +166,8 @@ function PanelControl() {
                         onClick={() => setActiveFilter(filter)}
                         className={`px-3 py-1 rounded-full text-md transition-colors cursor-pointer ${
                           activeFilter === filter
-                            ? "bg-[#3a5a3a] text-white"
-                            : "border border-stone-200 text-stone-600 hover:border-stone-400"
+                            ? "bg-[#1b2c44] text-white"
+                            : "border border-slate-200 text-slate-600 hover:border-slate-400"
                         }`}
                       >
                         {filter === "hoy"
@@ -185,9 +185,9 @@ function PanelControl() {
 
               {/* Total */}
               <div className="mb-4">
-                <p className="text-md text-stone-600">Total del período</p>
+                <p className="text-md text-slate-600">Total del período</p>
                 <p
-                  className="text-5xl font-semibold text-stone-800"
+                  className="text-5xl font-semibold text-slate-800"
                   style={{ fontFamily: "Cormorant Garamond, serif" }}
                 >
                   ${Number(ingresos.total || 0).toLocaleString()}
@@ -202,12 +202,12 @@ function PanelControl() {
                     datasets: [
                       {
                         data: graficaData.map((d) => Number(d.total)),
-                        borderColor: "#3a5a3a",
+                        borderColor: "#1b2c44",
                         backgroundColor: "rgba(58,90,58,0.08)",
                         fill: true,
                         tension: 0.4,
                         pointRadius: 3,
-                        pointBackgroundColor: "#3a5a3a",
+                        pointBackgroundColor: "#1b2c44",
                       },
                     ],
                   }}
@@ -243,25 +243,25 @@ function PanelControl() {
 
             {/* Clases de hoy */}
             <div className="bg-white rounded-2xl p-5">
-              <p className="font-semibold text-stone-800 mb-4">Clases de hoy</p>
+              <p className="font-semibold text-slate-800 mb-4">Clases de hoy</p>
               <div className="flex flex-col gap-3">
                 {todayClasses.map((clase) => (
                   <div
                     key={clase.schedule_id}
-                    className="flex items-center justify-between py-3 border-b border-stone-100 last:border-0"
+                    className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0"
                   >
                     <div className="flex items-center gap-4">
                       <p
-                        className="text-2xl font-semibold text-stone-800"
+                        className="text-2xl font-semibold text-slate-800"
                         style={{ fontFamily: "Cormorant Garamond, serif" }}
                       >
                         {clase.time.slice(0, 5)}
                       </p>
                       <div>
-                        <p className="font-medium text-stone-800">
+                        <p className="font-medium text-slate-800">
                           {clase.name}
                         </p>
-                        <p className="text-md text-stone-600">
+                        <p className="text-md text-slate-600">
                           con {clase.instructor}
                         </p>
                       </div>
@@ -270,7 +270,7 @@ function PanelControl() {
                       className={`text-md px-3 py-1 rounded-full ${
                         clase.available_spots === 0
                           ? "bg-amber-50 text-amber-700"
-                          : "bg-[#e8f0e8] text-[#3a5a3a]"
+                          : "bg-[#e8eef7] text-[#1b2c44]"
                       }`}
                     >
                       {clase.available_spots === 0
@@ -284,28 +284,28 @@ function PanelControl() {
           </div>
           {/* Columna derecha */}
           <div className="bg-white rounded-2xl p-5 h-fit">
-            <p className="font-semibold text-stone-800 border-b border-stone-100 pb-4 mb-4">
+            <p className="font-semibold text-slate-800 border-b border-slate-100 pb-4 mb-4">
               Actividad reciente
             </p>
             <ul className="flex flex-col gap-4">
               {actividad.map((item, index) => (
                 <li
                   key={index}
-                  className="flex items-start gap-3 border-b border-stone-100 last:border-0 pb-4"
+                  className="flex items-start gap-3 border-b border-slate-100 last:border-0 pb-4"
                 >
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      item.tipo === "reserva" ? "bg-[#e8f0e8]" : "bg-[#faeeda]"
+                      item.tipo === "reserva" ? "bg-[#e8eef7]" : "bg-[#faeeda]"
                     }`}
                   >
                     {item.tipo === "reserva" ? (
-                      <CalendarCheck size={15} className="text-[#3a5a3a]" />
+                      <CalendarCheck size={15} className="text-[#1b2c44]" />
                     ) : (
                       <Heart size={15} className="text-amber-700" />
                     )}
                   </div>
                   <div>
-                    <p className="text-md text-stone-800">
+                    <p className="text-md text-slate-800">
                       <span className="font-medium">
                         {item.name} {item.last_name}
                       </span>
@@ -313,7 +313,7 @@ function PanelControl() {
                         ? ` reservó ${item.class_name}`
                         : ` agregó tu estudio a favoritos`}
                     </p>
-                    <p className="text-md text-stone-400">
+                    <p className="text-md text-slate-400">
                       {new Date(item.created_at).toLocaleDateString("es-MX", {
                         day: "numeric",
                         month: "short",

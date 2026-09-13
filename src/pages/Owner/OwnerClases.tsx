@@ -211,12 +211,12 @@ function OwnerClases() {
       <div className="p-4 md:p-8">
         <div className="flex items-center justify-between mb-8">
           <h1
-            className="text-4xl md:text-6xl font-semibold text-stone-800"
+            className="text-4xl md:text-6xl font-semibold text-slate-800"
             style={{ fontFamily: "Cormorant Garamond, serif" }}
           >
             Mis{" "}
             <span
-              className="italic text-[#3a5a3a]"
+              className="text-[#1b2c44]"
               style={{ fontFamily: "Cormorant Garamond, serif" }}
             >
               Clases
@@ -227,7 +227,7 @@ function OwnerClases() {
               setPopupMode("add");
               setClassPopup(true);
             }}
-            className="flex items-center gap-2 bg-[#3a5a3a] text-white px-5 py-2.5 rounded-xl text-md font-medium hover:bg-[#2e4a2e] transition-colors cursor-pointer"
+            className="flex items-center gap-2 bg-[#1b2c44] text-white px-5 py-2.5 rounded-xl text-md font-medium hover:bg-[#33506f] transition-colors cursor-pointer"
           >
             <Plus size={20} />
             Agregar clase
@@ -283,10 +283,10 @@ function OwnerClases() {
         </div>
 
         {/* Calendario */}
-        <div className="bg-white rounded-2xl overflow-hidden border border-stone-100">
+        <div className="bg-white rounded-2xl overflow-hidden border border-slate-100">
           {/* Header días */}
-          <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-stone-100">
-            <div className="p-3 bg-stone-50" />
+          <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-slate-100">
+            <div className="p-3 bg-slate-50" />
             {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((day, i) => {
               const today = new Date();
               const startOfWeek = new Date(today);
@@ -296,15 +296,15 @@ function OwnerClases() {
               return (
                 <div
                   key={day}
-                  className={`p-3 text-center border-l border-stone-100 ${isToday ? "bg-[#e8f0e8]" : "bg-stone-50"}`}
+                  className={`p-3 text-center border-l border-slate-100 ${isToday ? "bg-[#e8eef7]" : "bg-slate-50"}`}
                 >
                   <p
-                    className={`text-md font-medium ${isToday ? "text-[#3a5a3a]" : "text-stone-600"}`}
+                    className={`text-md font-medium ${isToday ? "text-[#1b2c44]" : "text-slate-600"}`}
                   >
                     {day}
                   </p>
                   <p
-                    className={`text-md ${isToday ? "text-[#3a5a3a] font-medium" : "text-stone-400"}`}
+                    className={`text-md ${isToday ? "text-[#1b2c44] font-medium" : "text-slate-400"}`}
                   >
                     {startOfWeek.getDate()}
                   </p>
@@ -317,10 +317,10 @@ function OwnerClases() {
           {Array.from({ length: 17 }, (_, i) => i + 6).map((hour) => (
             <div
               key={hour}
-              className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-stone-100"
+              className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-slate-100"
             >
-              <div className="p-2 text-right pr-3 bg-stone-50 border-r border-stone-100">
-                <p className="text-md text-stone-400">{hour}:00</p>
+              <div className="p-2 text-right pr-3 bg-slate-50 border-r border-slate-100">
+                <p className="text-md text-slate-400">{hour}:00</p>
               </div>
               {[1, 2, 3, 4, 5, 6, 0].map((dayIndex) => {
                 const classesInCell = validSchedules.filter((s) => {
@@ -334,7 +334,7 @@ function OwnerClases() {
                 return (
                   <div
                     key={dayIndex}
-                    className="relative border-l border-stone-100 h-14 overflow-hidden hover:bg-stone-50 transition-colors"
+                    className="relative border-l border-slate-100 h-14 overflow-hidden hover:bg-slate-50 transition-colors"
                   >
                     {classesInCell
                       .filter((s) => {
@@ -344,12 +344,12 @@ function OwnerClases() {
                       .map((s) => (
                         <div
                           key={s.schedule_id}
-                          className="mx-1 mt-1 bg-[#e8f0e8] border-l-2 border-[#3a5a3a] rounded px-2 py-1"
+                          className="mx-1 mt-1 bg-[#e8eef7] border-l-2 border-[#1b2c44] rounded px-2 py-1"
                         >
-                          <p className="text-md font-medium text-[#3a5a3a] leading-tight">
+                          <p className="text-md font-medium text-[#1b2c44] leading-tight">
                             {s.name}
                           </p>
-                          <p className="text-md text-[#3B6D11] leading-tight">
+                          <p className="text-md text-[#33506f] leading-tight">
                             {s.instructor}
                           </p>
                         </div>
@@ -357,13 +357,13 @@ function OwnerClases() {
                     {halfHourClasses.map((s) => (
                       <div
                         key={s.schedule_id}
-                        className="mx-1 bg-[#e8f0e8] border-l-2 border-[#3a5a3a] rounded px-2 py-1"
+                        className="mx-1 bg-[#e8eef7] border-l-2 border-[#1b2c44] rounded px-2 py-1"
                         style={{ marginTop: "50%" }}
                       >
-                        <p className="text-md font-medium text-[#3a5a3a] leading-tight">
+                        <p className="text-md font-medium text-[#1b2c44] leading-tight">
                           {s.name}
                         </p>
-                        <p className="text-md text-[#3B6D11] leading-tight">
+                        <p className="text-md text-[#33506f] leading-tight">
                           {s.instructor}
                         </p>
                       </div>
@@ -379,12 +379,12 @@ function OwnerClases() {
         {classPopup && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl p-8 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto flex flex-col gap-4">
-              <p className="font-semibold text-stone-800 text-lg">
+              <p className="font-semibold text-slate-800 text-lg">
                 {popupMode === "add" ? "Agregar clase" : "Editar clase"}
               </p>
 
               <div>
-                <label className="text-md text-stone-600 block mb-1.5">
+                <label className="text-md text-slate-600 block mb-1.5">
                   Nombre de la clase
                 </label>
                 <input
@@ -394,12 +394,12 @@ function OwnerClases() {
                     setNewClassForm({ ...newClassForm, name: e.target.value })
                   }
                   placeholder="Reformer Básico"
-                  className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-md outline-none focus:border-stone-400 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none focus:border-slate-400 transition-colors"
                 />
               </div>
 
               <div>
-                <label className="text-md text-stone-600 block mb-1.5">
+                <label className="text-md text-slate-600 block mb-1.5">
                   Instructor
                 </label>
                 <select
@@ -410,7 +410,7 @@ function OwnerClases() {
                       instructor_id: parseInt(e.target.value),
                     })
                   }
-                  className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-md outline-none focus:border-stone-400 transition-colors text-stone-600"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none focus:border-slate-400 transition-colors text-slate-600"
                 >
                   <option value="">Selecciona un instructor</option>
                   {instructors.map((instructor) => (
@@ -423,7 +423,7 @@ function OwnerClases() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-md text-stone-600 block mb-1.5">
+                  <label className="text-md text-slate-600 block mb-1.5">
                     Capacidad
                   </label>
                   <input
@@ -436,15 +436,15 @@ function OwnerClases() {
                       })
                     }
                     placeholder="10"
-                    className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-md outline-none focus:border-stone-400 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none focus:border-slate-400 transition-colors"
                   />
                 </div>
                 <div>
-                  <label className="text-md text-stone-600 block mb-1.5">
+                  <label className="text-md text-slate-600 block mb-1.5">
                     Precio
                   </label>
                   <div className="flex items-center gap-2">
-                    <span className="text-stone-400">$</span>
+                    <span className="text-slate-400">$</span>
                     <input
                       type="number"
                       value={newClassForm.price}
@@ -455,14 +455,14 @@ function OwnerClases() {
                         })
                       }
                       placeholder="320"
-                      className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-md outline-none focus:border-stone-400 transition-colors"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none focus:border-slate-400 transition-colors"
                     />
                   </div>
                 </div>
               </div>
 
               <div>
-                <label className="text-md text-stone-600 block mb-2">
+                <label className="text-md text-slate-600 block mb-2">
                   Tipo de clase
                 </label>
                 <div className="flex gap-4">
@@ -478,9 +478,9 @@ function OwnerClases() {
                           classType: e.target.value,
                         })
                       }
-                      className="accent-[#3a5a3a]"
+                      className="accent-[#1b2c44]"
                     />
-                    <span className="text-md text-stone-700">Única</span>
+                    <span className="text-md text-slate-700">Única</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -494,9 +494,9 @@ function OwnerClases() {
                           classType: e.target.value,
                         })
                       }
-                      className="accent-[#3a5a3a]"
+                      className="accent-[#1b2c44]"
                     />
-                    <span className="text-md text-stone-700">Permanente</span>
+                    <span className="text-md text-slate-700">Permanente</span>
                   </label>
                 </div>
               </div>
@@ -504,7 +504,7 @@ function OwnerClases() {
               {newClassForm.classType === "única" && (
                 <div className="flex flex-col gap-3">
                   <div>
-                    <label className="text-md text-stone-600 block mb-1.5">
+                    <label className="text-md text-slate-600 block mb-1.5">
                       Fecha
                     </label>
                     <input
@@ -516,11 +516,11 @@ function OwnerClases() {
                           selectedDate: e.target.value,
                         })
                       }
-                      className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-md outline-none focus:border-stone-400 transition-colors"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none focus:border-slate-400 transition-colors"
                     />
                   </div>
                   <div>
-                    <label className="text-md text-stone-600 block mb-1.5">
+                    <label className="text-md text-slate-600 block mb-1.5">
                       Hora
                     </label>
                     <select
@@ -531,7 +531,7 @@ function OwnerClases() {
                           selectedTime: e.target.value,
                         })
                       }
-                      className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-md outline-none text-stone-600"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none text-slate-600"
                     >
                       {[
                         "6:00 AM",
@@ -580,7 +580,7 @@ function OwnerClases() {
               {newClassForm.classType === "permanente" && (
                 <div className="flex flex-col gap-3">
                   <div>
-                    <label className="text-md text-stone-600 block mb-2">
+                    <label className="text-md text-slate-600 block mb-2">
                       Días
                     </label>
                     <div className="flex flex-wrap gap-2">
@@ -611,15 +611,15 @@ function OwnerClases() {
                                     ),
                               })
                             }
-                            className="accent-[#3a5a3a]"
+                            className="accent-[#1b2c44]"
                           />
-                          <span className="text-md text-stone-700">{d}</span>
+                          <span className="text-md text-slate-700">{d}</span>
                         </label>
                       ))}
                     </div>
                   </div>
                   <div>
-                    <label className="text-md text-stone-600 block mb-1.5">
+                    <label className="text-md text-slate-600 block mb-1.5">
                       Hora
                     </label>
                     <select
@@ -630,7 +630,7 @@ function OwnerClases() {
                           selectedTime: e.target.value,
                         })
                       }
-                      className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-md outline-none text-stone-600"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none text-slate-600"
                     >
                       {[
                         "6:00 AM",
@@ -679,7 +679,7 @@ function OwnerClases() {
               <div className="flex gap-3 mt-2">
                 <button
                   onClick={() => setClassPopup(false)}
-                  className="flex-1 border border-stone-200 text-stone-600 py-2.5 rounded-xl text-md hover:bg-stone-50 transition-colors cursor-pointer"
+                  className="flex-1 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-md hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -687,7 +687,7 @@ function OwnerClases() {
                   onClick={
                     popupMode === "add" ? handleAddClass : handleEditClass
                   }
-                  className="flex-1 bg-[#3a5a3a] text-white py-2.5 rounded-xl text-md hover:bg-[#2e4a2e] transition-colors cursor-pointer"
+                  className="flex-1 bg-[#1b2c44] text-white py-2.5 rounded-xl text-md hover:bg-[#33506f] transition-colors cursor-pointer"
                 >
                   {popupMode === "add" ? "Guardar clase" : "Guardar cambios"}
                 </button>

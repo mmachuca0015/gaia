@@ -1,15 +1,23 @@
+import Header from "./components/Header";
 import Hero from "./components/Hero";
-import About from "./components/About";
-import Features from "./components/Features";
-import Waitlist from "./components/Waitlist";
+import ForClients from "./components/ForClients";
+import ForOwners from "./components/ForOwners";
+import Comparison from "./components/Comparison";
+import Pricing from "./components/Pricing";
+import DemoCta from "./components/DemoCta";
+import Footer from "./components/Footer";
 
 function Landing() {
   return (
-    <div>
+    <div className="bg-paper">
+      <Header />
       <Hero />
-      <About />
-      <Features />
-      <Waitlist />
+      <ForClients />
+      <ForOwners />
+      <Comparison />
+      <Pricing />
+      <DemoCta />
+      <Footer />
     </div>
   );
 }

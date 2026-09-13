@@ -243,7 +243,7 @@ router.post("/test", passwordResetLimiter, async (req, res) => {
     );
 
     await resend.emails.send({
-      from: "PILA <onboarding@resend.dev>",
+      from: "wellco <onboarding@resend.dev>",
       to: email,
       subject: "Recupera tu contraseña",
       html: `<p>Haz click en el siguiente link para recuperar tu contraseña. Este link expira en 30 minutos.</p>

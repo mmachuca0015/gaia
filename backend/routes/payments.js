@@ -268,7 +268,7 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
 
     try {
       await resend.emails.send({
-        from: "PILA <onboarding@resend.dev>",
+        from: "wellco <onboarding@resend.dev>",
         to: booking.email,
         subject: "¡Reserva confirmada!",
         html: `
@@ -282,7 +282,7 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
     <p><strong>Total pagado:</strong> $${booking.price} MXN</p>
     <br>
     <p>¡Nos vemos en clase!</p>
-    <p>El equipo de PILA</p>
+    <p>El equipo de wellco</p>
   `,
       });
     } catch (error) {

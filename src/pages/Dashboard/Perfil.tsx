@@ -48,12 +48,12 @@ function Perfil() {
     <div>
       <div className="p-4 md:p-8">
         <h1
-          className="text-4xl md:text-6xl font-semibold text-stone-800"
+          className="text-4xl md:text-6xl font-semibold text-slate-800"
           style={{ fontFamily: "Cormorant Garamond, serif" }}
         >
           Mi{" "}
           <span
-            className="italic text-[#3a5a3a]"
+            className="text-[#1b2c44]"
             style={{ fontFamily: "Cormorant Garamond, serif" }}
           >
             Perfil
@@ -62,14 +62,14 @@ function Perfil() {
       </div>
       <div className="max-w-2xl mx-auto">
         <div className="bg-white rounded-2xl p-6 flex items-center gap-4 mb-4">
-          <div className="w-16 h-16 rounded-full bg-stone-200 border border-stone-200 flex items-center justify-center text-stone-600 font-medium text-lg">
+          <div className="w-16 h-16 rounded-full bg-slate-200 border border-slate-200 flex items-center justify-center text-slate-600 font-medium text-lg">
             {initials}
           </div>
           <div>
-            <p className="font-semibold text-stone-800 text-lg">
+            <p className="font-semibold text-slate-800 text-lg">
               {user.name} {user.last_name}
             </p>
-            <p className="text-stone-400 text-sm">{user.email}</p>
+            <p className="text-slate-400 text-sm">{user.email}</p>
           </div>
         </div>
       </div>
@@ -78,24 +78,24 @@ function Perfil() {
           <div
             key={item.label}
             onClick={() => navigate(item.path)}
-            className={`group flex items-center gap-3 px-5 py-4 hover:bg-[#3a5a3a] cursor-pointer transition-colors ${
-              index !== menuItems.length - 1 ? "border-b border-stone-200" : ""
+            className={`group flex items-center gap-3 px-5 py-4 hover:bg-[#1b2c44] cursor-pointer transition-colors ${
+              index !== menuItems.length - 1 ? "border-b border-slate-200" : ""
             }`}
           >
             <item.icon
               size={18}
-              className="text-stone-400 group-hover:text-white"
+              className="text-slate-400 group-hover:text-white"
             />
-            <span className="flex-1 text-sm text-stone-700 group-hover:text-white">
+            <span className="flex-1 text-sm text-slate-700 group-hover:text-white">
               {item.label}
             </span>
             <ChevronRight
               size={16}
-              className="text-stone-300 group-hover:text-white"
+              className="text-slate-300 group-hover:text-white"
             />
           </div>
         ))}
-        <div className="lg:hidden flex items-center gap-3 px-5 py-4 hover:bg-red-50 cursor-pointer transition-colors border-t border-stone-200">
+        <div className="lg:hidden flex items-center gap-3 px-5 py-4 hover:bg-red-50 cursor-pointer transition-colors border-t border-slate-200">
           <LogOut size={18} className="text-red-400" />
           <span className="flex-1 text-sm text-red-400">Cerrar sesión</span>
           <ChevronRight size={16} className="text-red-300" />

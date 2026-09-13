@@ -1,8 +1,10 @@
-# PILA — Contexto del proyecto
+# wellco — Contexto del proyecto
 
 ## Qué es
 
-Plataforma de reservas full-stack que conecta estudios de pilates con usuarios finales. Antes se llamaba GAIA (originalmente GAIA Wellness).
+Marketplace de reservas full-stack que conecta estudios de ejercicio con usuarios finales.
+
+Historial de nombres: GAIA Wellness -> GAIA -> PILA -> **wellco** (nombre actual, desde septiembre de 2025). La carpeta del repo sigue llamandose `GAIA` y `package.json` ya dice `wellco`.
 
 ## Stack
 
@@ -45,15 +47,43 @@ Plataforma de reservas full-stack que conecta estudios de pilates con usuarios f
 
 ## Modelo de negocio
 
-- Comisión del 3.6% por transacción
-- Suscripción mensual para estudios
+- Comisión del 7.2% por transacción (incluye el procesamiento de Stripe)
+- Suscripción mensual para estudios: plan Light y plan Pro
+- Gratis para los clientes que reservan
+
+**Ojo:** los precios que se muestran en `src/pages/Landing/components/Pricing.tsx`
+($199 Light / $399 Pro) y sus listas de features son PLACEHOLDER, puestos solo
+para ver el diseño. Faltan los definitivos.
+
+- El plan anual aplica 15% de descuento (`ANNUAL_DISCOUNT` en `Pricing.tsx`). El
+  precio grande siempre se muestra por mes; el total anual va en la línea de abajo.
+- **La comisión por transacción no se menciona en la landing** — es una decisión
+  de producto, no un olvido. Se habla de ella en el demo.
 
 ## Diseño / branding
 
-- Tipografía de encabezados: Cormorant Garamond (serif)
-- Fondo: beige `#f6eee2`
-- Verde oscuro: `#3a5a3a`
-- Texto secundario: `text-stone-600`
+Paleta azul apagada. Sustituye al beige/verde anterior.
+
+- Tipografía de encabezados: Cormorant Garamond (serif), a menudo en itálica para el acento
+- Tokens de Tailwind v4 definidos en `src/index.css` con `@theme`:
+  - `ink` `#1b2c44` — azul marino desaturado; texto principal y botones primarios
+  - `ink-soft` `#33506f` — hover de los botones primarios
+  - `paper` `#ffffff` — fondo base
+  - `surface` `#f4f7fa` — fondo de secciones alternas, con tinte azul
+  - `line` `#e0e7ef` — bordes
+- Se usan como `bg-ink`, `text-ink`, `bg-surface`, `border-line`, y admiten
+  opacidad (`bg-ink/5`)
+- Los grises son la escala `slate` de Tailwind (tiene tinte azul), no `neutral`
+  ni `stone`. Texto secundario: `text-slate-500`; texto tenue: `text-slate-400`
+- El ámbar (`#faeeda`, `amber-50/700`) se conserva: señala estado, no marca
+
+Toda la app está migrada (landing, dashboards, panel de dueño, admin, auth). Ya
+no queda beige ni verde, y las variables `--gaia-*` se eliminaron de
+`src/index.css` porque nadie las usaba.
+
+**Cursivas:** los `h1` de la app ("Hola, *nombre*") van en redonda; la cursiva
+de Cormorant solo se usa como acento en la landing, que es material de
+marketing. Si migras una pantalla nueva, no le pongas `italic` al encabezado.
 
 ## Estructura de carpetas
 
@@ -75,6 +105,8 @@ Plataforma de reservas full-stack que conecta estudios de pilates con usuarios f
 - `lib/api.ts` — cliente HTTP único (cookie de sesión + URL base). Todas las llamadas pasan por aquí.
 - `layouts/` — layouts usados en el proyecto
 - `pages/` — páginas: dashboard, login, landing, panel del dueño de estudio, panel de administrador, reset password
+- `pages/Landing/components/` — secciones de la landing: `Header`, `Hero`, `ForClients`, `ForOwners`, `Comparison`, `Pricing`, `DemoCta`, `Footer`
+- `pages/Landing/components/previews/` — renders de la app hechos con markup (no son capturas): `BrowserFrame`, `UserAppPreview`, `OwnerAppPreview`. Si cambia el UI real de `Explorar.tsx` o `PanelControl.tsx`, hay que actualizarlos a mano
 - `App.tsx` — reúne todas las rutas del proyecto
 - `main.tsx` — archivo principal de React
 

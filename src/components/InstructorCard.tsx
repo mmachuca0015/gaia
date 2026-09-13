@@ -18,20 +18,20 @@ function InstructorCard({
   return (
     <div className="bg-white rounded-2xl p-6">
       <div className="flex items-center gap-4 mb-4">
-        <div className="w-20 h-20 text-2xl rounded-full bg-stone-200 border border-stone-300 flex items-center justify-center text-stone-600 font-medium flex-shrink-0">
+        <div className="w-20 h-20 text-2xl rounded-full bg-slate-200 border border-slate-300 flex items-center justify-center text-slate-600 font-medium flex-shrink-0">
           <span>
             {name.charAt(0)}
             {last_name.charAt(0)}
           </span>
         </div>
         <div>
-          <p className="font-medium text-stone-800">
+          <p className="font-medium text-slate-800">
             {name} {last_name}
           </p>
-          <p className="text-md text-stone-600">
+          <p className="text-md text-slate-600">
             {classes_per_week} clases por semana
           </p>
-          <p className="text-md text-stone-400">Se unió hace {joined}</p>
+          <p className="text-md text-slate-400">Se unió hace {joined}</p>
         </div>
       </div>
       <div className="flex justify-center">

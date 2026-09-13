@@ -27,12 +27,12 @@ function Favoritos() {
       {/* Header */}
       <div className="mb-14">
         <h1
-          className="text-4xl md:text-6xl font-semibold text-stone-800"
+          className="text-4xl md:text-6xl font-semibold text-slate-800"
           style={{ fontFamily: "Cormorant Garamond, serif" }}
         >
           Tus estudios{" "}
           <span
-            className="italic text-[#3a5a3a]"
+            className="text-[#1b2c44]"
             style={{ fontFamily: "Cormorant Garamond, serif" }}
           >
             favoritos

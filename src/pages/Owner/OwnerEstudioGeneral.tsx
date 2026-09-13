@@ -142,15 +142,15 @@ function OwnerEstudioGeneral() {
           <ArrowLeft
             size={22}
             onClick={() => navigate(-1)}
-            className="text-[#3a5a3a] cursor-pointer"
+            className="text-[#1b2c44] cursor-pointer"
           />
           <h1
-            className="text-4xl md:text-6xl font-semibold text-stone-800"
+            className="text-4xl md:text-6xl font-semibold text-slate-800"
             style={{ fontFamily: "Cormorant Garamond, serif" }}
           >
             Mi{" "}
             <span
-              className="italic text-[#3a5a3a]"
+              className="text-[#1b2c44]"
               style={{ fontFamily: "Cormorant Garamond, serif" }}
             >
               Estudio
@@ -161,32 +161,32 @@ function OwnerEstudioGeneral() {
         <div className="max-w-2xl mx-auto flex flex-col gap-6">
           {/* Información General */}
           <div className="bg-white rounded-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-stone-100">
-              <p className="font-semibold text-stone-800">
+            <div className="px-5 py-4 border-b border-slate-100">
+              <p className="font-semibold text-slate-800">
                 Información General
               </p>
             </div>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <div>
-                <p className="text-md text-stone-600 mb-0.5">
+                <p className="text-md text-slate-600 mb-0.5">
                   Nombre del estudio
                 </p>
-                <p className="text-stone-800">{studio?.name}</p>
+                <p className="text-slate-800">{studio?.name}</p>
               </div>
               <button
                 onClick={() => {
                   setEditMode("name");
                   setEditForm({ ...editForm, name: studio?.name || "" });
                 }}
-                className="text-md text-[#3a5a3a] font-medium cursor-pointer hover:underline"
+                className="text-md text-[#1b2c44] font-medium cursor-pointer hover:underline"
               >
                 Editar
               </button>
             </div>
             <div className="flex items-start justify-between px-5 py-4">
               <div>
-                <p className="text-md text-stone-600 mb-0.5">Descripción</p>
-                <p className="text-stone-800 max-w-sm">{studio?.description}</p>
+                <p className="text-md text-slate-600 mb-0.5">Descripción</p>
+                <p className="text-slate-800 max-w-sm">{studio?.description}</p>
               </div>
               <button
                 onClick={() => {
@@ -196,7 +196,7 @@ function OwnerEstudioGeneral() {
                     description: studio?.description || "",
                   });
                 }}
-                className="text-md text-[#3a5a3a] font-medium cursor-pointer hover:underline"
+                className="text-md text-[#1b2c44] font-medium cursor-pointer hover:underline"
               >
                 Editar
               </button>
@@ -205,8 +205,8 @@ function OwnerEstudioGeneral() {
 
           {/* Dirección y contacto */}
           <div className="bg-white rounded-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-stone-100">
-              <p className="font-semibold text-stone-800">
+            <div className="px-5 py-4 border-b border-slate-100">
+              <p className="font-semibold text-slate-800">
                 Dirección y contacto
               </p>
             </div>
@@ -225,8 +225,8 @@ function OwnerEstudioGeneral() {
                   key={item.label}
                   className="flex items-center justify-between"
                 >
-                  <p className="text-md text-stone-600">{item.label}</p>
-                  <p className="text-stone-800">{item.value || "—"}</p>
+                  <p className="text-md text-slate-600">{item.label}</p>
+                  <p className="text-slate-800">{item.value || "—"}</p>
                 </div>
               ))}
               <div className="flex justify-end mt-2">
@@ -245,7 +245,7 @@ function OwnerEstudioGeneral() {
                       zip_code: studio?.zip_code || "",
                     });
                   }}
-                  className="text-md text-[#3a5a3a] font-medium cursor-pointer hover:underline"
+                  className="text-md text-[#1b2c44] font-medium cursor-pointer hover:underline"
                 >
                   Editar dirección
                 </button>
@@ -255,19 +255,19 @@ function OwnerEstudioGeneral() {
 
           {/* Medios */}
           <div className="bg-white rounded-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-stone-100">
-              <p className="font-semibold text-stone-800">Medios</p>
+            <div className="px-5 py-4 border-b border-slate-100">
+              <p className="font-semibold text-slate-800">Medios</p>
             </div>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <div>
-                <p className="text-md text-stone-600 mb-1">Imagen de perfil</p>
+                <p className="text-md text-slate-600 mb-1">Imagen de perfil</p>
                 {studio?.logo_url ? (
                   <img
                     src={studio.logo_url}
                     className="w-16 h-10 rounded-lg object-cover"
                   />
                 ) : (
-                  <p className="text-md text-stone-400">Sin imagen</p>
+                  <p className="text-md text-slate-400">Sin imagen</p>
                 )}
               </div>
               <button
@@ -278,21 +278,21 @@ function OwnerEstudioGeneral() {
                     logo_url: studio?.logo_url || "",
                   });
                 }}
-                className="text-md text-[#3a5a3a] font-medium cursor-pointer hover:underline"
+                className="text-md text-[#1b2c44] font-medium cursor-pointer hover:underline"
               >
                 Editar
               </button>
             </div>
             <div className="flex items-center justify-between px-5 py-4">
               <div>
-                <p className="text-md text-stone-600 mb-1">Imagen de portada</p>
+                <p className="text-md text-slate-600 mb-1">Imagen de portada</p>
                 {studio?.cover_url ? (
                   <img
                     src={studio.cover_url}
                     className="w-16 h-10 rounded-lg object-cover"
                   />
                 ) : (
-                  <p className="text-md text-stone-400">Sin imagen</p>
+                  <p className="text-md text-slate-400">Sin imagen</p>
                 )}
               </div>
               <button
@@ -303,7 +303,7 @@ function OwnerEstudioGeneral() {
                     cover_url: studio?.cover_url || "",
                   });
                 }}
-                className="text-md text-[#3a5a3a] font-medium cursor-pointer hover:underline"
+                className="text-md text-[#1b2c44] font-medium cursor-pointer hover:underline"
               >
                 Editar
               </button>
@@ -315,11 +315,11 @@ function OwnerEstudioGeneral() {
         {editMode === "name" && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl p-8 w-full max-w-sm mx-4 flex flex-col gap-4">
-              <p className="font-semibold text-stone-800 text-lg text-center">
+              <p className="font-semibold text-slate-800 text-lg text-center">
                 Cambiar nombre del estudio
               </p>
               <div>
-                <label className="text-md text-stone-600 block mb-1.5">
+                <label className="text-md text-slate-600 block mb-1.5">
                   Nombre
                 </label>
                 <input
@@ -329,19 +329,19 @@ function OwnerEstudioGeneral() {
                   onChange={(e) =>
                     setEditForm({ ...editForm, name: e.target.value })
                   }
-                  className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-md outline-none focus:border-stone-400 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none focus:border-slate-400 transition-colors"
                 />
               </div>
               <div className="flex gap-3 mt-2">
                 <button
                   onClick={() => setEditMode(null)}
-                  className="flex-1 border border-stone-200 text-stone-600 py-2.5 rounded-xl text-md hover:bg-stone-50 transition-colors cursor-pointer"
+                  className="flex-1 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-md hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleUpdateStudio}
-                  className="flex-1 bg-[#3a5a3a] text-white py-2.5 rounded-xl text-md hover:bg-[#2e4a2e] transition-colors cursor-pointer"
+                  className="flex-1 bg-[#1b2c44] text-white py-2.5 rounded-xl text-md hover:bg-[#33506f] transition-colors cursor-pointer"
                 >
                   Guardar
                 </button>
@@ -354,11 +354,11 @@ function OwnerEstudioGeneral() {
         {editMode === "description" && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl p-8 w-full max-w-2xl mx-4 flex flex-col gap-4">
-              <p className="font-semibold text-stone-800 text-lg text-center">
+              <p className="font-semibold text-slate-800 text-lg text-center">
                 Cambiar descripción del estudio
               </p>
               <div>
-                <label className="text-md text-stone-600 block mb-1.5">
+                <label className="text-md text-slate-600 block mb-1.5">
                   Descripción
                 </label>
                 <textarea
@@ -368,19 +368,19 @@ function OwnerEstudioGeneral() {
                     setEditForm({ ...editForm, description: e.target.value })
                   }
                   rows={4}
-                  className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-md outline-none focus:border-stone-400 transition-colors resize-none"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none focus:border-slate-400 transition-colors resize-none"
                 />
               </div>
               <div className="flex gap-3 mt-2">
                 <button
                   onClick={() => setEditMode(null)}
-                  className="flex-1 border border-stone-200 text-stone-600 py-2.5 rounded-xl text-md hover:bg-stone-50 transition-colors cursor-pointer"
+                  className="flex-1 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-md hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleUpdateStudio}
-                  className="flex-1 bg-[#3a5a3a] text-white py-2.5 rounded-xl text-md hover:bg-[#2e4a2e] transition-colors cursor-pointer"
+                  className="flex-1 bg-[#1b2c44] text-white py-2.5 rounded-xl text-md hover:bg-[#33506f] transition-colors cursor-pointer"
                 >
                   Guardar
                 </button>
@@ -393,13 +393,13 @@ function OwnerEstudioGeneral() {
         {editMode === "address" && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl p-8 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto flex flex-col gap-4">
-              <p className="font-semibold text-stone-800 text-lg text-center">
+              <p className="font-semibold text-slate-800 text-lg text-center">
                 Editar dirección
               </p>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-md text-stone-600 block mb-1.5">
+                  <label className="text-md text-slate-600 block mb-1.5">
                     País
                   </label>
                   <select
@@ -407,13 +407,13 @@ function OwnerEstudioGeneral() {
                     onChange={(e) =>
                       setEditForm({ ...editForm, country: e.target.value })
                     }
-                    className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-md outline-none text-stone-600"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none text-slate-600"
                   >
                     <option value="MX">México</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-md text-stone-600 block mb-1.5">
+                  <label className="text-md text-slate-600 block mb-1.5">
                     Código Postal
                   </label>
                   <input
@@ -424,14 +424,14 @@ function OwnerEstudioGeneral() {
                       fetchZipData(e.target.value, editForm.country);
                     }}
                     placeholder="45010"
-                    className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-md outline-none focus:border-stone-400 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none focus:border-slate-400 transition-colors"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-md text-stone-600 block mb-1.5">
+                  <label className="text-md text-slate-600 block mb-1.5">
                     Estado
                   </label>
                   <select
@@ -439,7 +439,7 @@ function OwnerEstudioGeneral() {
                     onChange={(e) =>
                       setEditForm({ ...editForm, state: e.target.value })
                     }
-                    className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-md outline-none text-stone-600"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none text-slate-600"
                   >
                     <option value="">
                       {zipData?.state || "Ingresa tu CP"}
@@ -450,7 +450,7 @@ function OwnerEstudioGeneral() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-md text-stone-600 block mb-1.5">
+                  <label className="text-md text-slate-600 block mb-1.5">
                     Ciudad
                   </label>
                   <select
@@ -458,7 +458,7 @@ function OwnerEstudioGeneral() {
                     onChange={(e) =>
                       setEditForm({ ...editForm, city: e.target.value })
                     }
-                    className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-md outline-none text-stone-600"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none text-slate-600"
                   >
                     <option value="">{zipData?.city || "Ingresa tu CP"}</option>
                     {zipData && (
@@ -469,7 +469,7 @@ function OwnerEstudioGeneral() {
               </div>
 
               <div>
-                <label className="text-md text-stone-600 block mb-1.5">
+                <label className="text-md text-slate-600 block mb-1.5">
                   Colonia
                 </label>
                 <select
@@ -477,7 +477,7 @@ function OwnerEstudioGeneral() {
                   onChange={(e) =>
                     setEditForm({ ...editForm, neighborhood: e.target.value })
                   }
-                  className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-md outline-none text-stone-600"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none text-slate-600"
                 >
                   <option value="">Selecciona una colonia</option>
                   {zipData?.neighborhoods.map((n) => (
@@ -489,7 +489,7 @@ function OwnerEstudioGeneral() {
               </div>
 
               <div>
-                <label className="text-md text-stone-600 block mb-1.5">
+                <label className="text-md text-slate-600 block mb-1.5">
                   Calle
                 </label>
                 <input
@@ -499,13 +499,13 @@ function OwnerEstudioGeneral() {
                     setEditForm({ ...editForm, street: e.target.value })
                   }
                   placeholder="Av. Juárez"
-                  className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-md outline-none focus:border-stone-400 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none focus:border-slate-400 transition-colors"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-md text-stone-600 block mb-1.5">
+                  <label className="text-md text-slate-600 block mb-1.5">
                     Número exterior
                   </label>
                   <input
@@ -515,11 +515,11 @@ function OwnerEstudioGeneral() {
                       setEditForm({ ...editForm, ext_number: e.target.value })
                     }
                     placeholder="123"
-                    className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-md outline-none focus:border-stone-400 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none focus:border-slate-400 transition-colors"
                   />
                 </div>
                 <div>
-                  <label className="text-md text-stone-600 block mb-1.5">
+                  <label className="text-md text-slate-600 block mb-1.5">
                     Número interior
                   </label>
                   <input
@@ -529,16 +529,16 @@ function OwnerEstudioGeneral() {
                       setEditForm({ ...editForm, int_number: e.target.value })
                     }
                     placeholder="2B (opcional)"
-                    className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-md outline-none focus:border-stone-400 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none focus:border-slate-400 transition-colors"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-md text-stone-600 block mb-1.5">
+                <label className="text-md text-slate-600 block mb-1.5">
                   Ubica tu estudio en el mapa
                 </label>
-                <p className="text-md text-stone-400 mb-2">
+                <p className="text-md text-slate-400 mb-2">
                   Da click en el mapa para colocar el pin
                 </p>
                 <MapContainer
@@ -564,13 +564,13 @@ function OwnerEstudioGeneral() {
               <div className="flex gap-3 mt-2">
                 <button
                   onClick={() => setEditMode(null)}
-                  className="flex-1 border border-stone-200 text-stone-600 py-2.5 rounded-xl text-md hover:bg-stone-50 transition-colors cursor-pointer"
+                  className="flex-1 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-md hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleUpdateStudio}
-                  className="flex-1 bg-[#3a5a3a] text-white py-2.5 rounded-xl text-md hover:bg-[#2e4a2e] transition-colors cursor-pointer"
+                  className="flex-1 bg-[#1b2c44] text-white py-2.5 rounded-xl text-md hover:bg-[#33506f] transition-colors cursor-pointer"
                 >
                   Guardar
                 </button>
@@ -582,7 +582,7 @@ function OwnerEstudioGeneral() {
         {editMode === "cover" && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl p-8 w-full max-w-md mx-4 flex flex-col gap-4">
-              <p className="font-semibold text-stone-800 text-lg text-center">
+              <p className="font-semibold text-slate-800 text-lg text-center">
                 Imagen de portada
               </p>
 
@@ -595,7 +595,7 @@ function OwnerEstudioGeneral() {
                   const url = await uploadImage(file);
                   setEditForm({ ...editForm, cover_url: url });
                 }}
-                className="w-full text-md text-stone-600 hover:cursor-pointer"
+                className="w-full text-md text-slate-600 hover:cursor-pointer"
               />
 
               {editForm.cover_url && (
@@ -608,13 +608,13 @@ function OwnerEstudioGeneral() {
               <div className="flex gap-3 mt-2">
                 <button
                   onClick={() => setEditMode(null)}
-                  className="flex-1 border border-stone-200 text-stone-600 py-2.5 rounded-xl text-md hover:bg-stone-50 transition-colors cursor-pointer"
+                  className="flex-1 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-md hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleUpdateStudio}
-                  className="flex-1 bg-[#3a5a3a] text-white py-2.5 rounded-xl text-md hover:bg-[#2e4a2e] transition-colors cursor-pointer"
+                  className="flex-1 bg-[#1b2c44] text-white py-2.5 rounded-xl text-md hover:bg-[#33506f] transition-colors cursor-pointer"
                 >
                   Guardar
                 </button>
@@ -626,7 +626,7 @@ function OwnerEstudioGeneral() {
         {editMode === "logo" && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl p-8 w-full max-w-md mx-4 flex flex-col gap-4">
-              <p className="font-semibold text-stone-800 text-lg text-center">
+              <p className="font-semibold text-slate-800 text-lg text-center">
                 Logo del estudio
               </p>
 
@@ -639,7 +639,7 @@ function OwnerEstudioGeneral() {
                   const url = await uploadImage(file);
                   setEditForm({ ...editForm, logo_url: url });
                 }}
-                className="w-full text-md text-stone-600 hover:cursor-pointer"
+                className="w-full text-md text-slate-600 hover:cursor-pointer"
               />
 
               {editForm.logo_url && (
@@ -652,13 +652,13 @@ function OwnerEstudioGeneral() {
               <div className="flex gap-3 mt-2">
                 <button
                   onClick={() => setEditMode(null)}
-                  className="flex-1 border border-stone-200 text-stone-600 py-2.5 rounded-xl text-md hover:bg-stone-50 transition-colors cursor-pointer"
+                  className="flex-1 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-md hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleUpdateStudio}
-                  className="flex-1 bg-[#3a5a3a] text-white py-2.5 rounded-xl text-md hover:bg-[#2e4a2e] transition-colors cursor-pointer"
+                  className="flex-1 bg-[#1b2c44] text-white py-2.5 rounded-xl text-md hover:bg-[#33506f] transition-colors cursor-pointer"
                 >
                   Guardar
                 </button>

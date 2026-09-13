@@ -4,7 +4,7 @@ import AdminSidebar from "../components/AdminSidebar";
 
 function AdminLayout() {
   return (
-    <div className="flex h-screen bg-[#f6eee2]">
+    <div className="flex h-screen bg-[#f4f7fa]">
       <AdminSidebar />
       <main className="flex-1 overflow-y-auto p-8">
         <Outlet />

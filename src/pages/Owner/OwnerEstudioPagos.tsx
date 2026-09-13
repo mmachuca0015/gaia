@@ -40,15 +40,15 @@ function OwnerEstudioPagos() {
         <ArrowLeft
           size={22}
           onClick={() => navigate(-1)}
-          className="text-[#3a5a3a] cursor-pointer"
+          className="text-[#1b2c44] cursor-pointer"
         />
         <h1
-          className="text-4xl md:text-6xl font-semibold text-stone-800"
+          className="text-4xl md:text-6xl font-semibold text-slate-800"
           style={{ fontFamily: "Cormorant Garamond, serif" }}
         >
           Mis{" "}
           <span
-            className="italic text-[#3a5a3a]"
+            className="text-[#1b2c44]"
             style={{ fontFamily: "Cormorant Garamond, serif" }}
           >
             Pagos
@@ -59,24 +59,24 @@ function OwnerEstudioPagos() {
       <div className="max-w-2xl mx-auto">
         {studio?.stripe_account_id ? (
           <div className="bg-white rounded-2xl p-6">
-            <p className="font-medium text-stone-800 mb-1">
+            <p className="font-medium text-slate-800 mb-1">
               Cuenta bancaria conectada
             </p>
-            <p className="text-md text-stone-600">
+            <p className="text-md text-slate-600">
               Tu cuenta de Stripe está activa y lista para recibir pagos.
             </p>
           </div>
         ) : (
           <div className="bg-white rounded-2xl p-6 flex flex-col items-center gap-4 text-center">
-            <CreditCard size={36} className="text-stone-300" />
-            <p className="font-medium text-stone-800">Sin cuenta bancaria</p>
-            <p className="text-md text-stone-600">
+            <CreditCard size={36} className="text-slate-300" />
+            <p className="font-medium text-slate-800">Sin cuenta bancaria</p>
+            <p className="text-md text-slate-600">
               Conecta tu cuenta bancaria para recibir pagos de tus clases.
             </p>
             <button
               onClick={handleConnectAccount}
               disabled={loading}
-              className="bg-[#3a5a3a] text-white px-6 py-2.5 rounded-xl text-md font-medium hover:bg-[#2e4a2e] transition-colors cursor-pointer"
+              className="bg-[#1b2c44] text-white px-6 py-2.5 rounded-xl text-md font-medium hover:bg-[#33506f] transition-colors cursor-pointer"
             >
               {loading ? "Conectando..." : "Conectar cuenta bancaria"}
             </button>
