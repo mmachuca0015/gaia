@@ -1,6 +1,7 @@
 import { Compass, CalendarDays, User, LogOut, Heart, Bell } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 
+import { logout } from "../lib/api";
 const navItems = [
   { icon: Compass, label: "Explorar", path: "/explorar" },
   { icon: CalendarDays, label: "Mis Clases", path: "/clases" },
@@ -48,8 +49,10 @@ function Sidebar() {
 
       <div className="mt-auto px-3">
         <button
-          onClick={() => {
-            localStorage.clear();
+          onClick={async () => {
+            // Borrar el localStorage no cerraba nada: la sesion vive en el
+            // servidor y hay que pedirle que la elimine.
+            await logout();
             navigate("/login");
           }}
           className="flex items-center gap-3 w-full px-3 py-2.5 rounded-full text-sm font-medium transition-colors border 

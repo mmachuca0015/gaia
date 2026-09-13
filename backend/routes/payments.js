@@ -5,63 +5,86 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { Resend } = require("resend");
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-router.post("/create-payment-intent", async (req, res) => {
-  const { amount } = req.body;
+const { requireAuth, requireRole } = require("../middleware/auth");
 
+const COMMISSION_RATE = 0.036; // 3.6% por transaccion
+const FRONTEND_URL = (process.env.FRONTEND_URL || "http://localhost:5173")
+  .split(",")[0]
+  .trim();
+
+// Devuelve el stripe_customer_id del usuario de la sesion, o null.
+async function getCustomerId(userId) {
+  const { rows } = await pool.query(
+    "SELECT stripe_customer_id FROM users WHERE id = $1",
+    [userId],
+  );
+  return rows[0]?.stripe_customer_id ?? null;
+}
+
+router.post(
+  "/create-setup-intent",
+  requireAuth,
+  requireRole("user"),
+  async (req, res) => {
+    try {
+      const setupIntent = await stripe.setupIntents.create({
+        payment_method_types: ["card"],
+      });
+      res.json({ clientSecret: setupIntent.client_secret });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Error al crear setup intent" });
+    }
+  },
+);
+
+router.post(
+  "/save-card",
+  requireAuth,
+  requireRole("user"),
+  async (req, res) => {
+    const { paymentMethodId } = req.body;
+
+    try {
+      // El correo se lee de la base de datos, no del body: si lo mandara el
+      // cliente podria crear un Customer de Stripe a nombre de otra persona.
+      const { rows } = await pool.query(
+        "SELECT email, stripe_customer_id FROM users WHERE id = $1",
+        [req.user.id],
+      );
+      if (rows.length === 0) {
+        return res.status(404).json({ error: "Usuario no encontrado" });
+      }
+
+      const customer = await stripe.customers.create({
+        email: rows[0].email,
+        payment_method: paymentMethodId,
+      });
+
+      await pool.query(
+        "UPDATE users SET stripe_customer_id = $1 WHERE id = $2",
+        [customer.id, req.user.id],
+      );
+
+      res.json({
+        message: "Tarjeta guardada correctamente",
+        customerId: customer.id,
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Error al guardar la tarjeta" });
+    }
+  },
+);
+
+// La tarjeta se consulta por el customer de la SESION. Antes el customerId
+// venia en la URL, asi que cualquiera que conociera un id de Stripe podia ver
+// la tarjeta de otra persona.
+router.get("/card", requireAuth, requireRole("user"), async (req, res) => {
   try {
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: amount * 100, // Stripe usa centavos
-      currency: "mxn",
-    });
+    const customerId = await getCustomerId(req.user.id);
+    if (!customerId) return res.json(null);
 
-    res.json({ clientSecret: paymentIntent.client_secret });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error al crear el pago" });
-  }
-});
-
-router.post("/create-setup-intent", async (req, res) => {
-  try {
-    const setupIntent = await stripe.setupIntents.create({
-      payment_method_types: ["card"],
-    });
-    res.json({ clientSecret: setupIntent.client_secret });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error al crear setup intent" });
-  }
-});
-
-router.post("/save-card", async (req, res) => {
-  const { paymentMethodId, userId, email } = req.body;
-
-  try {
-    // Crear Customer en Stripe
-    const customer = await stripe.customers.create({
-      email,
-      payment_method: paymentMethodId,
-    });
-
-    // Guardar stripe_customer_id en la base de datos
-    await pool.query("UPDATE users SET stripe_customer_id = $1 WHERE id = $2", [
-      customer.id,
-      userId,
-    ]);
-
-    res.json({
-      message: "Tarjeta guardada correctamente",
-      customerId: customer.id,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error al guardar la tarjeta" });
-  }
-});
-
-router.get("/card/:customerId", async (req, res) => {
-  const { customerId } = req.params;
-  try {
     const paymentMethods = await stripe.paymentMethods.list({
       customer: customerId,
       type: "card",
@@ -72,35 +95,32 @@ router.get("/card/:customerId", async (req, res) => {
     }
 
     const card = paymentMethods.data[0].card;
-    res.json({
-      brand: card.brand,
-      last4: card.last4,
-    });
+    res.json({ brand: card.brand, last4: card.last4 });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Error al obtener tarjeta" });
   }
 });
 
-router.delete("/card/:customerId", async (req, res) => {
-  const { customerId } = req.params;
-  const { userId } = req.body;
+router.delete("/card", requireAuth, requireRole("user"), async (req, res) => {
   try {
-    // Obtener payment methods del customer
+    const customerId = await getCustomerId(req.user.id);
+    if (!customerId) {
+      return res.json({ message: "No hay tarjeta que eliminar" });
+    }
+
     const paymentMethods = await stripe.paymentMethods.list({
       customer: customerId,
       type: "card",
     });
 
-    // Desadjuntar cada payment method
     for (const pm of paymentMethods.data) {
       await stripe.paymentMethods.detach(pm.id);
     }
 
-    // Borrar stripe_customer_id de la base de datos
     await pool.query(
       "UPDATE users SET stripe_customer_id = NULL WHERE id = $1",
-      [userId],
+      [req.user.id],
     );
 
     res.json({ message: "Tarjeta eliminada correctamente" });
@@ -110,48 +130,85 @@ router.delete("/card/:customerId", async (req, res) => {
   }
 });
 
-router.post("/charge", async (req, res) => {
-  const { userId, scheduleId, amount, classDate } = req.body;
+router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
+  const { scheduleId, classDate } = req.body;
+  const userId = req.user.id;
 
+  const client = await pool.connect();
   try {
-    // Obtener stripe_account_id del estudio
-    const studioResult = await pool.query(
-      "SELECT stripe_account_id FROM studios WHERE id = (SELECT studio_id FROM classes WHERE id = (SELECT class_id FROM schedules WHERE id = $1))",
+    if (!scheduleId || !classDate) {
+      return res.status(400).json({ error: "Faltan datos de la reserva" });
+    }
+
+    // EL PRECIO SE LEE DE LA BASE DE DATOS. Antes llegaba en el body, asi que
+    // el cliente decidia cuanto pagar por la clase.
+    const classInfo = await client.query(
+      `SELECT classes.price, classes.id AS class_id, studios.stripe_account_id
+       FROM schedules
+       JOIN classes ON classes.id = schedules.class_id
+       JOIN studios ON studios.id = classes.studio_id
+       WHERE schedules.id = $1`,
       [scheduleId],
     );
-    const stripeAccountId = studioResult.rows[0]?.stripe_account_id;
+    if (classInfo.rows.length === 0) {
+      return res.status(404).json({ error: "Clase no encontrada" });
+    }
 
-    // Obtener stripe_customer_id del usuario
-    const userResult = await pool.query(
-      "SELECT stripe_customer_id FROM users WHERE id = $1",
-      [userId],
+    const { price, stripe_account_id: stripeAccountId } = classInfo.rows[0];
+    if (!stripeAccountId) {
+      return res
+        .status(400)
+        .json({ error: "El estudio aun no puede recibir pagos" });
+    }
+
+    const amountCents = Math.round(Number(price) * 100);
+    if (!Number.isFinite(amountCents) || amountCents <= 0) {
+      return res.status(400).json({ error: "Precio invalido" });
+    }
+
+    const customerId = await getCustomerId(userId);
+    if (!customerId) {
+      return res.status(400).json({ error: "No tienes una tarjeta guardada" });
+    }
+
+    const paymentMethods = await stripe.paymentMethods.list({
+      customer: customerId,
+      type: "card",
+    });
+    if (paymentMethods.data.length === 0) {
+      return res.status(400).json({ error: "No tienes una tarjeta guardada" });
+    }
+    const paymentMethodId = paymentMethods.data[0].id;
+
+    // Reserva y lugar disponible se tocan dentro de una transaccion, con el
+    // renglon del horario bloqueado: sin esto dos peticiones simultaneas
+    // podian vender el mismo ultimo lugar dos veces.
+    await client.query("BEGIN");
+
+    const schedule = await client.query(
+      "SELECT available_spots FROM schedules WHERE id = $1 FOR UPDATE",
+      [scheduleId],
     );
-    const customerId = userResult.rows[0].stripe_customer_id;
+    if (schedule.rows[0].available_spots <= 0) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Ya no hay lugares disponibles" });
+    }
 
-    const existingBooking = await pool.query(
+    const existingBooking = await client.query(
       "SELECT id FROM bookings WHERE user_id = $1 AND schedule_id = $2 AND class_date = $3 AND status = 'activa'",
       [userId, scheduleId, classDate],
     );
-
     if (existingBooking.rows.length > 0) {
+      await client.query("ROLLBACK");
       return res
         .status(400)
         .json({ error: "Ya tienes una reserva para esta clase" });
     }
 
-    // Obtener el payment method del customer
-    const paymentMethods = await stripe.paymentMethods.list({
-      customer: customerId,
-      type: "card",
-    });
-    const paymentMethodId = paymentMethods.data[0].id;
+    const pilaCommission = Math.round(amountCents * COMMISSION_RATE);
 
-    // Calcular comisión de PILA
-    const pilaCommission = Math.round(amount * 100 * 0.036);
-
-    // Cobrar al customer
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: amount * 100,
+      amount: amountCents,
       currency: "mxn",
       customer: customerId,
       payment_method: paymentMethodId,
@@ -159,26 +216,27 @@ router.post("/charge", async (req, res) => {
       off_session: true,
       transfer_data: {
         destination: stripeAccountId,
-        amount: amount * 100 - pilaCommission,
+        amount: amountCents - pilaCommission,
       },
     });
 
-    // Crear booking en la base de datos
-    await pool.query(
-      "INSERT INTO bookings (user_id, schedule_id, status, class_date) VALUES ($1, $2, 'activa', $3)",
+    const bookingResult = await client.query(
+      "INSERT INTO bookings (user_id, schedule_id, status, class_date) VALUES ($1, $2, 'activa', $3) RETURNING id",
       [userId, scheduleId, classDate],
     );
 
-    // Restar lugar disponible
-    await pool.query(
+    await client.query(
       "UPDATE schedules SET available_spots = available_spots - 1 WHERE id = $1",
       [scheduleId],
     );
 
-    // Obtener datos del usuario y la clase
+    await client.query("COMMIT");
+
+    // El correo se arma con la reserva recien creada, no con "la ultima del
+    // usuario", que en concurrencia podia ser otra.
     const emailData = await pool.query(
       `
-  SELECT 
+  SELECT
     users.name,
     users.email,
     classes.name AS class_name,
@@ -195,17 +253,15 @@ router.post("/charge", async (req, res) => {
     schedules.time,
     studios.name AS studio_name,
     classes.price
-  FROM users
-  JOIN bookings ON bookings.user_id = users.id
+  FROM bookings
+  JOIN users ON users.id = bookings.user_id
   JOIN schedules ON bookings.schedule_id = schedules.id
   JOIN classes ON schedules.class_id = classes.id
   JOIN studios ON classes.studio_id = studios.id
   LEFT JOIN instructors ON classes.instructor_id = instructors.id
-  WHERE users.id = $1
-  ORDER BY bookings.created_at DESC
-  LIMIT 1
+  WHERE bookings.id = $1
 `,
-      [userId],
+      [bookingResult.rows[0].id],
     );
 
     const booking = emailData.rows[0];
@@ -235,43 +291,63 @@ router.post("/charge", async (req, res) => {
 
     res.json({ message: "Pago exitoso", paymentIntentId: paymentIntent.id });
   } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
     console.error(err);
     res.status(500).json({ error: "Error al procesar el pago" });
+  } finally {
+    client.release();
   }
 });
 
-router.post("/create-connect-account", async (req, res) => {
-  const { studioId } = req.body;
-  try {
-    // Crear cuenta de Stripe Connect
-    const account = await stripe.accounts.create({
-      type: "express",
-      country: "MX",
-      capabilities: {
-        card_payments: { requested: true },
-        transfers: { requested: true },
-      },
-    });
+// Onboarding de Stripe Connect. El estudio se toma de la sesion del dueño:
+// antes el studioId llegaba en el body, asi que cualquiera podia sobrescribir
+// el stripe_account_id de otro estudio y desviarse sus cobros.
+router.post(
+  "/create-connect-account",
+  requireAuth,
+  requireRole("owner"),
+  async (req, res) => {
+    try {
+      const studioResult = await pool.query(
+        "SELECT id FROM studios WHERE owner_id = $1",
+        [req.user.id],
+      );
+      if (studioResult.rows.length === 0) {
+        return res.status(404).json({ error: "Estudio no encontrado" });
+      }
+      const studioId = studioResult.rows[0].id;
 
-    // Guardar el account_id en la base de datos
-    await pool.query(
-      "UPDATE studios SET stripe_account_id = $1 WHERE id = $2",
-      [account.id, studioId],
-    );
+      const account = await stripe.accounts.create({
+        type: "express",
+        country: "MX",
+        capabilities: {
+          card_payments: { requested: true },
+          transfers: { requested: true },
+        },
+      });
 
-    // Generar link de onboarding
-    const accountLink = await stripe.accountLinks.create({
-      account: account.id,
-      refresh_url: "http://localhost:5173/owner/estudio/pagos",
-      return_url: "http://localhost:5173/owner/estudio/pagos",
-      type: "account_onboarding",
-    });
+      await pool.query(
+        "UPDATE studios SET stripe_account_id = $1 WHERE id = $2",
+        [account.id, studioId],
+      );
 
-    res.json({ url: accountLink.url });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error al crear cuenta de Stripe" });
-  }
-});
+      const accountLink = await stripe.accountLinks.create({
+        account: account.id,
+        refresh_url: `${FRONTEND_URL}/owner/estudio/pagos`,
+        return_url: `${FRONTEND_URL}/owner/estudio/pagos`,
+        type: "account_onboarding",
+      });
+
+      res.json({ url: accountLink.url });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Error al crear cuenta de Stripe" });
+    }
+  },
+);
+
+// Se elimino /create-payment-intent: recibia el monto del body y no lo usaba
+// ninguna pantalla. El cobro real pasa por /charge, que lee el precio de la
+// base de datos.
 
 module.exports = router;

@@ -3,6 +3,8 @@ import { Dumbbell, Store, ArrowLeft } from "lucide-react";
 import { estados } from "../data/estados.js";
 import { useNavigate } from "react-router-dom";
 
+import { api, setCachedUser } from "../lib/api";
+
 type Step =
   | "Iniciar sesión"
   | "Crear cuenta"
@@ -63,22 +65,25 @@ function Login() {
       alert("Por favor llena todos los campos");
       return;
     }
-    const res = await fetch("http://localhost:3001/users/login", {
+    const res = await api("/users/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(loginForm),
     });
     const data = await res.json();
     if (res.ok) {
-      localStorage.setItem("role", data.role);
-      localStorage.setItem("user", JSON.stringify(data));
-      if (data.role === "owner") {
+      // La sesion real es la cookie httpOnly que acaba de poner el backend.
+      // Esto solo cachea el nombre y el rol para pintar la interfaz.
+      setCachedUser(data);
+      if (data.role === "admin") {
+        navigate("/admin");
+      } else if (data.role === "owner") {
         navigate("/panel-de-control");
       } else {
         navigate("/explorar");
       }
     } else {
-      console.log("Error:", data.error);
+      alert(data.error || "No pudimos iniciar sesión");
     }
   };
 
@@ -106,16 +111,17 @@ function Login() {
       return;
     }
 
-    const res = await fetch("http://localhost:3001/users/register", {
+    const res = await api("/users/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(registerUserForm),
     });
     const data = await res.json();
     if (res.ok) {
+      setCachedUser(data);
       navigate("/explorar");
     } else {
-      console.log("Error:", data.error);
+      alert(data.error || "No pudimos crear tu cuenta");
     }
   };
 
@@ -127,8 +133,8 @@ function Login() {
       !registerStudioForm.password ||
       !registerStudioForm.state ||
       !registerStudioForm.country ||
-      !registerUserForm.confirmEmail ||
-      !registerUserForm.confirmPassword ||
+      !registerStudioForm.confirmEmail ||
+      !registerStudioForm.confirmPassword ||
       !registerStudioForm.studio_name ||
       !registerStudioForm.phone
     ) {
@@ -145,31 +151,32 @@ function Login() {
       alert("Las contraseñas no coinciden");
       return;
     }
-    const res = await fetch("http://localhost:3001/studios/register-studio", {
+    const res = await api("/studios/register-studio", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(registerStudioForm),
     });
     const data = await res.json();
     if (res.ok) {
+      setCachedUser(data);
       navigate("/panel-de-control");
     } else {
-      console.log("Error:", data.error);
+      alert(data.error || "No pudimos registrar el estudio");
     }
   };
 
   const handleForgotPassword = async () => {
-    console.log(forgotForm);
-    const res = await fetch("http://localhost:3001/users/test", {
+    const res = await api("/users/test", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(forgotForm),
     });
     const data = await res.json();
     if (res.ok) {
-      alert("Te enviamos un email para recuperar tu contraseña");
+      // Mensaje neutro a proposito: no revela si el correo esta registrado.
+      alert("Si el correo está registrado, te enviamos un enlace");
     } else {
-      console.log("Error:", data.error);
+      alert(data.error || "No pudimos enviar el correo");
     }
   };
 

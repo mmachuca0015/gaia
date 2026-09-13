@@ -4,6 +4,7 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 
+import { api } from "../lib/api";
 function PaymentForm({ onSuccess }: { onSuccess: () => void }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -27,17 +28,14 @@ function PaymentForm({ onSuccess }: { onSuccess: () => void }) {
     // Mandar el paymentMethodId al backend
     const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-    const res = await fetch("http://localhost:3001/payments/save-card", {
+    const res = await api("/payments/save-card", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         paymentMethodId: setupIntent?.payment_method,
-        userId: user.id,
-        email: user.email,
       }),
     });
     const data = await res.json();
-    console.log(data);
 
     // Actualizar localStorage con el nuevo stripe_customer_id
     localStorage.setItem(

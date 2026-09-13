@@ -20,6 +20,11 @@ import OwnerEstudioGeneral from "./pages/Owner/OwnerEstudioGeneral";
 import OwnerEstudioPagos from "./pages/Owner/OwnerEstudioPagos";
 import OwnerEstudioSeguridad from "./pages/Owner/OwnerEstudioSeguridad";
 import OwnerReservas from "./pages/Owner/OwnerReservas";
+import AdminLayout from "./layouts/AdminLayout";
+import AdminDashboard from "./pages/Admin/AdminDashboard";
+import AdminUsuarios from "./pages/Admin/AdminUsuarios";
+import AdminEstudios from "./pages/Admin/AdminEstudios";
+import AdminSuscripciones from "./pages/Admin/AdminSuscripciones";
 
 function App() {
   return (
@@ -28,7 +33,22 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route element={<ProtectedRoute />}>
+
+        {/* Cada bloque exige no solo sesion, sino el rol correcto: antes un
+            cliente podia abrir /admin escribiendo la URL. */}
+        <Route element={<ProtectedRoute allow={["admin"]} />}>
+          <Route element={<AdminLayout />}>
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/usuarios" element={<AdminUsuarios />} />
+            <Route path="/admin/estudios" element={<AdminEstudios />} />
+            <Route
+              path="/admin/suscripciones"
+              element={<AdminSuscripciones />}
+            />
+          </Route>
+        </Route>
+
+        <Route element={<ProtectedRoute allow={["owner"]} />}>
           <Route element={<OwnerLayout />}>
             <Route path="/panel-de-control" element={<PanelControl />} />
             <Route path="/owner/clases" element={<OwnerClases />} />
@@ -48,7 +68,9 @@ function App() {
             />
             <Route path="/owner/reservas" element={<OwnerReservas />} />
           </Route>
+        </Route>
 
+        <Route element={<ProtectedRoute allow={["user"]} />}>
           <Route element={<DashboardLayout />}>
             <Route path="/explorar" element={<Explorar />} />
             <Route path="/clases" element={<MisClases />} />

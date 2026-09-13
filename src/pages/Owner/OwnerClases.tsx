@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
 import ClassManagementCard from "../../components/ClassManagementCard";
 
+import { api } from "../../lib/api";
 function OwnerClases() {
   type Studio = {
     id: number;
@@ -37,7 +38,7 @@ function OwnerClases() {
   });
 
   useEffect(() => {
-    fetch(`http://localhost:3001/studios/owner/${owner.id}`)
+    api(`/studios/owner/${owner.id}`)
       .then((res) => res.json())
       .then((data) => {
         setStudio(data);
@@ -46,7 +47,7 @@ function OwnerClases() {
 
   useEffect(() => {
     if (!studio?.id) return;
-    fetch(`http://localhost:3001/studios/${studio?.id}/classes`)
+    api(`/studios/${studio?.id}/classes`)
       .then((res) => res.json())
       .then((data) => {
         setClasses(data);
@@ -55,7 +56,7 @@ function OwnerClases() {
 
   useEffect(() => {
     if (!studio?.id) return;
-    fetch(`http://localhost:3001/studios/${studio?.id}/all-schedules`)
+    api(`/studios/${studio?.id}/all-schedules`)
       .then((res) => res.json())
       .then((data) => {
         setSchedules(data);
@@ -107,24 +108,21 @@ function OwnerClases() {
       alert("Selecciona al menos un día");
       return;
     }
-    const res = await fetch(
-      `http://localhost:3001/studios/${studio?.id}/add-class`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: newClassForm.name,
-          instructor_id: newClassForm.instructor_id,
-          capacity: newClassForm.capacity,
-          price: newClassForm.price,
-          studio_id: studio?.id,
-          classType: newClassForm.classType,
-          selectedDay: dayMap[newClassForm.selectedDate],
-          selectedDays: newClassForm.selectedDays.map((d) => dayMap[d]),
-          selectedTime: convertTo24h(newClassForm.selectedTime),
-        }),
-      },
-    );
+    const res = await api(`/studios/${studio?.id}/add-class`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: newClassForm.name,
+        instructor_id: newClassForm.instructor_id,
+        capacity: newClassForm.capacity,
+        price: newClassForm.price,
+        studio_id: studio?.id,
+        classType: newClassForm.classType,
+        selectedDay: dayMap[newClassForm.selectedDate],
+        selectedDays: newClassForm.selectedDays.map((d) => dayMap[d]),
+        selectedTime: convertTo24h(newClassForm.selectedTime),
+      }),
+    });
     const data = await res.json();
     if (res.ok) {
       console.log("Clase agregada correctamente");
@@ -139,11 +137,11 @@ function OwnerClases() {
         selectedDays: [] as string[],
         selectedTime: "6:00 AM",
       });
-      fetch(`http://localhost:3001/studios/${studio?.id}/classes`)
+      api(`/studios/${studio?.id}/classes`)
         .then((res) => res.json())
         .then((data) => setClasses(data));
       // Refrescar schedules
-      fetch(`http://localhost:3001/studios/${studio?.id}/all-schedules`)
+      api(`/studios/${studio?.id}/all-schedules`)
         .then((res) => res.json())
         .then((data) => setSchedules(data));
       console.log(schedules);
@@ -153,31 +151,28 @@ function OwnerClases() {
   };
 
   const handleEditClass = async () => {
-    const res = await fetch(
-      `http://localhost:3001/studios/${studio?.id}/classes/${editingClass.id}`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: newClassForm.name,
-          instructor_id: newClassForm.instructor_id,
-          capacity: newClassForm.capacity,
-          price: newClassForm.price,
-          classType: newClassForm.classType,
-          selectedDate: newClassForm.selectedDate,
-          selectedDays: newClassForm.selectedDays.map((d) => dayMap[d]),
-          selectedTime: convertTo24h(newClassForm.selectedTime),
-        }),
-      },
-    );
+    const res = await api(`/studios/${studio?.id}/classes/${editingClass.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: newClassForm.name,
+        instructor_id: newClassForm.instructor_id,
+        capacity: newClassForm.capacity,
+        price: newClassForm.price,
+        classType: newClassForm.classType,
+        selectedDate: newClassForm.selectedDate,
+        selectedDays: newClassForm.selectedDays.map((d) => dayMap[d]),
+        selectedTime: convertTo24h(newClassForm.selectedTime),
+      }),
+    });
     const data = await res.json();
     if (res.ok) {
       setClassPopup(false);
       setEditingClass(null);
-      fetch(`http://localhost:3001/studios/${studio?.id}/classes`)
+      api(`/studios/${studio?.id}/classes`)
         .then((res) => res.json())
         .then((data) => setClasses(data));
-      fetch(`http://localhost:3001/studios/${studio?.id}/all-schedules`)
+      api(`/studios/${studio?.id}/all-schedules`)
         .then((res) => res.json())
         .then((data) => setSchedules(data));
     } else {
@@ -186,12 +181,9 @@ function OwnerClases() {
   };
 
   const handleDeleteClass = async (classId: number) => {
-    const res = await fetch(
-      `http://localhost:3001/studios/${studio?.id}/classes/${classId}`,
-      {
-        method: "DELETE",
-      },
-    );
+    const res = await api(`/studios/${studio?.id}/classes/${classId}`, {
+      method: "DELETE",
+    });
     const data = await res.json();
     if (res.ok) {
       setClasses(classes.filter((c) => c.id !== classId));
@@ -205,7 +197,7 @@ function OwnerClases() {
   //Obtener instructores del estudio
   useEffect(() => {
     if (studio) {
-      fetch(`http://localhost:3001/studios/${studioId}/instructors`)
+      api(`/studios/${studioId}/instructors`)
         .then((res) => res.json())
         .then((data) => setInstructors(data));
     }

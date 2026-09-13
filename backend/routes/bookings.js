@@ -1,9 +1,15 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { requireAuth, requireRole } = require("../middleware/auth");
 
-router.get("/", async (req, res) => {
-  const { userId } = req.query;
+// El id sale de la sesion, no del query: antes bastaba con cambiar ?userId=
+// en la URL para leer las reservas de cualquier otra persona.
+//
+// requireRole("user") no es opcional: los ids se repiten entre tablas, asi que
+// sin fijar el rol el dueño con id 7 leeria las reservas del cliente con id 7.
+router.get("/", requireAuth, requireRole("user"), async (req, res) => {
+  const userId = req.user.id;
   try {
     const result = await pool.query(
       `

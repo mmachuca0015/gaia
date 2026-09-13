@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import BookingsCard from "../../components/BookingsCard";
 import { CalendarDays, Astroid } from "lucide-react";
 
+import { api } from "../../lib/api";
 function MisClases() {
   type Booking = {
     status: string;
@@ -16,7 +17,7 @@ function MisClases() {
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   useEffect(() => {
-    fetch(`http://localhost:3001/bookings?userId=${user.id}`)
+    api("/bookings")
       .then((res) => res.json())
       .then((data) => setBookings(data));
   }, []);

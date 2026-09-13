@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import ClassCard from "../../components/ClassCard";
 
+import { api } from "../../lib/api";
 function EstudioDetalle() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -65,7 +66,7 @@ function EstudioDetalle() {
     /*Datos generales del estudio*/
   }
   useEffect(() => {
-    fetch(`http://localhost:3001/studios/${id}`)
+    api(`/studios/${id}`)
       .then((res) => res.json())
       .then((data) => setStudio(data));
   }, [id]);
@@ -85,7 +86,7 @@ function EstudioDetalle() {
 
   const [classes, setClasses] = useState<Class[]>([]);
   const fetchClases = () => {
-    fetch(`http://localhost:3001/studios/${id}/clases?day=${selectedDay}`)
+    api(`/studios/${id}/clases?day=${selectedDay}`)
       .then((res) => res.json())
       .then((data) => setClasses(data));
   };
@@ -98,24 +99,16 @@ function EstudioDetalle() {
   const [isFavorite, setIsFavorite] = useState(false);
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const handleAddToFavorite = () => {
-    fetch(`http://localhost:3001/studios/favorites/${id}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id }),
-    });
+    api(`/studios/favorites/${id}`, { method: "POST" });
   };
 
   const handleRemoveFromFavorite = () => {
-    fetch(`http://localhost:3001/studios/favorites/${id}`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id }),
-    });
+    api(`/studios/favorites/${id}`, { method: "DELETE" });
   };
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
-    fetch(`http://localhost:3001/studios/favorites/${user.id}`)
+    api(`/studios/favorites/${user.id}`)
       .then((res) => res.json())
       .then((data) => {
         const isFav = data.some(
@@ -138,7 +131,7 @@ function EstudioDetalle() {
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
-    fetch(`http://localhost:3001/bookings?userId=${user.id}`)
+    api("/bookings")
       .then((res) => res.json())
       .then((data) => {
         setUserBookings(data.map((b: any) => b.schedule_id));

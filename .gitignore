@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 .env
 backend/node_modules
+
+# Utilidad local para generar hashes: contiene contrasenas en texto plano
+backend/hash.js

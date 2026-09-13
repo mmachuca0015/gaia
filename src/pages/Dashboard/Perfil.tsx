@@ -9,6 +9,7 @@ import {
   LogOut,
 } from "lucide-react";
 
+import { api } from "../../lib/api";
 function Perfil() {
   type User = {
     name: string;
@@ -22,7 +23,7 @@ function Perfil() {
 
   const [user, setUser] = useState<User | null>(null);
   useEffect(() => {
-    fetch(`http://localhost:3001/users/${localUser.id}`)
+    api(`/users/${localUser.id}`)
       .then((res) => res.json())
       .then((data) => setUser(data));
   }, []);

@@ -1,6 +1,7 @@
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useState } from "react";
 
+import { api } from "../lib/api";
 function ResetPassword() {
   const navigate = useNavigate();
 
@@ -21,7 +22,7 @@ function ResetPassword() {
       alert("Las contraseñas no coinciden");
       return;
     }
-    const res = await fetch("http://localhost:3001/users/reset-password", {
+    const res = await api("/users/reset-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...resetForm, token }),

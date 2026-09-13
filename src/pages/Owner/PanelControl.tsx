@@ -11,6 +11,7 @@ import {
   Tooltip,
 } from "chart.js";
 
+import { api } from "../../lib/api";
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -30,7 +31,7 @@ function PanelControl() {
 
   const [studio, setStudio] = useState<Studio | null>(null);
   useEffect(() => {
-    fetch(`http://localhost:3001/studios/owner/${owner.id}`)
+    api(`/studios/owner/${owner.id}`)
       .then((res) => res.json())
       .then((data) => setStudio(data));
   }, []);
@@ -42,9 +43,7 @@ function PanelControl() {
 
   useEffect(() => {
     if (!studio?.id) return;
-    fetch(
-      `http://localhost:3001/studios/${studio.id}/ingresos?period=${activeFilter}`,
-    )
+    api(`/studios/${studio.id}/ingresos?period=${activeFilter}`)
       .then((res) => res.json())
       .then((data) => setIngresos(data));
   }, [studio, activeFilter]);
@@ -55,9 +54,7 @@ function PanelControl() {
 
   useEffect(() => {
     if (!studio?.id) return;
-    fetch(
-      `http://localhost:3001/studios/${studio.id}/ingresos-grafica?period=${activeFilter}`,
-    )
+    api(`/studios/${studio.id}/ingresos-grafica?period=${activeFilter}`)
       .then((res) => res.json())
       .then((data) => setGraficaData(data));
   }, [studio, activeFilter]);
@@ -78,7 +75,7 @@ function PanelControl() {
 
   useEffect(() => {
     if (!studio) return;
-    fetch(`http://localhost:3001/studios/${studio.id}/clases-hoy`)
+    api(`/studios/${studio.id}/clases-hoy`)
       .then((res) => res.json())
       .then((data) => {
         console.log(studio);
@@ -91,7 +88,7 @@ function PanelControl() {
 
   useEffect(() => {
     if (!studio?.id) return;
-    fetch(`http://localhost:3001/studios/${studio.id}/actividad-reciente`)
+    api(`/studios/${studio.id}/actividad-reciente`)
       .then((res) => res.json())
       .then((data) => setActividad(data));
   }, [studio]);

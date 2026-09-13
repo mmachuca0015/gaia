@@ -10,6 +10,7 @@ import {
   LogOut,
 } from "lucide-react";
 
+import { api } from "../../lib/api";
 function OwnerEstudio() {
   const navigate = useNavigate();
   const menuItems = [
@@ -38,7 +39,7 @@ function OwnerEstudio() {
   const owner = JSON.parse(localStorage.getItem("user") || "{}");
   const [studio, setStudio] = useState<Studio | null>(null);
   useEffect(() => {
-    fetch(`http://localhost:3001/studios/owner/${owner.id}`)
+    api(`/studios/owner/${owner.id}`)
       .then((res) => res.json())
       .then((data) => setStudio(data));
   }, []);

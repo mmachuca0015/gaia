@@ -2,6 +2,7 @@ import { Users } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { api } from "../lib/api";
 type ClassCardProps = {
   hour: string;
   name: string;
@@ -55,13 +56,11 @@ function ClassCard({
   const handlePagar = async () => {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-    const res = await fetch("http://localhost:3001/payments/charge", {
+    const res = await api("/payments/charge", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        userId: user.id,
         scheduleId: schedule_id,
-        amount: price,
         classDate: classDate,
       }),
     });

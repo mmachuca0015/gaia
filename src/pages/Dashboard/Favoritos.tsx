@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import StudioCard from "../../components/StudioCard";
 
+import { api } from "../../lib/api";
 function Favoritos() {
   type Studio = {
     studio_id: number;
@@ -16,7 +17,7 @@ function Favoritos() {
   const [studios, setStudios] = useState<Studio[]>([]);
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   useEffect(() => {
-    fetch(`http://localhost:3001/studios/favorites/${user.id}`)
+    api(`/studios/favorites/${user.id}`)
       .then((res) => res.json())
       .then((data) => setStudios(data));
   }, []);

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { CalendarCheck } from "lucide-react";
 
+import { api } from "../../lib/api";
 function OwnerReservas() {
   type Studio = {
     id: number;
@@ -17,7 +18,7 @@ function OwnerReservas() {
   const [reservaUsers, setReservaUsers] = useState<any[]>([]);
 
   useEffect(() => {
-    fetch(`http://localhost:3001/studios/owner/${owner.id}`)
+    api(`/studios/owner/${owner.id}`)
       .then((res) => res.json())
       .then((data) => {
         setStudio(data);
@@ -26,17 +27,15 @@ function OwnerReservas() {
 
   useEffect(() => {
     if (!studio?.id) return;
-    fetch(
-      `http://localhost:3001/studios/${studio.id}/reservas?type=${activeTab}`,
-    )
+    api(`/studios/${studio.id}/reservas?type=${activeTab}`)
       .then((res) => res.json())
       .then((data) => setReservations(data));
   }, [studio, activeTab]);
 
   const handleShowDetails = async (reserva: any) => {
     setSelectedReserva(reserva);
-    const res = await fetch(
-      `http://localhost:3001/studios/${studio?.id}/reservas/${reserva.schedule_id}/usuarios?classDate=${reserva.class_date}`,
+    const res = await api(
+      `/studios/${studio?.id}/reservas/${reserva.schedule_id}/usuarios?classDate=${reserva.class_date}`,
     );
     const data = await res.json();
     setReservaUsers(data);

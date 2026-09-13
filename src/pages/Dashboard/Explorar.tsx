@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import StudioCard from "../../components/StudioCard";
 import { Search } from "lucide-react";
 
+import { api } from "../../lib/api";
 function Explorar() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   type Studio = {
@@ -16,7 +17,7 @@ function Explorar() {
   };
   const [studios, setStudios] = useState<Studio[]>([]);
   useEffect(() => {
-    fetch("http://localhost:3001/studios")
+    api("/studios")
       .then((res) => res.json())
       .then((data) => setStudios(data));
   }, []);

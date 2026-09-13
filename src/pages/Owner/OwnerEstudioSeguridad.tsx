@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 
+import { api, setCachedUser } from "../../lib/api";
 function OwnerEstudioSeguridad() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const navigate = useNavigate();
@@ -23,23 +24,17 @@ function OwnerEstudioSeguridad() {
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
 
   useEffect(() => {
-    fetch(`http://localhost:3001/users/studio-owner/${user.id}`)
+    api(`/users/studio-owner/${user.id}`)
       .then((res) => res.json())
       .then((data) => setStudio(data));
   }, []);
 
   const handleContinue = async () => {
-    const response = await fetch(
-      "http://localhost:3001/users/verify-owner-password",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          typedPassword: currentPassword,
-          userId: user.id,
-        }),
-      },
-    );
+    const response = await api("/users/verify-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ typedPassword: currentPassword }),
+    });
     const data = await response.json();
     if (data.isValid) {
       setShowPopup(false);
@@ -56,24 +51,16 @@ function OwnerEstudioSeguridad() {
       return;
     }
     // fetch al backend
-    const response = await fetch(
-      "http://localhost:3001/users/change-owner-email",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: user.id,
-          newEmail: newEmail,
-        }),
-      },
-    );
+    const response = await api("/users/change-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ currentPassword, newEmail }),
+    });
     const data = await response.json();
     if (response.ok) {
-      localStorage.setItem(
-        "user",
-        JSON.stringify({ ...user, email: newEmail }),
-      );
+      setCachedUser({ ...user, email: newEmail });
       setShowEmailForm(false);
+      setCurrentPassword("");
       setNewEmail("");
       setConfirmNewEmail("");
       alert("Correo actualizado correctamente");
@@ -87,24 +74,17 @@ function OwnerEstudioSeguridad() {
       alert("Las contraseñas no coinciden");
       return;
     }
-    const response = await fetch(
-      "http://localhost:3001/users/change-owner-password",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: user.id,
-          newPassword: newPassword,
-        }),
-      },
-    );
+    const response = await api("/users/change-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
     const data = await response.json();
     if (response.ok) {
-      localStorage.setItem(
-        "user",
-        JSON.stringify({ ...user, password: newPassword }),
-      );
+      // La contraseña no se guarda en el navegador. Antes se escribia en
+      // localStorage en texto plano.
       setShowPasswordForm(false);
+      setCurrentPassword("");
       setNewPassword("");
       setConfirmNewPassword("");
       alert("Contraseña actualizada correctamente");

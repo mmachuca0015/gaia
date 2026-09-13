@@ -5,6 +5,7 @@ import PaymentForm from "../../components/PaymentForm";
 import { Elements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 
+import { api } from "../../lib/api";
 function AgregarTarjeta() {
   const navigate = useNavigate();
 
@@ -20,7 +21,7 @@ function AgregarTarjeta() {
 
   useEffect(() => {
     if (!showForm) return;
-    fetch("http://localhost:3001/payments/create-setup-intent", {
+    api("/payments/create-setup-intent", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
     })
@@ -32,7 +33,7 @@ function AgregarTarjeta() {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
     if (user.stripe_customer_id) {
       setHasCard(true);
-      fetch(`http://localhost:3001/payments/card/${user.stripe_customer_id}`)
+      api("/payments/card")
         .then((res) => res.json())
         .then((data) => setCardData(data));
     }
@@ -40,14 +41,7 @@ function AgregarTarjeta() {
 
   const handleDeleteCard = async () => {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
-    await fetch(
-      `http://localhost:3001/payments/card/${user.stripe_customer_id}`,
-      {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id }),
-      },
-    );
+    await api("/payments/card", { method: "DELETE" });
 
     // Actualizar localStorage
     localStorage.setItem(
@@ -116,9 +110,7 @@ function AgregarTarjeta() {
                           const user = JSON.parse(
                             localStorage.getItem("user") || "{}",
                           );
-                          fetch(
-                            `http://localhost:3001/payments/card/${user.stripe_customer_id}`,
-                          )
+                          api("/payments/card")
                             .then((res) => res.json())
                             .then((data) => {
                               setCardData(data);

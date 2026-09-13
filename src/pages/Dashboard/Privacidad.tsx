@@ -2,6 +2,7 @@ import { ChevronLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 
+import { api, setCachedUser } from "../../lib/api";
 function Privacidad() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const navigate = useNavigate();
@@ -17,17 +18,11 @@ function Privacidad() {
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
 
   const handleContinue = async () => {
-    const response = await fetch(
-      "http://localhost:3001/users/verify-password",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          typedPassword: currentPassword,
-          userId: user.id,
-        }),
-      },
-    );
+    const response = await api("/users/verify-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ typedPassword: currentPassword }),
+    });
     const data = await response.json();
     if (data.isValid) {
       setShowPopup(false);
@@ -44,21 +39,16 @@ function Privacidad() {
       return;
     }
     // fetch al backend
-    const response = await fetch("http://localhost:3001/users/change-email", {
+    const response = await api("/users/change-email", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: user.id,
-        newEmail: newEmail,
-      }),
+      body: JSON.stringify({ currentPassword, newEmail }),
     });
     const data = await response.json();
     if (response.ok) {
-      localStorage.setItem(
-        "user",
-        JSON.stringify({ ...user, email: newEmail }),
-      );
+      setCachedUser({ ...user, email: newEmail });
       setShowEmailForm(false);
+      setCurrentPassword("");
       setNewEmail("");
       setConfirmNewEmail("");
       alert("Correo actualizado correctamente");
@@ -72,24 +62,17 @@ function Privacidad() {
       alert("Las contraseñas no coinciden");
       return;
     }
-    const response = await fetch(
-      "http://localhost:3001/users/change-password",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: user.id,
-          newPassword: newPassword,
-        }),
-      },
-    );
+    const response = await api("/users/change-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
     const data = await response.json();
     if (response.ok) {
-      localStorage.setItem(
-        "user",
-        JSON.stringify({ ...user, password: newPassword }),
-      );
+      // La contraseña no se guarda en el navegador. Antes se escribia en
+      // localStorage en texto plano.
       setShowPasswordForm(false);
+      setCurrentPassword("");
       setNewPassword("");
       setConfirmNewPassword("");
       alert("Contraseña actualizada correctamente");

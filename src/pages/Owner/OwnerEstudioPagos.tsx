@@ -2,6 +2,7 @@ import { ArrowLeft, CreditCard } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 
+import { api } from "../../lib/api";
 function OwnerEstudioPagos() {
   const navigate = useNavigate();
 
@@ -13,20 +14,16 @@ function OwnerEstudioPagos() {
   const owner = JSON.parse(localStorage.getItem("user") || "{}");
   const [studio, setStudio] = useState<Studio | null>(null);
   useEffect(() => {
-    fetch(`http://localhost:3001/studios/owner/${owner.id}`)
+    api(`/studios/owner/${owner.id}`)
       .then((res) => res.json())
       .then((data) => setStudio(data));
   }, []);
 
   const handleConnectAccount = async () => {
-    const res = await fetch(
-      "http://localhost:3001/payments/create-connect-account",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ studioId: studio?.id }),
-      },
-    );
+    // El estudio lo determina el backend a partir de la sesion del dueño.
+    const res = await api("/payments/create-connect-account", {
+      method: "POST",
+    });
     const data = await res.json();
     if (res.ok) {
       window.location.href = data.url;

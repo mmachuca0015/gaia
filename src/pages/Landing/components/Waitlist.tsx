@@ -1,12 +1,13 @@
 import { useState } from "react";
 
+import { api } from "../../../lib/api";
 function Waitlist() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
 
   const handleWaitlist = async () => {
     if (!email) return;
-    const res = await fetch("http://localhost:3001/users/waitlist", {
+    const res = await api("/users/waitlist", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),

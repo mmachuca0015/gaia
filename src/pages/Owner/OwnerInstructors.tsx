@@ -2,6 +2,7 @@ import InstructorCard from "../../components/InstructorCard";
 import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
 
+import { api } from "../../lib/api";
 function OwnerInstructors() {
   //Obtener datos del estudio
   type Studio = {
@@ -11,7 +12,7 @@ function OwnerInstructors() {
   const owner = JSON.parse(localStorage.getItem("user") || "{}");
   const [studio, setStudio] = useState<Studio | null>(null);
   useEffect(() => {
-    fetch(`http://localhost:3001/studios/owner/${owner.id}`)
+    api(`/studios/owner/${owner.id}`)
       .then((res) => res.json())
       .then((data) => setStudio(data));
   }, []);
@@ -20,7 +21,7 @@ function OwnerInstructors() {
   const [instructors, setInstructors] = useState<any[]>([]);
   useEffect(() => {
     if (studio) {
-      fetch(`http://localhost:3001/studios/${studioId}/instructors`)
+      api(`/studios/${studioId}/instructors`)
         .then((res) => res.json())
         .then((data) => setInstructors(data));
     }
@@ -52,18 +53,15 @@ function OwnerInstructors() {
       alert("Por favor llena todos los campos");
       return;
     }
-    const res = await fetch(
-      `http://localhost:3001/studios/${studio?.id}/instructors`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newInstructorForm),
-      },
-    );
+    const res = await api(`/studios/${studio?.id}/instructors`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newInstructorForm),
+    });
     if (res.ok) {
       setShowInstructorForm(false);
       setNewInstructorForm({ name: "", last_name: "" });
-      fetch(`http://localhost:3001/studios/${studio?.id}/instructors`)
+      api(`/studios/${studio?.id}/instructors`)
         .then((res) => res.json())
         .then((data) => setInstructors(data));
     }
@@ -75,15 +73,15 @@ function OwnerInstructors() {
   );
 
   const handleDeleteInstructor = async (instructorId: number) => {
-    const res = await fetch(
-      `http://localhost:3001/studios/${studio?.id}/instructors/${instructorId}`,
+    const res = await api(
+      `/studios/${studio?.id}/instructors/${instructorId}`,
       {
         method: "DELETE",
       },
     );
     if (res.ok) {
       setDeleteInstructorId(null);
-      fetch(`http://localhost:3001/studios/${studio?.id}/instructors`)
+      api(`/studios/${studio?.id}/instructors`)
         .then((res) => res.json())
         .then((data) => setInstructors(data));
     }

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 
+import { api } from "../../lib/api";
 function OwnerEstudioGeneral() {
   const navigate = useNavigate();
   type Studio = {
@@ -24,7 +25,7 @@ function OwnerEstudioGeneral() {
   const owner = JSON.parse(localStorage.getItem("user") || "{}");
   const [studio, setStudio] = useState<Studio | null>(null);
   useEffect(() => {
-    fetch(`http://localhost:3001/studios/owner/${owner.id}`)
+    api(`/studios/owner/${owner.id}`)
       .then((res) => res.json())
       .then((data) => setStudio(data));
   }, []);
@@ -82,14 +83,14 @@ function OwnerEstudioGeneral() {
   };
 
   const handleUpdateStudio = async () => {
-    const res = await fetch(`http://localhost:3001/studios/${studio?.id}`, {
+    const res = await api(`/studios/${studio?.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(editForm),
     });
     if (res.ok) {
       setEditMode(null);
-      fetch(`http://localhost:3001/studios/owner/${owner.id}`)
+      api(`/studios/owner/${owner.id}`)
         .then((res) => res.json())
         .then((data) => setStudio(data));
     }
