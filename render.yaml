@@ -1,0 +1,66 @@
+# Blueprint de Render. Permite recrear toda la infraestructura desde cero
+# apuntando Render a este repositorio (New > Blueprint).
+#
+# Los valores marcados sync:false NO van aqui: son secretos y se capturan en
+# el panel de Render, para que no queden escritos en el repositorio.
+
+databases:
+  - name: wellco-db
+    databaseName: wellco
+    user: wellco
+    plan: free
+    region: oregon
+    postgresMajorVersion: "16"
+
+services:
+  # ---------------------------------------------------------------- backend
+  - type: web
+    name: wellco-api
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: npm ci
+    # Las migraciones corren antes de levantar la version nueva, no durante
+    # el arranque: si fallan, el despliegue se detiene y sigue viva la
+    # version anterior.
+    preDeployCommand: npm run migrate
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: wellco-db
+          property: connectionString
+      # Origen permitido para CORS y base de los enlaces de correo.
+      - key: FRONTEND_URL
+        value: https://wellcoapp.com
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+
+  # --------------------------------------------------------------- frontend
+  - type: web
+    name: wellco-web
+    runtime: static
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://api.wellcoapp.com
+      - key: VITE_STRIPE_PUBLIC_KEY
+        sync: false
+      - key: VITE_CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: VITE_CLOUDINARY_UPLOAD_PRESET
+        sync: false
+    routes:
+      # React Router maneja el ruteo en el cliente. Sin esta regla, entrar
+      # directo a /explorar o recargar la pagina devuelve 404, porque en el
+      # servidor no existe ese archivo.
+      - type: rewrite
+        source: /*
+        destination: /index.html
