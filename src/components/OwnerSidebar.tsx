@@ -32,11 +32,8 @@ function OwnerSidebar() {
           className="text-3xl font-semibold tracking-widest text-[#1b2c44]"
           style={{ fontFamily: "Cormorant Garamond, serif" }}
         >
-          wellco
+          Wellco
         </h1>
-        <p className="text-xs tracking-[0.3em] text-slate-500 mt-0.5">
-          WELLNESS
-        </p>
       </div>
 
       {/* Nav */}

@@ -31,7 +31,7 @@ function DemoCta() {
           className="text-4xl md:text-5xl font-semibold text-white leading-tight mb-5"
           style={{ fontFamily: "Cormorant Garamond, serif" }}
         >
-          Conoce wellco
+          Conoce Wellco
           <br />
           <span className="italic">en 15 minutos</span>
         </h2>

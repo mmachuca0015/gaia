@@ -18,7 +18,7 @@ const features = [
     icon: ShieldCheck,
     title: "Seguro de verdad",
     description:
-      "Tu sesión vive en el servidor y se puede revocar al instante. Tus pagos los procesa Stripe: wellco nunca guarda tu tarjeta.",
+      "Tu sesión vive en el servidor y se puede revocar al instante. Tus pagos los procesa Stripe: Wellco nunca guarda tu tarjeta.",
   },
   {
     icon: MapPin,

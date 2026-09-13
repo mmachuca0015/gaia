@@ -1,51 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
-
-const ANNUAL_DISCOUNT = 0.15;
-
-/* PLACEHOLDER: precios y features de ejemplo para ver el diseño.
-   Cambiar por los reales cuando estén definidos. */
-const plans = [
-  {
-    name: "Light",
-    price: 199,
-    tagline: "Para estudios que empiezan a llenar su agenda.",
-    featured: false,
-    features: [
-      "Perfil en el marketplace",
-      "Hasta 3 instructores",
-      "Agenda y reservaciones ilimitadas",
-      "Cobros con Stripe Connect",
-      "Confirmaciones por correo",
-      "Panel de ingresos básico",
-    ],
-  },
-  {
-    name: "Pro",
-    price: 399,
-    tagline: "Para estudios con varias clases al día y equipo completo.",
-    featured: true,
-    features: [
-      "Todo lo de Light",
-      "Instructores ilimitados",
-      "Gráficas de ingresos por período",
-      "Actividad reciente en tiempo real",
-      "Posición destacada en el marketplace",
-      "Galería de fotos ampliada",
-      "Soporte prioritario",
-    ],
-  },
-];
+import {
+  fetchPlans,
+  monthlyPrice,
+  annualTotal,
+  introPrice,
+  toPesos,
+  formatMoney,
+  type Plan,
+} from "../../../lib/plans";
 
 function Pricing() {
   const [annual, setAnnual] = useState(false);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [error, setError] = useState(false);
 
-  /* El precio grande siempre se muestra por mes: en anual es el mensual con el
-     descuento aplicado, y abajo va el total que se factura de una vez. */
-  const monthlyPrice = (price: number) =>
-    annual ? Math.round(price * (1 - ANNUAL_DISCOUNT)) : price;
-  const annualTotal = (price: number) =>
-    Math.round(price * 12 * (1 - ANNUAL_DISCOUNT));
+  // Los precios vienen de la API. Si el admin cambia uno, esta seccion lo
+  // refleja en la siguiente visita sin volver a desplegar la landing.
+  useEffect(() => {
+    fetchPlans()
+      .then(setPlans)
+      .catch(() => setError(true));
+  }, []);
 
   return (
     <section id="precios" className="bg-paper py-24 px-6">
@@ -91,113 +67,145 @@ function Pricing() {
                   annual ? "bg-white/15 text-white" : "bg-ink/8 text-ink"
                 }`}
               >
-                -15%
+                -{plans[0]?.annual_discount ?? 15}%
               </span>
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-3xl mx-auto">
-          {plans.map((plan) => (
-            <div
-              key={plan.name}
-              className={`rounded-2xl p-8 border flex flex-col ${
-                plan.featured ? "bg-ink border-ink" : "bg-surface border-line"
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <p
-                  className={`text-2xl font-semibold ${
-                    plan.featured ? "text-white" : "text-ink"
-                  }`}
-                  style={{ fontFamily: "Cormorant Garamond, serif" }}
-                >
-                  {plan.name}
-                </p>
-                {plan.featured && (
-                  <span className="text-[10px] tracking-[0.2em] text-slate-300 border border-white/25 px-2.5 py-1 rounded-full">
-                    POPULAR
-                  </span>
-                )}
-              </div>
-
-              <p
-                className={`text-sm mb-6 ${
-                  plan.featured ? "text-slate-400" : "text-slate-500"
-                }`}
-              >
-                {plan.tagline}
-              </p>
-
-              <div className="mb-6">
-                <div className="flex items-baseline gap-1.5">
-                  <span
-                    className={`text-5xl font-semibold ${
-                      plan.featured ? "text-white" : "text-ink"
-                    }`}
-                    style={{ fontFamily: "Cormorant Garamond, serif" }}
-                  >
-                    ${monthlyPrice(plan.price)}
-                  </span>
-                  <span
-                    className={`text-sm ${
-                      plan.featured ? "text-slate-400" : "text-slate-500"
+        {error ? (
+          <p className="text-center text-slate-500 text-sm">
+            No pudimos cargar los planes. Vuelve a intentarlo en un momento.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-3xl mx-auto">
+            {/* Esqueletos mientras carga, para que la seccion no salte de alto */}
+            {plans.length === 0
+              ? [0, 1].map((i) => (
+                  <div
+                    key={i}
+                    className="rounded-2xl border border-line bg-surface p-8 h-[520px] animate-pulse"
+                  />
+                ))
+              : plans.map((plan) => (
+                  <div
+                    key={plan.id}
+                    className={`rounded-2xl p-8 border flex flex-col ${
+                      plan.is_featured
+                        ? "bg-ink border-ink"
+                        : "bg-surface border-line"
                     }`}
                   >
-                    MXN / mes
-                  </span>
-                </div>
+                    <div className="flex items-center justify-between mb-1">
+                      <p
+                        className={`text-2xl font-semibold ${
+                          plan.is_featured ? "text-white" : "text-ink"
+                        }`}
+                        style={{ fontFamily: "Cormorant Garamond, serif" }}
+                      >
+                        {plan.name}
+                      </p>
+                      {plan.is_featured && (
+                        <span className="text-[10px] tracking-[0.2em] text-slate-300 border border-white/25 px-2.5 py-1 rounded-full">
+                          POPULAR
+                        </span>
+                      )}
+                    </div>
 
-                <p
-                  className={`text-xs mt-2 ${
-                    plan.featured ? "text-slate-400" : "text-slate-500"
-                  }`}
-                >
-                  {annual ? (
-                    <>
-                      <span className="line-through">${plan.price}</span> ·
-                      facturado ${annualTotal(plan.price).toLocaleString("es-MX")}{" "}
-                      al año
-                    </>
-                  ) : (
-                    "Facturado mes a mes. Cancela cuando quieras."
-                  )}
-                </p>
-              </div>
-
-              <ul className="flex flex-col gap-3 mb-8">
-                {plan.features.map((f) => (
-                  <li key={f} className="flex gap-3 items-start">
-                    <Check
-                      size={15}
-                      className={`mt-0.5 shrink-0 ${
-                        plan.featured ? "text-white" : "text-ink"
-                      }`}
-                    />
-                    <span
-                      className={`text-sm leading-relaxed ${
-                        plan.featured ? "text-slate-200" : "text-slate-500"
+                    <p
+                      className={`text-sm mb-6 ${
+                        plan.is_featured ? "text-slate-400" : "text-slate-500"
                       }`}
                     >
-                      {f}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+                      {plan.tagline}
+                    </p>
 
-              <a
-                href="#demo"
-                className={`mt-auto text-center text-sm font-medium px-6 py-3.5 rounded-full transition-colors ${
-                  plan.featured
-                    ? "bg-white text-ink hover:bg-slate-200"
-                    : "bg-ink text-white hover:bg-ink-soft"
-                }`}
-              >
-                Agenda un demo gratis
-              </a>
-            </div>
-          ))}
-        </div>
+                    <div className="mb-6">
+                      <div className="flex items-baseline gap-1.5">
+                        <span
+                          className={`text-5xl font-semibold ${
+                            plan.is_featured ? "text-white" : "text-ink"
+                          }`}
+                          style={{ fontFamily: "Cormorant Garamond, serif" }}
+                        >
+                          ${formatMoney(monthlyPrice(plan, annual))}
+                        </span>
+                        <span
+                          className={`text-sm ${
+                            plan.is_featured ? "text-slate-400" : "text-slate-500"
+                          }`}
+                        >
+                          {plan.currency.toUpperCase()} / mes
+                        </span>
+                      </div>
+
+                      <p
+                        className={`text-xs mt-2 ${
+                          plan.is_featured ? "text-slate-400" : "text-slate-500"
+                        }`}
+                      >
+                        {annual ? (
+                          <>
+                            <span className="line-through">
+                              ${formatMoney(toPesos(plan.price_cents) * 12)}
+                            </span>{" "}
+                            · facturado ${formatMoney(annualTotal(plan))} al año
+                          </>
+                        ) : (
+                          "Facturado mes a mes. Cancela cuando quieras."
+                        )}
+                      </p>
+
+                      {!annual && plan.intro_discount > 0 && (
+                        <p
+                          className={`text-xs mt-2 px-2.5 py-1.5 rounded-lg inline-block ${
+                            plan.is_featured
+                              ? "bg-white/10 text-white"
+                              : "bg-ink/5 text-ink"
+                          }`}
+                        >
+                          Tu primer mes: ${formatMoney(introPrice(plan))} ·{" "}
+                          {plan.intro_discount}% de descuento
+                        </p>
+                      )}
+                    </div>
+
+                    <ul className="flex flex-col gap-3 mb-8">
+                      {plan.features.map((f) => (
+                        <li key={f.id} className="flex gap-3 items-start">
+                          <Check
+                            size={15}
+                            className={`mt-0.5 shrink-0 ${
+                              plan.is_featured ? "text-white" : "text-ink"
+                            }`}
+                          />
+                          <span
+                            className={`text-sm leading-relaxed ${
+                              plan.is_featured
+                                ? "text-slate-200"
+                                : "text-slate-500"
+                            }`}
+                          >
+                            {f.label}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <a
+                      href="#demo"
+                      className={`mt-auto text-center text-sm font-medium px-6 py-3.5 rounded-full transition-colors ${
+                        plan.is_featured
+                          ? "bg-white text-ink hover:bg-slate-200"
+                          : "bg-ink text-white hover:bg-ink-soft"
+                      }`}
+                    >
+                      Agenda un demo gratis
+                    </a>
+                  </div>
+                ))}
+          </div>
+        )}
 
         <div className="max-w-3xl mx-auto mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="border border-line rounded-2xl p-5">

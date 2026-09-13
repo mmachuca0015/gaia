@@ -9,6 +9,11 @@ const bookingsRouter = require("./routes/bookings");
 const userRouter = require("./routes/users");
 const paymentsRouter = require("./routes/payments");
 const adminRouter = require("./routes/admin");
+const plansRouter = require("./routes/plans");
+const {
+  router: subscriptionsRouter,
+  webhookHandler,
+} = require("./routes/subscriptions");
 
 const app = express();
 
@@ -40,6 +45,15 @@ app.use(
   }),
 );
 
+// El webhook de Stripe va antes de express.json y con el cuerpo sin parsear:
+// la firma se calcula sobre los bytes exactos que mando Stripe, y convertirlos
+// a objeto los invalida.
+app.post(
+  "/subscriptions/webhook",
+  express.raw({ type: "application/json" }),
+  webhookHandler,
+);
+
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 
@@ -50,6 +64,8 @@ app.use("/bookings", bookingsRouter);
 app.use("/users", userRouter);
 app.use("/payments", paymentsRouter);
 app.use("/admin", adminRouter);
+app.use("/plans", plansRouter);
+app.use("/subscriptions", subscriptionsRouter);
 
 // Manejador de errores: nunca filtrar el stack al cliente.
 app.use((err, req, res, next) => {

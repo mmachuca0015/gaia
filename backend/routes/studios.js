@@ -36,6 +36,8 @@ router.post("/register-studio", async (req, res) => {
     phone,
     email,
     password,
+    plan_id,
+    billing_interval,
   } = req.body;
 
   const normalizedEmail =
@@ -45,6 +47,20 @@ router.post("/register-studio", async (req, res) => {
   try {
     if (!name || !last_name || !studio_name || !normalizedEmail || !country) {
       return res.status(400).json({ error: "Faltan campos obligatorios" });
+    }
+
+    // Sin plan no hay estudio. Se valida contra la base y no solo su
+    // presencia: un plan_id inventado dejaria una suscripcion apuntando a
+    // nada, y uno desactivado permitiria contratar una tarifa retirada.
+    if (!plan_id) {
+      return res.status(400).json({ error: "Elige un plan para continuar" });
+    }
+    const planCheck = await client.query(
+      "SELECT id FROM plans WHERE id = $1 AND is_active = TRUE",
+      [plan_id],
+    );
+    if (planCheck.rows.length === 0) {
+      return res.status(400).json({ error: "El plan seleccionado no esta disponible" });
     }
     if (typeof password !== "string" || password.length < MIN_PASSWORD_LENGTH) {
       return res.status(400).json({
@@ -80,6 +96,15 @@ router.post("/register-studio", async (req, res) => {
     const result = await client.query(
       "INSERT INTO studios ( name, country, state, phone, owner_id) VALUES ($1, $2, $3, $4, $5) RETURNING *",
       [studio_name, country, state, phone, ownerId],
+    );
+
+    // Nace 'pendiente'. Solo el webhook de Stripe la pasa a 'activa', porque
+    // es el unico que sabe de verdad si el cobro se completo.
+    // Solo 'month' o 'year'; cualquier otra cosa cae a mensual en vez de
+    // reventar el CHECK de la tabla.
+    await client.query(
+      "INSERT INTO subscriptions (owner_id, plan_id, status, billing_interval) VALUES ($1, $2, 'pendiente', $3)",
+      [ownerId, plan_id, billing_interval === "year" ? "year" : "month"],
     );
 
     await client.query("COMMIT");

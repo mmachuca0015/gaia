@@ -49,16 +49,60 @@ Historial de nombres: GAIA Wellness -> GAIA -> PILA -> **wellco** (nombre actual
 
 - Comisión del 7.2% por transacción (incluye el procesamiento de Stripe)
 - Suscripción mensual para estudios: plan Light y plan Pro
+- 50% de descuento en el primer mes (`intro_discount`, por plan) — **solo plan mensual**
+- 15% de descuento por pagar el año completo (`annual_discount`, por plan)
+- **Los dos descuentos no se acumulan**: quien paga anual no recibe el de bienvenida
 - Gratis para los clientes que reservan
 
-**Ojo:** los precios que se muestran en `src/pages/Landing/components/Pricing.tsx`
-($199 Light / $399 Pro) y sus listas de features son PLACEHOLDER, puestos solo
-para ver el diseño. Faltan los definitivos.
+**La comisión por transacción no se menciona en la landing** — es una decisión
+de producto, no un olvido. Se habla de ella en el demo.
 
-- El plan anual aplica 15% de descuento (`ANNUAL_DISCOUNT` en `Pricing.tsx`). El
-  precio grande siempre se muestra por mes; el total anual va en la línea de abajo.
-- **La comisión por transacción no se menciona en la landing** — es una decisión
-  de producto, no un olvido. Se habla de ella en el demo.
+## Suscripciones (leer antes de tocar precios o el registro de estudios)
+
+- **Los precios NO están en el código.** Viven en la tabla `plans` y los leen
+  la landing (`Pricing.tsx`), el paso de plan del registro (`PlanPicker.tsx`) y
+  el panel de admin (`AdminSuscripciones.tsx`), todos vía `src/lib/plans.ts`.
+  Cambiar un precio en `/admin/suscripciones` mueve las tres vistas sin desplegar.
+- `price_cents` es un **entero en centavos**. Nunca NUMERIC ni float: así cobra
+  Stripe y así no aparecen los 198.99999.
+- Las características son filas en `plan_features`, no un array, porque el admin
+  las agrega y quita de una en una.
+- **Un dueño no puede crear perfil sin plan.** `POST /studios/register-studio`
+  exige `plan_id`, lo valida contra la base (que exista y esté activo) y crea la
+  fila de `subscriptions` dentro de la misma transacción que el dueño y el estudio.
+- **El cobro es dentro de la app, no con Checkout hospedado.** `POST
+  /subscriptions/payment-intent` crea la suscripción en Stripe con
+  `payment_behavior: "default_incomplete"` y devuelve un `clientSecret`; el
+  `PaymentElement` de `SubscriptionPayment.tsx` lo confirma con
+  `redirect: "if_required"`. Solo se sale de la app si el banco pide 3D Secure.
+- `save_default_payment_method: "on_subscription"` es lo que **deja la tarjeta
+  guardada** para el cobro automático del siguiente periodo. Si se quita, la
+  renovación falla y la suscripción cae a `vencida`.
+- Si ya hay un `stripe_subscription_id` en estado `incomplete`, el endpoint
+  **reusa** su client secret en vez de crear otra. Sin eso, cada recarga o
+  reintento dejaba suscripciones a medio pagar en Stripe.
+- La suscripción nace en `pendiente`. **Solo el webhook la pasa a `activa`**
+  (evento `invoice.paid`), nunca el frontend: que el navegador confirme no
+  prueba que el cobro cerró, y el cobro puede cerrar aunque cierren la pestaña.
+- En la API 2026-04 **`invoice.payment_intent` ya no existe**: el secreto está en
+  `invoice.confirmation_secret`. `extractClientSecret` prueba las dos formas.
+- El webhook se monta en `index.js` **antes de `express.json`** y con
+  `express.raw`. La firma se calcula sobre los bytes exactos que mandó Stripe;
+  parsearlos la invalida. Si mueves ese `app.post`, se rompe.
+- Un Price de Stripe es inmutable. `ensureStripePrice` crea uno nuevo cuando el
+  monto de la base ya no coincide y desactiva el viejo, sin borrarlo: las
+  suscripciones vigentes lo siguen necesitando.
+- Los dueños registrados **antes** de que existieran los planes no tienen fila en
+  `subscriptions`. `GET /subscriptions/me` los reporta como `heredada` y no se
+  les bloquea nada. No conviertas eso en un bloqueo sin migrarlos primero.
+- Cada plan tiene **dos Prices en Stripe**: mensual (`stripe_price_id`) y anual
+  (`stripe_price_id_year`). `ensureStripePrice(plan, interval)` los crea a demanda.
+- `subscriptions.billing_interval` recuerda cómo se contrató. Sin eso, al renovar
+  no habría forma de saber si toca cobrar el mes o el año.
+- **El total anual lo calcula SQL**, no el frontend (`annual_price_cents` en
+  `PLANS_QUERY`). Es el mismo número que se le manda a Stripe, así que lo que se
+  muestra no puede diferir de lo que se cobra. No lo recalcules en el cliente.
+- Un plan con suscripciones no se borra, se desactiva (`is_active = false`).
 
 ## Diseño / branding
 
@@ -94,6 +138,9 @@ marketing. Si migras una pantalla nueva, no le pongas `italic` al encabezado.
 - `hash.js` — configuración de bcrypt para el hash de contraseñas
 - `auth/sessions.js` — creación, lectura y revocación de sesiones
 - `middleware/auth.js` — `requireAuth`, `requireRole`, `requireStudioOwner`
+- `services/stripePlans.js` — puente con Stripe: crea Products, Prices y el cupón de bienvenida
+- `routes/plans.js` — lectura pública de planes y CRUD del admin
+- `routes/subscriptions.js` — Checkout, estado y el webhook de Stripe
 - `migrations/` — SQL versionado; se aplica con `node migrations/run.js`
 - `index.js` — archivo principal del backend
 
@@ -103,6 +150,8 @@ marketing. Si migras una pantalla nueva, no le pongas `italic` al encabezado.
 - `components/` — componentes de React/TypeScript reutilizables
 - `data/` — datos estáticos (por ejemplo, estados de México para formularios)
 - `lib/api.ts` — cliente HTTP único (cookie de sesión + URL base). Todas las llamadas pasan por aquí.
+- `lib/stripe.ts` — instancia única de Stripe.js, compartida por `main.tsx` y el `<Elements>` anidado del pago de suscripción
+- `lib/plans.ts` — tipos y cálculos de planes; única fuente para landing, registro y admin
 - `layouts/` — layouts usados en el proyecto
 - `pages/` — páginas: dashboard, login, landing, panel del dueño de estudio, panel de administrador, reset password
 - `pages/Landing/components/` — secciones de la landing: `Header`, `Hero`, `ForClients`, `ForOwners`, `Comparison`, `Pricing`, `DemoCta`, `Footer`
@@ -123,5 +172,5 @@ marketing. Si migras una pantalla nueva, no le pongas `italic` al encabezado.
 ## Variables de entorno
 
 - Frontend (`.env`): `VITE_API_URL`, `VITE_STRIPE_PUBLIC_KEY`, `VITE_CLOUDINARY_*`
-- Backend (`backend/.env`, ver `backend/.env.example`): `DB_*`, `PORT`, `NODE_ENV`, `FRONTEND_URL`, `RESEND_API_KEY`, `STRIPE_SECRET_KEY`
+- Backend (`backend/.env`, ver `backend/.env.example`): `DB_*`, `PORT`, `NODE_ENV`, `FRONTEND_URL`, `RESEND_API_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
 - En producción: `NODE_ENV=production` (activa la cookie `Secure`) y `FRONTEND_URL` con el dominio real (controla CORS y los enlaces de los correos).

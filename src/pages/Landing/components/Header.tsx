@@ -20,7 +20,7 @@ function Header() {
           className="text-2xl font-semibold tracking-widest text-ink"
           style={{ fontFamily: "Cormorant Garamond, serif" }}
         >
-          wellco
+          Wellco
         </a>
 
         <nav className="hidden md:flex items-center gap-8">

@@ -30,7 +30,7 @@ function Footer() {
               className="text-2xl font-semibold tracking-widest text-ink mb-3"
               style={{ fontFamily: "Cormorant Garamond, serif" }}
             >
-              wellco
+              Wellco
             </p>
             <p className="text-sm text-slate-500 leading-relaxed">
               El marketplace donde reservas tu clase de ejercicio favorita — y
@@ -72,7 +72,7 @@ function Footer() {
 
         <div className="border-t border-line pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-slate-400">
-            © {new Date().getFullYear()} wellco. Todos los derechos reservados.
+            © {new Date().getFullYear()} Wellco. Todos los derechos reservados.
           </p>
           <p className="text-xs text-slate-400">
             Pagos procesados por Stripe.

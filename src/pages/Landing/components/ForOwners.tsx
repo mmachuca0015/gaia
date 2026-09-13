@@ -52,7 +52,7 @@ function ForOwners() {
             <span className="italic">desde un solo panel</span>
           </h2>
           <p className="text-slate-500 leading-relaxed">
-            wellco no es solo una vitrina donde te encuentran: es el sistema con
+            Wellco no es solo una vitrina donde te encuentran: es el sistema con
             el que operas. Ingresos, clases, instructores, reservaciones y pagos
             en una sola plataforma — y clientes nuevos que llegan solos desde el
             marketplace.

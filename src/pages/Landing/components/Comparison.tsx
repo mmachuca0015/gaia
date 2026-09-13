@@ -47,7 +47,7 @@ function Comparison() {
           >
             Cómo se ve el día a día
             <br />
-            <span className="italic">con y sin wellco</span>
+            <span className="italic">con y sin Wellco</span>
           </h2>
         </div>
 

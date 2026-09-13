@@ -39,6 +39,11 @@ services:
         value: https://wellcoapp.com
       - key: STRIPE_SECRET_KEY
         sync: false
+      # Firma de los webhooks de Stripe. Sin esta variable el endpoint
+      # /subscriptions/webhook responde 500 a proposito: sin poder verificar
+      # la firma, cualquiera podria activarse una suscripcion gratis.
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
       - key: RESEND_API_KEY
         sync: false
 

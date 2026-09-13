@@ -1,15 +1,26 @@
 import { useState } from "react";
 import { Dumbbell, Store, ArrowLeft } from "lucide-react";
 import { estados } from "../data/estados.js";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { api, setCachedUser } from "../lib/api";
+import {
+  fetchPlans,
+  firstChargePrice,
+  formatMoney,
+  type Plan,
+  type BillingInterval,
+} from "../lib/plans";
+import PlanPicker from "../components/PlanPicker";
+import SubscriptionPayment from "../components/SubscriptionPayment";
 
 type Step =
   | "Iniciar sesión"
   | "Crear cuenta"
   | "Registrar usuario"
   | "Registrar estudio"
+  | "Elegir plan"
+  | "Pagar"
   | "Recuperar contraseña";
 
 function Login() {
@@ -58,7 +69,19 @@ function Login() {
   }
   const [forgotForm, setForgotForm] = useState({ email: "" });
 
+  {
+    /*Plan elegido por el dueño de estudio. Sin esto no se crea el perfil. */
+  }
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
+  const [billingInterval, setBillingInterval] =
+    useState<BillingInterval>("month");
+  const [creatingStudio, setCreatingStudio] = useState(false);
+
   const navigate = useNavigate();
+
+  const selectedPlan =
+    plans.find((p) => p.id === selectedPlanId) ?? null;
 
   const handleLogin = async () => {
     if (!loginForm.email || !loginForm.password) {
@@ -125,7 +148,9 @@ function Login() {
     }
   };
 
-  const handleRegisterStudio = async () => {
+  // Paso 1: valida los datos del estudio y pasa a elegir plan. El registro
+  // real no ocurre aqui, porque sin plan no hay perfil que crear.
+  const handleStudioFormNext = async () => {
     if (
       !registerStudioForm.name ||
       !registerStudioForm.last_name ||
@@ -151,17 +176,55 @@ function Login() {
       alert("Las contraseñas no coinciden");
       return;
     }
-    const res = await api("/studios/register-studio", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(registerStudioForm),
-    });
-    const data = await res.json();
-    if (res.ok) {
+
+    setStep("Elegir plan");
+    if (plans.length === 0) {
+      try {
+        const data = await fetchPlans();
+        setPlans(data);
+        // Preselecciona el destacado para que el paso no arranque vacio.
+        setSelectedPlanId(
+          (data.find((p) => p.is_featured) ?? data[0])?.id ?? null,
+        );
+      } catch {
+        alert("No pudimos cargar los planes. Intenta de nuevo.");
+      }
+    }
+  };
+
+  // Paso 2: crea el estudio con el plan elegido y manda directo al pago.
+  const handleRegisterStudio = async () => {
+    if (!selectedPlanId) {
+      alert("Elige un plan para continuar");
+      return;
+    }
+
+    setCreatingStudio(true);
+    try {
+      const res = await api("/studios/register-studio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...registerStudioForm,
+          plan_id: selectedPlanId,
+          billing_interval: billingInterval,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "No pudimos registrar el estudio");
+        return;
+      }
+
       setCachedUser(data);
-      navigate("/panel-de-control");
-    } else {
-      alert(data.error || "No pudimos registrar el estudio");
+
+      // La cuenta ya existe y la sesion tambien, pero la suscripcion nace
+      // pendiente. El cobro se hace en el siguiente paso, sin salir de la app;
+      // si el dueño lo abandona, el panel se lo vuelve a pedir en vez de
+      // perder la cuenta recien creada.
+      setStep("Pagar");
+    } finally {
+      setCreatingStudio(false);
     }
   };
 
@@ -183,19 +246,17 @@ function Login() {
   return (
     <div className="min-h-screen bg-[#f4f7fa] flex items-center justify-center p-4">
       <div
-        className={`bg-white rounded-3xl p-8 w-full ${step === "Registrar estudio" ? "max-w-3xl" : "max-w-sm"} shadow-sm`}
+        className={`bg-white rounded-3xl p-8 w-full ${step === "Registrar estudio" || step === "Elegir plan" ? "max-w-3xl" : "max-w-sm"} shadow-sm`}
       >
-        {/* Logo */}
+        {/* Logo. Es la salida del formulario: de vuelta a la landing. */}
         <div className="text-center mb-8">
-          <h1
-            className="text-3xl font-semibold tracking-widest text-[#1b2c44]"
+          <Link
+            to="/"
+            className="text-3xl font-semibold tracking-widest text-[#1b2c44] inline-block hover:text-[#33506f] transition-colors"
             style={{ fontFamily: "Cormorant Garamond, serif" }}
           >
-            wellco
-          </h1>
-          <p className="text-xs tracking-[0.3em] text-slate-400 mt-0.5">
-            WELLNESS
-          </p>
+            Wellco
+          </Link>
         </div>
 
         {/* Switch tabs */}
@@ -286,7 +347,7 @@ function Login() {
           <div className="flex flex-col gap-4">
             <div className="mb-2">
               <p className="text-lg font-semibold text-slate-800">
-                ¿Cómo quieres usar wellco?
+                ¿Cómo quieres usar Wellco?
               </p>
               <p className="text-sm text-slate-400">Elige tu tipo de cuenta</p>
             </div>
@@ -307,7 +368,7 @@ function Login() {
               <Store size={24} className="text-[#1b2c44]" />
               <p className="font-medium text-slate-800">Soy dueño de estudio</p>
               <p className="text-xs text-slate-400">
-                Quiero publicar mi estudio en wellco
+                Quiero publicar mi estudio en Wellco
               </p>
             </button>
           </div>
@@ -667,11 +728,76 @@ function Login() {
               </div>
             </div>
             <button
-              onClick={handleRegisterStudio}
+              onClick={handleStudioFormNext}
               className="block mx-auto bg-[#1b2c44] text-white py-3 px-30 rounded-xl text-sm font-medium hover:bg-[#33506f] transition-colors mt-auto cursor-pointer"
             >
-              Crear estudio
+              Continuar
             </button>
+          </div>
+        )}
+
+        {/*Elegir plan: paso obligatorio antes de crear el perfil*/}
+        {step === "Elegir plan" && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-3 mb-2">
+              <ArrowLeft
+                size={20}
+                onClick={() => setStep("Registrar estudio")}
+                className="text-[#1b2c44] cursor-pointer"
+              />
+              <div>
+                <p className="font-semibold text-slate-800">Elige tu plan</p>
+                <p className="text-xs text-slate-400">
+                  Tu estudio se crea al confirmar el pago
+                </p>
+              </div>
+            </div>
+
+            <PlanPicker
+              plans={plans}
+              selectedId={selectedPlanId}
+              onSelect={setSelectedPlanId}
+              interval={billingInterval}
+              onIntervalChange={setBillingInterval}
+            />
+
+            <button
+              onClick={handleRegisterStudio}
+              disabled={!selectedPlanId || creatingStudio}
+              className="block mx-auto bg-[#1b2c44] text-white py-3 px-16 rounded-xl text-sm font-medium hover:bg-[#33506f] transition-colors mt-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {creatingStudio ? "Creando..." : "Crear estudio"}
+            </button>
+            {selectedPlan && (
+              <p className="text-xs text-slate-400 text-center">
+                Hoy se te cobran ${formatMoney(
+                  firstChargePrice(selectedPlan, billingInterval),
+                )}{" "}
+                {selectedPlan.currency.toUpperCase()}
+                {billingInterval === "year" ? " por el año" : " el primer mes"}.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/*Pago. La cuenta ya existe; falta cobrar para activarla.*/}
+        {step === "Pagar" && (
+          <div className="flex flex-col gap-4">
+            <div className="mb-2">
+              <p className="font-semibold text-slate-800">Datos de pago</p>
+              <p className="text-xs text-slate-400">
+                {selectedPlan
+                  ? `Plan ${selectedPlan.name} · ${
+                      billingInterval === "year" ? "anual" : "mensual"
+                    }`
+                  : "Completa tu suscripción"}
+              </p>
+            </div>
+
+            <SubscriptionPayment
+              cta="Pagar y activar"
+              onSuccess={() => navigate("/panel-de-control")}
+            />
           </div>
         )}
 

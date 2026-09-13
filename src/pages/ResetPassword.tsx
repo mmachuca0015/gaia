@@ -45,11 +45,8 @@ function ResetPassword() {
             className="text-3xl font-semibold tracking-widest text-[#1b2c44]"
             style={{ fontFamily: "Cormorant Garamond, serif" }}
           >
-            wellco
+            Wellco
           </h1>
-          <p className="text-xs tracking-[0.3em] text-slate-400 mt-0.5">
-            WELLNESS
-          </p>
         </div>
         <h1 className="text-lg font-semibold text-center mb-8 text-slate-800 mt-1">
           Restablecer contraseña

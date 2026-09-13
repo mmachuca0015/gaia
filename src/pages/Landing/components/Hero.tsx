@@ -26,7 +26,7 @@ function Hero() {
         </h1>
 
         <p className="text-base md:text-lg text-slate-500 max-w-2xl mx-auto mb-10 leading-relaxed">
-          wellco es la plataforma que conecta estudios de ejercicio con quienes
+          Wellco es la plataforma que conecta estudios de ejercicio con quienes
           quieren moverse. Encuentra, reserva y paga en segundos — y si tienes un
           estudio, gestiónalo completo desde un solo panel.
         </p>

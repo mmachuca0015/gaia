@@ -33,7 +33,7 @@ function OwnerAppPreview() {
             className="text-lg font-semibold tracking-widest text-ink px-2 mb-6"
             style={{ fontFamily: "Cormorant Garamond, serif" }}
           >
-            wellco
+            Wellco
           </p>
           <nav className="flex flex-col gap-1">
             {navItems.map(({ icon: Icon, label, active }) => (
