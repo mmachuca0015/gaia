@@ -24,7 +24,7 @@ function BookingsCard({
         </button>
       </div>
 
-      <p className="text-sm italic text-slate-600 mb-4">con {instructor}</p>
+      <p className="text-sm text-slate-600 mb-4">con {instructor}</p>
 
       <div className="flex items-center gap-4 text-sm text-slate-500">
         <div className="flex items-center gap-1.5">
