@@ -1,10 +1,11 @@
 const express = require("express");
 const pool = require("../db");
 const { requireAuth, requireRole } = require("../middleware/auth");
+const { stripe, resourceMissing } = require("../services/stripe");
 const {
-  stripe,
   ensureStripePrice,
   ensureIntroCoupon,
+  ensureCourtesyCoupon,
 } = require("../services/stripePlans");
 
 const router = express.Router();
@@ -67,10 +68,13 @@ router.post(
                 p.id, p.slug, p.name, p.tagline, p.price_cents, p.currency,
                 p.intro_discount, p.annual_discount, p.stripe_product_id,
                 p.stripe_price_id, p.stripe_price_id_year,
-                o.email, o.name AS owner_name
+                o.email, o.name AS owner_name,
+                c.code AS coupon_code, c.percent_off AS coupon_percent,
+                c.duration_months AS coupon_months
          FROM subscriptions s
          JOIN plans p         ON p.id = s.plan_id
          JOIN studio_owners o ON o.id = s.owner_id
+         LEFT JOIN coupons c  ON c.id = s.coupon_id
          WHERE s.owner_id = $1`,
         [req.user.id],
       );
@@ -85,7 +89,22 @@ router.post(
       }
 
       // --- Cliente de Stripe
+      //
+      // El customer guardado se verifica antes de reusarlo. Un `cus_` de modo
+      // prueba no existe con la llave live, y el subscriptions.create de mas
+      // abajo fallaria dejando al dueño sin poder pagar su plan y sin pista
+      // de por que.
       let customerId = sub.stripe_customer_id;
+      if (customerId) {
+        const customer = await stripe.customers
+          .retrieve(customerId)
+          .catch((err) => {
+            if (resourceMissing(err)) return null;
+            throw err;
+          });
+        if (!customer || customer.deleted) customerId = null;
+      }
+
       if (!customerId) {
         const customer = await stripe.customers.create({
           email: sub.email,
@@ -106,7 +125,13 @@ router.post(
       if (sub.stripe_subscription_id) {
         const existing = await stripe.subscriptions
           .retrieve(sub.stripe_subscription_id, { expand: SUBSCRIPTION_EXPAND })
-          .catch(() => null);
+          .catch((err) => {
+            // No existe: quedo en el otro modo o se borro, y mas abajo se crea
+            // una nueva. Un error de red, en cambio, se deja subir: tratarlo
+            // como "no existe" crearia una SEGUNDA suscripcion de cobro.
+            if (resourceMissing(err)) return null;
+            throw err;
+          });
 
         if (existing && existing.status === "incomplete") {
           const clientSecret = extractClientSecret(existing.latest_invoice);
@@ -124,10 +149,22 @@ router.post(
       const interval = sub.billing_interval === "year" ? "year" : "month";
       const priceId = await ensureStripePrice(sub, interval);
 
-      // El descuento de bienvenida es solo del plan mensual. Quien paga al año
-      // ya trae el 15% metido en el precio y los dos no se acumulan.
-      const couponId =
-        interval === "month" ? await ensureIntroCoupon(sub.intro_discount) : null;
+      // Un solo descuento por suscripcion, nunca dos.
+      //
+      // Manda el cupon de cortesia si el dueño canjeo uno al registrarse: es
+      // un trato cerrado a mano y siempre pesa mas que la promocion generica.
+      // Si no hay cupon, queda el descuento de bienvenida, que es solo del
+      // plan mensual porque el anual ya trae su 15% metido en el precio.
+      let couponId = null;
+      if (sub.coupon_code) {
+        couponId = await ensureCourtesyCoupon({
+          code: sub.coupon_code,
+          percent_off: sub.coupon_percent,
+          duration_months: sub.coupon_months,
+        });
+      } else if (interval === "month") {
+        couponId = await ensureIntroCoupon(sub.intro_discount);
+      }
 
       const subscription = await stripe.subscriptions.create({
         customer: customerId,

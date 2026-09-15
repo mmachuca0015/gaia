@@ -47,7 +47,41 @@ Historial de nombres: GAIA Wellness -> GAIA -> PILA -> **wellco** (nombre actual
 
 ## Modelo de negocio
 
-- Comisión del 7.2% por transacción (incluye el procesamiento de Stripe)
+- **Comisión total del 7.2%, partida en dos mitades, ambas sobre el TOTAL de la
+  transacción** (precio de la clase + cuota fija), no sobre el precio de la clase:
+  - 3.6% se lo queda Stripe. Lo descuenta de la cuenta de la plataforma.
+  - 3.6% es la comisión de Wellco (`COMMISSION_RATE` en `backend/routes/payments.js`).
+  - Si ves `0.036` en el código, **no es un error ni está a la mitad**. No lo
+    "corrijas" a `0.072`: duplicarías el cobro.
+- **Cuota fija de $3 MXN por transacción** (`TRANSACTION_FEE_CENTS`), que paga el
+  **cliente** encima del precio de la clase. Cubre el cargo fijo de Stripe.
+  - Es **por transacción, no por clase**. Hoy cada reserva es su propio cobro,
+    así que coincide; si algún día se reservan varias clases en un solo pago, la
+    cuota debe sumarse **una sola vez**.
+
+### El reparto, con T = precio + $3
+
+```
+cliente paga      T
+Stripe se queda   3.6% de T + $3
+Wellco se queda   3.6% de T
+estudio recibe    el resto = precio - 7.2% de T
+```
+
+Con una clase de $150: el cliente paga $153.00, el estudio recibe $138.98,
+Stripe cobra $8.51 y a Wellco le quedan **$5.51 netos, justo el 3.6% de T**.
+
+**La parte porcentual de Stripe se resta de `transfer_data.amount`.** Es lo menos
+obvio del cálculo: Stripe cobra su comisión de la cuenta de la plataforma, no de
+la del estudio. Si no se resta ahí, sale del bolsillo de Wellco y su comisión
+neta queda en **cero**. No quites esa resta.
+
+El monto de la cuota se expone en `GET /payments/fees` y el frontend lo lee de
+ahí (`src/lib/fees.ts`). **No lo escribas también en el frontend**: dos copias
+acaban desincronizadas y la pantalla diría un precio distinto al cobrado.
+
+La comisión real de Stripe varía según la tarjeta (internacional, AmEx, etc.),
+así que el neto de Wellco es aproximado, no exacto al centavo.
 - Suscripción mensual para estudios: plan Light y plan Pro
 - 50% de descuento en el primer mes (`intro_discount`, por plan) — **solo plan mensual**
 - 15% de descuento por pagar el año completo (`annual_discount`, por plan)

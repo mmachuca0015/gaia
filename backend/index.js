@@ -10,6 +10,7 @@ const userRouter = require("./routes/users");
 const paymentsRouter = require("./routes/payments");
 const adminRouter = require("./routes/admin");
 const plansRouter = require("./routes/plans");
+const { router: couponsRouter } = require("./routes/coupons");
 const {
   router: subscriptionsRouter,
   webhookHandler,
@@ -65,6 +66,7 @@ app.use("/users", userRouter);
 app.use("/payments", paymentsRouter);
 app.use("/admin", adminRouter);
 app.use("/plans", plansRouter);
+app.use("/coupons", couponsRouter);
 app.use("/subscriptions", subscriptionsRouter);
 
 // Manejador de errores: nunca filtrar el stack al cliente.

@@ -73,3 +73,21 @@ export function introPrice(plan: Plan) {
 export function firstChargePrice(plan: Plan, interval: BillingInterval) {
   return interval === "year" ? annualTotal(plan) : introPrice(plan);
 }
+
+/**
+ * Lo que se cobra hoy cuando el dueño canjeo un cupon de cortesia.
+ *
+ * El cupon SUSTITUYE al descuento de bienvenida, no se suma: por eso la base
+ * del mensual es el precio completo y no `introPrice`. Es la misma regla que
+ * aplica el backend al armar el cobro, escrita aqui para que la pantalla no
+ * prometa un numero distinto del que cobra Stripe.
+ */
+export function couponChargePrice(
+  plan: Plan,
+  interval: BillingInterval,
+  percentOff: number,
+) {
+  const base =
+    interval === "year" ? annualTotal(plan) : toPesos(plan.price_cents);
+  return Math.round(base * (1 - percentOff / 100));
+}

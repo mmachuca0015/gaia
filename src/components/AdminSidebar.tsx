@@ -4,6 +4,7 @@ import {
   Users,
   Store,
   CreditCard,
+  Ticket,
   LogOut,
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
@@ -22,6 +23,7 @@ function AdminSidebar() {
       path: "/admin/suscripciones",
       end: false,
     },
+    { icon: Ticket, label: "Cupones", path: "/admin/cupones", end: false },
   ];
 
   return (

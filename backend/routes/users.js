@@ -42,7 +42,19 @@ const USER_FIELDS = [
 ];
 const OWNER_FIELDS = ["id", "name", "last_name", "email"];
 
-const fieldsFor = (role) => (role === "user" ? USER_FIELDS : OWNER_FIELDS);
+// `admins` no tiene last_name. Antes esta lista se derivaba con un ternario
+// (user ? USER_FIELDS : OWNER_FIELDS), asi que a un admin se le pedia una
+// columna inexistente: /users/me respondia 500, ProtectedRoute lo leia como
+// "sin sesion" y devolvia al login justo despues de entrar bien.
+const ADMIN_FIELDS = ["id", "name", "email"];
+
+const FIELDS_BY_ROLE = {
+  user: USER_FIELDS,
+  owner: OWNER_FIELDS,
+  admin: ADMIN_FIELDS,
+};
+
+const fieldsFor = (role) => FIELDS_BY_ROLE[role] ?? ADMIN_FIELDS;
 
 // Limite de intentos de login por IP: frena fuerza bruta y relleno de
 // credenciales sin estorbar a un usuario normal.

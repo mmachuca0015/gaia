@@ -37,6 +37,9 @@ services:
       # Origen permitido para CORS y base de los enlaces de correo.
       - key: FRONTEND_URL
         value: https://wellcoapp.com
+      # Modo LIVE en produccion: sk_live_... La app avisa en los logs si aqui
+      # entra una llave de prueba, porque ese error no se nota solo: los cobros
+      # responden exito y no mueven un peso.
       - key: STRIPE_SECRET_KEY
         sync: false
       # Firma de los webhooks de Stripe. Sin esta variable el endpoint
@@ -56,6 +59,8 @@ services:
     envVars:
       - key: VITE_API_URL
         value: https://api.wellcoapp.com
+      # pk_live_..., del mismo modo que la llave secreta del backend. Mezclar
+      # modos hace que el pago falle justo al confirmarse en el navegador.
       - key: VITE_STRIPE_PUBLIC_KEY
         sync: false
       - key: VITE_CLOUDINARY_CLOUD_NAME

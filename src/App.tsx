@@ -25,6 +25,7 @@ import AdminDashboard from "./pages/Admin/AdminDashboard";
 import AdminUsuarios from "./pages/Admin/AdminUsuarios";
 import AdminEstudios from "./pages/Admin/AdminEstudios";
 import AdminSuscripciones from "./pages/Admin/AdminSuscripciones";
+import AdminCupones from "./pages/Admin/AdminCupones";
 
 function App() {
   return (
@@ -45,6 +46,7 @@ function App() {
               path="/admin/suscripciones"
               element={<AdminSuscripciones />}
             />
+            <Route path="/admin/cupones" element={<AdminCupones />} />
           </Route>
         </Route>
 

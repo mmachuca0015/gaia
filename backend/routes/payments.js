@@ -1,24 +1,96 @@
 const express = require("express");
 const pool = require("../db");
 const router = express.Router();
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const { stripe, resourceMissing } = require("../services/stripe");
 const { Resend } = require("resend");
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const { requireAuth, requireRole } = require("../middleware/auth");
 
-const COMMISSION_RATE = 0.036; // 3.6% por transaccion
+// Del 7.2% que se va en cada transaccion, Stripe se queda 3.6% por su cuenta
+// y este 3.6% es la comision de Wellco. Por eso aqui solo aparece la mitad:
+// la de Stripe nunca pasa por nuestro codigo, la descuenta ella.
+const COMMISSION_RATE = 0.036;
+
+// Cuota fija de Stripe por transaccion ($3 MXN). La paga el cliente encima del
+// precio de la clase, no el estudio.
+//
+// Es POR TRANSACCION, no por clase: si algun dia se reservan varias clases en
+// un mismo cobro, esta cuota se suma una sola vez. Por eso se aplica al armar
+// el PaymentIntent y no dentro del calculo de cada clase.
+const TRANSACTION_FEE_CENTS = 300;
 const FRONTEND_URL = (process.env.FRONTEND_URL || "http://localhost:5173")
   .split(",")[0]
   .trim();
 
+// Cuotas vigentes, para que la interfaz muestre exactamente lo que se va a
+// cobrar. Publico y de solo lectura: no revela nada que el cliente no vea ya
+// en su recibo, y evita tener el numero escrito en dos lugares que se puedan
+// desincronizar.
+router.get("/fees", (req, res) => {
+  res.json({ transaction_fee_cents: TRANSACTION_FEE_CENTS });
+});
+
 // Devuelve el stripe_customer_id del usuario de la sesion, o null.
+//
+// El id guardado se verifica contra Stripe en vez de devolverse a ciegas. Un
+// `cus_` creado en modo prueba sigue en la base despues del corte a live y
+// alli no existe: sin esta comprobacion, ver la tarjeta o cobrar una clase
+// devolvia 500 y el usuario no tenia forma de salir del hoyo.
+//
+// Cuando el customer ya no existe se limpia la columna y se responde como si
+// el usuario nunca hubiera guardado tarjeta, que es exactamente su situacion:
+// el metodo de pago vivia en la cuenta de Stripe del otro modo.
 async function getCustomerId(userId) {
   const { rows } = await pool.query(
     "SELECT stripe_customer_id FROM users WHERE id = $1",
     [userId],
   );
-  return rows[0]?.stripe_customer_id ?? null;
+  const customerId = rows[0]?.stripe_customer_id ?? null;
+  if (!customerId) return null;
+
+  const customer = await stripe.customers.retrieve(customerId).catch((err) => {
+    if (resourceMissing(err)) return null;
+    throw err;
+  });
+
+  if (!customer || customer.deleted) {
+    await pool.query(
+      "UPDATE users SET stripe_customer_id = NULL WHERE id = $1",
+      [userId],
+    );
+    return null;
+  }
+
+  return customerId;
+}
+
+// ¿La cuenta Connect del estudio puede recibir su parte del cobro?
+//
+// Se pregunta ANTES de abrir la transaccion y de crear el PaymentIntent. Si se
+// dejara fallar al cobrar, el error de Stripe saldria como 500 generico y el
+// cliente no sabria que el problema es del estudio, no de su tarjeta.
+//
+// Dos casos distintos, misma respuesta para el cliente:
+//   - la cuenta no existe (un `acct_` de modo prueba tras el corte a live),
+//     y entonces se limpia para que el dueño vea de nuevo el boton de alta;
+//   - la cuenta existe pero no tiene activas las transferencias, porque el
+//     dueño no termino el onboarding o Stripe le pidio documentos.
+async function studioCanReceive(studioId, stripeAccountId) {
+  const account = await stripe.accounts.retrieve(stripeAccountId).catch((err) => {
+    if (resourceMissing(err)) return null;
+    throw err;
+  });
+
+  if (!account) {
+    await pool.query(
+      "UPDATE studios SET stripe_account_id = NULL WHERE id = $1",
+      [studioId],
+    );
+    return false;
+  }
+
+  return account.capabilities?.transfers === "active";
 }
 
 router.post(
@@ -143,7 +215,8 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
     // EL PRECIO SE LEE DE LA BASE DE DATOS. Antes llegaba en el body, asi que
     // el cliente decidia cuanto pagar por la clase.
     const classInfo = await client.query(
-      `SELECT classes.price, classes.id AS class_id, studios.stripe_account_id
+      `SELECT classes.price, classes.id AS class_id,
+              studios.id AS studio_id, studios.stripe_account_id
        FROM schedules
        JOIN classes ON classes.id = schedules.class_id
        JOIN studios ON studios.id = classes.studio_id
@@ -154,17 +227,28 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
       return res.status(404).json({ error: "Clase no encontrada" });
     }
 
-    const { price, stripe_account_id: stripeAccountId } = classInfo.rows[0];
-    if (!stripeAccountId) {
+    const {
+      price,
+      studio_id: studioId,
+      stripe_account_id: stripeAccountId,
+    } = classInfo.rows[0];
+    if (
+      !stripeAccountId ||
+      !(await studioCanReceive(studioId, stripeAccountId))
+    ) {
       return res
         .status(400)
         .json({ error: "El estudio aun no puede recibir pagos" });
     }
 
-    const amountCents = Math.round(Number(price) * 100);
-    if (!Number.isFinite(amountCents) || amountCents <= 0) {
+    const classCents = Math.round(Number(price) * 100);
+    if (!Number.isFinite(classCents) || classCents <= 0) {
       return res.status(400).json({ error: "Precio invalido" });
     }
+
+    // Total de la transaccion: es la base sobre la que se calculan LAS DOS
+    // comisiones, la de Stripe y la de Wellco.
+    const amountCents = classCents + TRANSACTION_FEE_CENTS;
 
     const customerId = await getCustomerId(userId);
     if (!customerId) {
@@ -205,7 +289,31 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
         .json({ error: "Ya tienes una reserva para esta clase" });
     }
 
-    const pilaCommission = Math.round(amountCents * COMMISSION_RATE);
+    // Reparto del dinero. Las dos comisiones van sobre el TOTAL de la
+    // transaccion (clase + cuota), no sobre el precio de la clase.
+    //
+    //   cliente paga      T = clase + 3
+    //   Stripe se queda   3.6% de T + 3
+    //   Wellco se queda   3.6% de T
+    //   estudio recibe    el resto = clase - 7.2% de T
+    //
+    // Los 3 pesos del cliente cubren justo el cargo fijo de Stripe, asi que a
+    // Wellco le queda limpio su 3.6%.
+    //
+    // La parte porcentual de Stripe se resta de la transferencia porque Stripe
+    // cobra su comision de la cuenta de la plataforma, no de la del estudio:
+    // sin restarla aqui, saldria del bolsillo de Wellco y su comision neta
+    // quedaria en cero.
+    const wellcoCommission = Math.round(amountCents * COMMISSION_RATE);
+    const stripePercentFee = Math.round(amountCents * COMMISSION_RATE);
+    const studioAmount = classCents - wellcoCommission - stripePercentFee;
+
+    if (studioAmount <= 0) {
+      await client.query("ROLLBACK");
+      return res
+        .status(400)
+        .json({ error: "El precio de la clase es demasiado bajo para cobrarse" });
+    }
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountCents,
@@ -216,7 +324,14 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
       off_session: true,
       transfer_data: {
         destination: stripeAccountId,
-        amount: amountCents - pilaCommission,
+        amount: studioAmount,
+      },
+      metadata: {
+        clase_centavos: String(classCents),
+        cuota_fija_centavos: String(TRANSACTION_FEE_CENTS),
+        comision_wellco_centavos: String(wellcoCommission),
+        stripe_porcentual_centavos: String(stripePercentFee),
+        estudio_centavos: String(studioAmount),
       },
     });
 
@@ -309,7 +424,7 @@ router.post(
   async (req, res) => {
     try {
       const studioResult = await pool.query(
-        "SELECT id FROM studios WHERE owner_id = $1",
+        "SELECT id, stripe_account_id FROM studios WHERE owner_id = $1",
         [req.user.id],
       );
       if (studioResult.rows.length === 0) {
@@ -317,22 +432,44 @@ router.post(
       }
       const studioId = studioResult.rows[0].id;
 
-      const account = await stripe.accounts.create({
-        type: "express",
-        country: "MX",
-        capabilities: {
-          card_payments: { requested: true },
-          transfers: { requested: true },
-        },
-      });
+      // Si ya hay una cuenta valida se reusa y solo se genera un enlace nuevo.
+      // Los enlaces de onboarding caducan, asi que volver aqui es normal: sin
+      // esta comprobacion, cada regreso creaba OTRA cuenta Connect y dejaba
+      // huerfana la anterior, con el papeleo que el dueño ya habia llenado.
+      //
+      // Tambien es el camino del corte a live: el `acct_` de modo prueba no
+      // existe con la llave nueva, se descarta y el dueño se da de alta otra
+      // vez, ahora en la cuenta real.
+      let accountId = studioResult.rows[0].stripe_account_id;
+      if (accountId) {
+        const existing = await stripe.accounts
+          .retrieve(accountId)
+          .catch((err) => {
+            if (resourceMissing(err)) return null;
+            throw err;
+          });
+        if (!existing) accountId = null;
+      }
 
-      await pool.query(
-        "UPDATE studios SET stripe_account_id = $1 WHERE id = $2",
-        [account.id, studioId],
-      );
+      if (!accountId) {
+        const account = await stripe.accounts.create({
+          type: "express",
+          country: "MX",
+          capabilities: {
+            card_payments: { requested: true },
+            transfers: { requested: true },
+          },
+        });
+        accountId = account.id;
+
+        await pool.query(
+          "UPDATE studios SET stripe_account_id = $1 WHERE id = $2",
+          [accountId, studioId],
+        );
+      }
 
       const accountLink = await stripe.accountLinks.create({
-        account: account.id,
+        account: accountId,
         refresh_url: `${FRONTEND_URL}/owner/estudio/pagos`,
         return_url: `${FRONTEND_URL}/owner/estudio/pagos`,
         type: "account_onboarding",

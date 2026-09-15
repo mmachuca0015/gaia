@@ -1,8 +1,9 @@
 import { Users } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { api } from "../lib/api";
+import { fetchTransactionFee } from "../lib/fees";
 type ClassCardProps = {
   hour: string;
   name: string;
@@ -43,6 +44,18 @@ function ClassCard({
   const [showConfirmPopUp, setShowConfirmPopUp] = useState(false);
   const navigate = useNavigate();
 
+  // Cuota fija por transaccion. Se pide al backend para que lo que se muestra
+  // aqui sea lo mismo que se va a cobrar.
+  const [feeCents, setFeeCents] = useState<number | null>(null);
+  useEffect(() => {
+    fetchTransactionFee()
+      .then(setFeeCents)
+      .catch(() => setFeeCents(null));
+  }, []);
+
+  const fee = (feeCents ?? 0) / 100;
+  const total = Number(price) + fee;
+
   const handleReservar = () => {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
     if (!user.stripe_customer_id) {
@@ -55,7 +68,6 @@ function ClassCard({
   //Función que realiza el pago
   const handlePagar = async () => {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
-
     const res = await api("/payments/charge", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -158,10 +170,30 @@ function ClassCard({
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-8 max-w-sm w-full mx-4 flex flex-col gap-4 text-center">
             <p className="font-semibold text-slate-800">Confirmar reserva</p>
-            <p className="text-sm text-slate-600">
-              Si das click en aceptar confirmas el pago de{" "}
-              <span className="font-semibold text-slate-800">${price}</span>{" "}
-              para reservar tu lugar en la clase.
+
+            {/* Desglose completo: el cargo por transaccion no puede aparecer
+                por sorpresa hasta el estado de cuenta. */}
+            <div className="text-sm text-left border border-slate-200 rounded-xl divide-y divide-slate-100">
+              <div className="flex justify-between px-4 py-2.5">
+                <span className="text-slate-600">Clase</span>
+                <span className="text-slate-800">${Number(price).toFixed(2)}</span>
+              </div>
+              {feeCents !== null && (
+                <div className="flex justify-between px-4 py-2.5">
+                  <span className="text-slate-600">Cargo por transacción</span>
+                  <span className="text-slate-800">${fee.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between px-4 py-2.5 font-semibold">
+                <span className="text-slate-800">Total</span>
+                <span className="text-slate-800">
+                  ${(feeCents !== null ? total : Number(price)).toFixed(2)} MXN
+                </span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-400">
+              Se cobrará a tu tarjeta guardada al confirmar.
             </p>
             <div className="flex gap-3 mt-2">
               <button

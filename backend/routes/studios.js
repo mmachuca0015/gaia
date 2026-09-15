@@ -9,6 +9,7 @@ const {
   requireRole,
   requireStudioOwner,
 } = require("../middleware/auth");
+const { redeemCoupon } = require("./coupons");
 
 const BCRYPT_ROUNDS = 12;
 const MIN_PASSWORD_LENGTH = 8;
@@ -38,6 +39,7 @@ router.post("/register-studio", async (req, res) => {
     password,
     plan_id,
     billing_interval,
+    coupon_code,
   } = req.body;
 
   const normalizedEmail =
@@ -98,13 +100,27 @@ router.post("/register-studio", async (req, res) => {
       [studio_name, country, state, phone, ownerId],
     );
 
+    const interval = billing_interval === "year" ? "year" : "month";
+
+    // El cupon se canja aqui dentro, con el renglon bloqueado, y no antes:
+    // asi el "un solo uso" se decide en el mismo instante en que se crea el
+    // dueño. Si algo falla despues, el ROLLBACK tambien libera el cupon.
+    //
+    // Se valida aunque el formulario ya lo haya verificado: entre que el dueño
+    // lo escribio y llego aqui, otro pudo canjearlo.
+    const canje = await redeemCoupon(client, coupon_code, interval, ownerId);
+    if (!canje.ok) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: canje.error });
+    }
+
     // Nace 'pendiente'. Solo el webhook de Stripe la pasa a 'activa', porque
     // es el unico que sabe de verdad si el cobro se completo.
     // Solo 'month' o 'year'; cualquier otra cosa cae a mensual en vez de
     // reventar el CHECK de la tabla.
     await client.query(
-      "INSERT INTO subscriptions (owner_id, plan_id, status, billing_interval) VALUES ($1, $2, 'pendiente', $3)",
-      [ownerId, plan_id, billing_interval === "year" ? "year" : "month"],
+      "INSERT INTO subscriptions (owner_id, plan_id, status, billing_interval, coupon_id) VALUES ($1, $2, 'pendiente', $3, $4)",
+      [ownerId, plan_id, interval, canje.couponId],
     );
 
     await client.query("COMMIT");

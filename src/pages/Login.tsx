@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dumbbell, Store, ArrowLeft } from "lucide-react";
+import { Dumbbell, Store, ArrowLeft, Ticket, Check, X } from "lucide-react";
 import { estados } from "../data/estados.js";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -7,10 +7,12 @@ import { api, setCachedUser } from "../lib/api";
 import {
   fetchPlans,
   firstChargePrice,
+  couponChargePrice,
   formatMoney,
   type Plan,
   type BillingInterval,
 } from "../lib/plans";
+import { validateCoupon, type CouponCheck } from "../lib/coupons";
 import PlanPicker from "../components/PlanPicker";
 import SubscriptionPayment from "../components/SubscriptionPayment";
 
@@ -33,6 +35,11 @@ function Login() {
     email: "",
     password: "",
   });
+
+  // El error va dentro de la tarjeta, no en un alert(): Chrome silencia los
+  // dialogos de una pagina que los repite ("Impedir que esta pagina cree
+  // cuadros de dialogo adicionales") y el usuario se queda sin ninguna pista.
+  const [loginError, setLoginError] = useState("");
 
   {
     /*Formulario de registro de usuario */
@@ -78,22 +85,81 @@ function Login() {
     useState<BillingInterval>("month");
   const [creatingStudio, setCreatingStudio] = useState(false);
 
+  {
+    /*Cupon de cortesia. Opcional: el registro funciona igual sin el. */
+  }
+  const [couponCode, setCouponCode] = useState("");
+  const [coupon, setCoupon] = useState<CouponCheck | null>(null);
+  const [couponError, setCouponError] = useState("");
+  const [checkingCoupon, setCheckingCoupon] = useState(false);
+
+  const comprobarCupon = async () => {
+    const code = couponCode.trim();
+    if (!code) return;
+
+    setCheckingCoupon(true);
+    setCouponError("");
+    try {
+      setCoupon(await validateCoupon(code, billingInterval));
+    } catch (err) {
+      setCoupon(null);
+      setCouponError(
+        err instanceof Error ? err.message : "No pudimos validar el cupón",
+      );
+    } finally {
+      setCheckingCoupon(false);
+    }
+  };
+
+  const quitarCupon = () => {
+    setCoupon(null);
+    setCouponCode("");
+    setCouponError("");
+  };
+
+  // Cambiar de mensual a anual (o al reves) invalida lo ya comprobado: un
+  // cupon de 3 meses sirve en mensual y no en anual. Se vuelve a comprobar
+  // solo, para que el dueño no tenga que acordarse de darle otra vez.
+  const cambiarIntervalo = (nuevo: BillingInterval) => {
+    setBillingInterval(nuevo);
+    if (coupon) {
+      setCoupon(null);
+      setCouponError("");
+      validateCoupon(coupon.code, nuevo)
+        .then(setCoupon)
+        .catch((err: Error) => setCouponError(err.message));
+    }
+  };
+
   const navigate = useNavigate();
 
   const selectedPlan =
     plans.find((p) => p.id === selectedPlanId) ?? null;
 
   const handleLogin = async () => {
+    setLoginError("");
+
     if (!loginForm.email || !loginForm.password) {
-      alert("Por favor llena todos los campos");
+      setLoginError("Escribe tu correo y tu contraseña");
       return;
     }
-    const res = await api("/users/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(loginForm),
-    });
-    const data = await res.json();
+
+    let res;
+    let data;
+    try {
+      res = await api("/users/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(loginForm),
+      });
+      data = await res.json();
+    } catch {
+      // Sin esto, si el backend esta apagado la promesa se rompe y el boton
+      // no hace absolutamente nada visible.
+      setLoginError("No pudimos conectar con el servidor. ¿Está encendido?");
+      return;
+    }
+
     if (res.ok) {
       // La sesion real es la cookie httpOnly que acaba de poner el backend.
       // Esto solo cachea el nombre y el rol para pintar la interfaz.
@@ -106,7 +172,7 @@ function Login() {
         navigate("/explorar");
       }
     } else {
-      alert(data.error || "No pudimos iniciar sesión");
+      setLoginError(data.error || "No pudimos iniciar sesión");
     }
   };
 
@@ -208,10 +274,19 @@ function Login() {
           ...registerStudioForm,
           plan_id: selectedPlanId,
           billing_interval: billingInterval,
+          coupon_code: coupon?.code ?? null,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
+        // El servidor revalida el cupon al canjearlo, asi que puede rechazar
+        // uno que aqui se veia bien: entre que se comprobo y se mando, otro
+        // estudio pudo quedarselo. Se limpia para que el aviso no contradiga
+        // lo que sigue en pantalla.
+        if (coupon) {
+          setCoupon(null);
+          setCouponError(data.error || "");
+        }
         alert(data.error || "No pudimos registrar el estudio");
         return;
       }
@@ -308,9 +383,11 @@ function Login() {
                 placeholder="correo@ejemplo.com"
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                 value={loginForm.email}
-                onChange={(e) =>
-                  setLoginForm({ ...loginForm, email: e.target.value })
-                }
+                onChange={(e) => {
+                  setLoginError("");
+                  setLoginForm({ ...loginForm, email: e.target.value });
+                }}
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               />
             </div>
             <div>
@@ -322,11 +399,22 @@ function Login() {
                 placeholder="••••••••"
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                 value={loginForm.password}
-                onChange={(e) =>
-                  setLoginForm({ ...loginForm, password: e.target.value })
-                }
+                onChange={(e) => {
+                  setLoginError("");
+                  setLoginForm({ ...loginForm, password: e.target.value });
+                }}
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               />
             </div>
+            {loginError && (
+              <p
+                role="alert"
+                className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3"
+              >
+                {loginError}
+              </p>
+            )}
+
             <button
               onClick={handleLogin}
               className="w-full bg-[#1b2c44] text-white py-3 rounded-xl text-sm font-medium hover:bg-[#33506f] transition-colors mt-2 cursor-pointer"
@@ -758,8 +846,68 @@ function Login() {
               selectedId={selectedPlanId}
               onSelect={setSelectedPlanId}
               interval={billingInterval}
-              onIntervalChange={setBillingInterval}
+              onIntervalChange={cambiarIntervalo}
             />
+
+            {/* Cupon de cortesia */}
+            <div className="border-t border-slate-100 pt-4">
+              {coupon ? (
+                <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-[#e8eef7]">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Check size={16} className="text-[#1b2c44] shrink-0" />
+                    <p className="text-sm text-[#1b2c44] truncate">
+                      <span className="font-mono">{coupon.code}</span>
+                      {" · "}
+                      {coupon.percent_off}% menos por {coupon.duration_label}
+                    </p>
+                  </div>
+                  <button
+                    onClick={quitarCupon}
+                    title="Quitar cupón"
+                    className="text-[#1b2c44]/50 hover:text-[#1b2c44] transition-colors cursor-pointer shrink-0"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <label className="flex items-center gap-1.5 text-xs text-slate-400 mb-1.5">
+                    <Ticket size={13} />
+                    ¿Tienes un cupón?
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={couponCode}
+                      placeholder="WELLCO-XXXXXX"
+                      onChange={(e) => {
+                        setCouponCode(e.target.value.toUpperCase());
+                        setCouponError("");
+                      }}
+                      onKeyDown={(e) => {
+                        // Enter aqui comprueba el cupon; sin esto el
+                        // formulario se enviaria y se saltaria el paso.
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          comprobarCupon();
+                        }
+                      }}
+                      className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-mono outline-none focus:border-slate-400 transition-colors"
+                    />
+                    <button
+                      onClick={comprobarCupon}
+                      disabled={!couponCode.trim() || checkingCoupon}
+                      className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm hover:border-slate-400 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {checkingCoupon ? "..." : "Aplicar"}
+                    </button>
+                  </div>
+                  {couponError && (
+                    <p className="text-xs text-red-500 mt-1.5">{couponError}</p>
+                  )}
+                </>
+              )}
+            </div>
 
             <button
               onClick={handleRegisterStudio}
@@ -771,7 +919,13 @@ function Login() {
             {selectedPlan && (
               <p className="text-xs text-slate-400 text-center">
                 Hoy se te cobran ${formatMoney(
-                  firstChargePrice(selectedPlan, billingInterval),
+                  coupon
+                    ? couponChargePrice(
+                        selectedPlan,
+                        billingInterval,
+                        coupon.percent_off,
+                      )
+                    : firstChargePrice(selectedPlan, billingInterval),
                 )}{" "}
                 {selectedPlan.currency.toUpperCase()}
                 {billingInterval === "year" ? " por el año" : " el primer mes"}.
