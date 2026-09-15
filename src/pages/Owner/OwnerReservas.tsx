@@ -2,6 +2,26 @@ import { useState, useEffect } from "react";
 import { CalendarCheck } from "lucide-react";
 
 import { api } from "../../lib/api";
+// Forma de GET /studios/:id/reservas. `reservas_count` y `available_spots`
+// vienen de un COUNT, asi que Postgres los manda como texto, no como number.
+type Reserva = {
+  schedule_id: number;
+  class_name: string;
+  instructor: string | null;
+  capacity: number;
+  time: string;
+  class_date: string;
+  reservas_count: string;
+  available_spots: string;
+};
+
+// Forma de GET /studios/:id/reservas/:scheduleId/usuarios.
+type ReservaUser = {
+  name: string;
+  last_name: string;
+  email: string;
+};
+
 function OwnerReservas() {
   type Studio = {
     id: number;
@@ -9,13 +29,13 @@ function OwnerReservas() {
   const owner = JSON.parse(localStorage.getItem("user") || "{}");
 
   const [studio, setStudio] = useState<Studio | null>(null);
-  const [reservations, setReservations] = useState<any[]>([]);
+  const [reservations, setReservations] = useState<Reserva[]>([]);
   const [activeTab, setActiveTab] = useState<"proximas" | "pasadas">(
     "proximas",
   );
   const [showDetails, setShowDetails] = useState(false);
-  const [selectedReserva, setSelectedReserva] = useState<any | null>(null);
-  const [reservaUsers, setReservaUsers] = useState<any[]>([]);
+  const [selectedReserva, setSelectedReserva] = useState<Reserva | null>(null);
+  const [reservaUsers, setReservaUsers] = useState<ReservaUser[]>([]);
 
   useEffect(() => {
     api(`/studios/owner/${owner.id}`)
@@ -23,7 +43,7 @@ function OwnerReservas() {
       .then((data) => {
         setStudio(data);
       });
-  }, []);
+  }, [owner.id]);
 
   useEffect(() => {
     if (!studio?.id) return;
@@ -32,7 +52,7 @@ function OwnerReservas() {
       .then((data) => setReservations(data));
   }, [studio, activeTab]);
 
-  const handleShowDetails = async (reserva: any) => {
+  const handleShowDetails = async (reserva: Reserva) => {
     setSelectedReserva(reserva);
     const res = await api(
       `/studios/${studio?.id}/reservas/${reserva.schedule_id}/usuarios?classDate=${reserva.class_date}`,
@@ -116,7 +136,7 @@ function OwnerReservas() {
                 </p>
                 <span
                   className={`text-md px-3 py-1 rounded-full ${
-                    reserva.available_spots === 0
+                    Number(reserva.available_spots) === 0
                       ? "bg-amber-50 text-amber-700"
                       : "bg-[#e8eef7] text-[#1b2c44]"
                   }`}

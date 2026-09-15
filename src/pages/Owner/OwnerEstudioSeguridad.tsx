@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 
@@ -6,13 +6,7 @@ import { api, setCachedUser } from "../../lib/api";
 function OwnerEstudioSeguridad() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const navigate = useNavigate();
-  type Studio = {
-    id: number;
-    email: string;
-    pasword: string;
-  };
 
-  const [studio, setStudio] = useState<Studio | null>(null);
   const [showPopup, setShowPopup] = useState(false);
   const [popupType, setPopupType] = useState<"email" | "password" | null>(null);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -22,12 +16,6 @@ function OwnerEstudioSeguridad() {
   const [confirmNewEmail, setConfirmNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
-
-  useEffect(() => {
-    api(`/users/studio-owner/${user.id}`)
-      .then((res) => res.json())
-      .then((data) => setStudio(data));
-  }, []);
 
   const handleContinue = async () => {
     const response = await api("/users/verify-password", {

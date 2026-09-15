@@ -23,24 +23,35 @@ function AdminSuscripciones() {
   const [priceDraft, setPriceDraft] = useState<Record<number, string>>({});
   const [featureDraft, setFeatureDraft] = useState<Record<number, string>>({});
 
-  const load = async () => {
-    try {
-      const data = await apiJson<Plan[]>("/plans/all");
-      setPlans(data);
-      setPriceDraft(
-        Object.fromEntries(data.map((p) => [p.id, String(toPesos(p.price_cents))])),
-      );
-      setError("");
-    } catch {
-      setError("No pudimos cargar los planes");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Las mutaciones piden recarga subiendo este contador en vez de llamar a mano
+  // a una funcion de carga: asi el efecto es el unico sitio que trae planes, y
+  // deja de llamar a setState de forma sincrona.
+  const [reloadToken, setReloadToken] = useState(0);
+  const reload = () => setReloadToken((n) => n + 1);
 
   useEffect(() => {
-    load();
-  }, []);
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await apiJson<Plan[]>("/plans/all");
+        if (cancelled) return;
+        setPlans(data);
+        setPriceDraft(
+          Object.fromEntries(
+            data.map((p) => [p.id, String(toPesos(p.price_cents))]),
+          ),
+        );
+        setError("");
+      } catch {
+        if (!cancelled) setError("No pudimos cargar los planes");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadToken]);
 
   const patchPlan = async (id: number, body: Record<string, unknown>) => {
     const res = await api(`/plans/${id}`, {
@@ -52,7 +63,7 @@ function AdminSuscripciones() {
       alert(data?.error || "No pudimos guardar el cambio");
       return;
     }
-    load();
+    reload();
   };
 
   const savePrice = (plan: Plan) => {
@@ -78,7 +89,7 @@ function AdminSuscripciones() {
       return;
     }
     setFeatureDraft({ ...featureDraft, [planId]: "" });
-    load();
+    reload();
   };
 
   const removeFeature = async (planId: number, featureId: number) => {
@@ -89,7 +100,7 @@ function AdminSuscripciones() {
       alert("No pudimos eliminar la caracteristica");
       return;
     }
-    load();
+    reload();
   };
 
   return (

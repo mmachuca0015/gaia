@@ -1,4 +1,3 @@
-import { Star } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 type StudioCardProps = {
@@ -16,7 +15,6 @@ function Studiocard({
   cover_url,
   is_open,
   name,
-  rating,
   price_from,
   neighborhood,
 }: StudioCardProps) {

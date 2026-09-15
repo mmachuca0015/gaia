@@ -15,7 +15,6 @@ function MisClases() {
   };
   const [bookings, setBookings] = useState<Booking[]>([]);
 
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
   useEffect(() => {
     api("/bookings")
       .then((res) => res.json())

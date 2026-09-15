@@ -8,7 +8,6 @@ type InstructorCardProps = {
 };
 
 function InstructorCard({
-  id,
   name,
   last_name,
   classes_per_week,

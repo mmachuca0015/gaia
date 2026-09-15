@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Star, BadgeCheck, CalendarCheck, Heart } from "lucide-react";
+import { CalendarCheck, Heart } from "lucide-react";
 import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -21,6 +21,26 @@ ChartJS.register(
   Tooltip,
 );
 
+// GET /studios/:id/actividad-reciente mezcla dos consultas distintas en una
+// sola lista. `tipo` es lo que distingue una de otra: solo las reservas traen
+// el nombre de la clase.
+type Actividad =
+  | {
+      tipo: "reserva";
+      name: string;
+      last_name: string;
+      class_name: string;
+      day: number | null;
+      time: string | null;
+      created_at: string;
+    }
+  | {
+      tipo: "favorito";
+      name: string;
+      last_name: string;
+      created_at: string;
+    };
+
 function PanelControl() {
   const owner = JSON.parse(localStorage.getItem("user") || "{}");
 
@@ -34,7 +54,7 @@ function PanelControl() {
     api(`/studios/owner/${owner.id}`)
       .then((res) => res.json())
       .then((data) => setStudio(data));
-  }, []);
+  }, [owner.id]);
 
   const [ingresos, setIngresos] = useState({ total: 0, reservas: 0 });
   const [activeFilter, setActiveFilter] = useState<
@@ -84,7 +104,7 @@ function PanelControl() {
     console.log(studio);
   }, [studio]);
 
-  const [actividad, setActividad] = useState<any[]>([]);
+  const [actividad, setActividad] = useState<Actividad[]>([]);
 
   useEffect(() => {
     if (!studio?.id) return;

@@ -3,8 +3,6 @@ import { useNavigate } from "react-router-dom";
 import {
   Lock,
   CreditCard,
-  Bell,
-  CircleQuestionMark,
   ChevronRight,
   LogOut,
 } from "lucide-react";
@@ -26,7 +24,7 @@ function Perfil() {
     api(`/users/${localUser.id}`)
       .then((res) => res.json())
       .then((data) => setUser(data));
-  }, []);
+  }, [localUser.id]);
 
   const menuItems = [
     { icon: Lock, label: "Privacidad", path: "/privacidad" },

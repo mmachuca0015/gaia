@@ -3,6 +3,41 @@ import { Plus } from "lucide-react";
 import ClassManagementCard from "../../components/ClassManagementCard";
 
 import { api } from "../../lib/api";
+// GET /studios/:id/classes (classes.* mas el nombre del instructor ya unido).
+type Clase = {
+  id: number;
+  name: string;
+  instructor_name: string | null;
+  instructor_id: number | null;
+  capacity: number;
+  price: number;
+  studio_id: number;
+};
+
+// GET /studios/:id/all-schedules. El LEFT JOIN contra schedules deja en null
+// todo lo del horario cuando la clase todavia no tiene ninguno; por eso existe
+// el filtro `time !== null` antes de pintar el calendario.
+type Horario = {
+  class_id: number;
+  name: string;
+  instructor: string | null;
+  capacity: number;
+  price: number;
+  schedule_id: number | null;
+  day: number | null;
+  time: string | null;
+  is_permanent: boolean | null;
+  date: string | null;
+};
+
+// GET /studios/:id/instructors.
+type Instructor = {
+  id: number;
+  name: string;
+  last_name: string;
+  studio_id: number;
+};
+
 function OwnerClases() {
   type Studio = {
     id: number;
@@ -11,11 +46,11 @@ function OwnerClases() {
   const owner = JSON.parse(localStorage.getItem("user") || "{}");
 
   const [studio, setStudio] = useState<Studio | null>(null);
-  const [classes, setClasses] = useState<any[]>([]);
-  const [schedules, setSchedules] = useState<any[]>([]);
+  const [classes, setClasses] = useState<Clase[]>([]);
+  const [schedules, setSchedules] = useState<Horario[]>([]);
   const [classPopup, setClassPopup] = useState(false);
   const [popupMode, setPopupMode] = useState<"add" | "edit">("add");
-  const [instructors, setInstructors] = useState<any[]>([]);
+  const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [newClassForm, setNewClassForm] = useState({
     name: "",
     instructor_id: 0,
@@ -26,16 +61,7 @@ function OwnerClases() {
     selectedDays: [] as string[],
     selectedTime: "6:00 AM",
   });
-  const [editingClass, setEditingClass] = useState<any | null>(null);
-  const [editForm, setEditForm] = useState({
-    name: "",
-    instructor_id: 0,
-    capacity: 0,
-    price: 0,
-    selectedTime: "6:00 AM",
-    selectedDay: "",
-    selectedDays: [] as string[],
-  });
+  const [editingClass, setEditingClass] = useState<Clase | null>(null);
 
   useEffect(() => {
     api(`/studios/owner/${owner.id}`)
@@ -43,7 +69,7 @@ function OwnerClases() {
       .then((data) => {
         setStudio(data);
       });
-  }, []);
+  }, [owner.id]);
 
   useEffect(() => {
     if (!studio?.id) return;
@@ -151,6 +177,8 @@ function OwnerClases() {
   };
 
   const handleEditClass = async () => {
+    if (!editingClass) return;
+
     const res = await api(`/studios/${studio?.id}/classes/${editingClass.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -196,15 +224,22 @@ function OwnerClases() {
   const studioId = studio?.id;
   //Obtener instructores del estudio
   useEffect(() => {
-    if (studio) {
-      api(`/studios/${studioId}/instructors`)
-        .then((res) => res.json())
-        .then((data) => setInstructors(data));
-    }
-  }, [studio]);
+    // Se guarda y se depende de studioId (un numero) en vez del objeto studio:
+    // la peticion solo necesita el id, y el objeto cambia de identidad en cada
+    // render aunque el id sea el mismo.
+    if (!studioId) return;
+    api(`/studios/${studioId}/instructors`)
+      .then((res) => res.json())
+      .then((data) => setInstructors(data));
+  }, [studioId]);
 
   //verifica el estado de schedules para ver si la clase es permanente o unica
-  const validSchedules = schedules.filter((s) => s.time !== null);
+  // El predicado de tipo no es decorativo: sin el, TypeScript sigue creyendo
+  // que `time` puede ser null dentro del calendario, aunque el filtro ya los
+  // haya sacado.
+  const validSchedules = schedules.filter(
+    (s): s is Horario & { time: string } => s.time !== null,
+  );
   if (!studio) return null;
   return (
     <div>
@@ -254,7 +289,7 @@ function OwnerClases() {
                 setClassPopup(true);
                 setNewClassForm({
                   name: clase.name,
-                  instructor_id: clase.instructor_id,
+                  instructor_id: clase.instructor_id ?? 0,
                   capacity: clase.capacity,
                   price: clase.price,
                   classType: isPermanent ? "permanente" : "única",
@@ -324,7 +359,7 @@ function OwnerClases() {
               </div>
               {[1, 2, 3, 4, 5, 6, 0].map((dayIndex) => {
                 const classesInCell = validSchedules.filter((s) => {
-                  const [h, m] = s.time.split(":").map(Number);
+                  const [h] = s.time.split(":").map(Number);
                   return s.day === dayIndex && h === hour;
                 });
                 const halfHourClasses = validSchedules.filter((s) => {
@@ -338,7 +373,7 @@ function OwnerClases() {
                   >
                     {classesInCell
                       .filter((s) => {
-                        const [h, m] = s.time.split(":").map(Number);
+                        const [, m] = s.time.split(":").map(Number);
                         return m === 0;
                       })
                       .map((s) => (

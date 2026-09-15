@@ -17,7 +17,7 @@ function OwnerEstudioPagos() {
     api(`/studios/owner/${owner.id}`)
       .then((res) => res.json())
       .then((data) => setStudio(data));
-  }, []);
+  }, [owner.id]);
 
   const handleConnectAccount = async () => {
     // El estudio lo determina el backend a partir de la sesion del dueño.
@@ -26,7 +26,9 @@ function OwnerEstudioPagos() {
     });
     const data = await res.json();
     if (res.ok) {
-      window.location.href = data.url;
+      // assign() en vez de asignar .href: hace lo mismo, pero no es escribir
+      // sobre una variable de fuera del componente.
+      window.location.assign(data.url);
     }
     setLoading(false);
   };

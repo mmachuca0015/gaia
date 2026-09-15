@@ -20,8 +20,32 @@ ChartJS.register(
   Tooltip,
 );
 
+// Postgres devuelve COUNT y SUM como texto (un bigint o un numeric no caben
+// siempre en un number de JS) y SUM sale null cuando no hay filas. Por eso todo
+// pasa por Number() antes de pintarse: no son numeros todavia.
+type AdminMetrics = {
+  transactions: { total: string; total_amount: string | null };
+  commission: { commission: string | null };
+  newStudios: { total: string };
+  newUsers: { total: string };
+};
+
+// `periodo` es una fecha en los periodos largos y la hora (un numero) con
+// "hoy", segun el GROUP BY que arma el backend. De ahi el String() al pintarlo.
+type ChartRow = {
+  periodo: string | number;
+  total: string;
+  amount: string | null;
+};
+
+type AdminCharts = {
+  transactions: ChartRow[];
+  users: ChartRow[];
+  studios: ChartRow[];
+};
+
 function AdminDashboard() {
-  const [metrics, setMetrics] = useState<any>(null);
+  const [metrics, setMetrics] = useState<AdminMetrics | null>(null);
 
   useEffect(() => {
     api("/admin/metrics")
@@ -32,7 +56,7 @@ function AdminDashboard() {
   const [activeFilter, setActiveFilter] = useState<
     "hoy" | "semana" | "mes" | "semestral"
   >("semana");
-  const [chartData, setChartData] = useState<any>(null);
+  const [chartData, setChartData] = useState<AdminCharts | null>(null);
 
   useEffect(() => {
     api(`/admin/charts?period=${activeFilter}`)
@@ -137,13 +161,13 @@ function AdminDashboard() {
           <Line
             data={{
               labels:
-                chartData?.transactions.map((d: any) => String(d.periodo)) ||
+                chartData?.transactions.map((d: ChartRow) => String(d.periodo)) ||
                 [],
               datasets: [
                 {
                   label: "Monto",
                   data:
-                    chartData?.transactions.map((d: any) => Number(d.amount)) ||
+                    chartData?.transactions.map((d: ChartRow) => Number(d.amount)) ||
                     [],
                   borderColor: "#1b2c44",
                   backgroundColor: "rgba(58,90,58,0.08)",
@@ -165,13 +189,13 @@ function AdminDashboard() {
           <Line
             data={{
               labels:
-                chartData?.transactions.map((d: any) => String(d.periodo)) ||
+                chartData?.transactions.map((d: ChartRow) => String(d.periodo)) ||
                 [],
               datasets: [
                 {
                   data:
                     chartData?.transactions.map(
-                      (d: any) => Number(d.amount) * 0.036,
+                      (d: ChartRow) => Number(d.amount) * 0.036,
                     ) || [],
                   borderColor: "#1b2c44",
                   backgroundColor: "rgba(58,90,58,0.08)",
@@ -193,10 +217,10 @@ function AdminDashboard() {
           <p className="font-semibold text-slate-800 mb-4">Usuarios nuevos</p>
           <Line
             data={{
-              labels: chartData?.users.map((d: any) => String(d.periodo)) || [],
+              labels: chartData?.users.map((d: ChartRow) => String(d.periodo)) || [],
               datasets: [
                 {
-                  data: chartData?.users.map((d: any) => Number(d.total)) || [],
+                  data: chartData?.users.map((d: ChartRow) => Number(d.total)) || [],
                   borderColor: "#1b2c44",
                   backgroundColor: "rgba(58,90,58,0.08)",
                   fill: true,
@@ -217,11 +241,11 @@ function AdminDashboard() {
           <Line
             data={{
               labels:
-                chartData?.studios.map((d: any) => String(d.periodo)) || [],
+                chartData?.studios.map((d: ChartRow) => String(d.periodo)) || [],
               datasets: [
                 {
                   data:
-                    chartData?.studios.map((d: any) => Number(d.total)) || [],
+                    chartData?.studios.map((d: ChartRow) => Number(d.total)) || [],
                   borderColor: "#1b2c44",
                   backgroundColor: "rgba(58,90,58,0.08)",
                   fill: true,

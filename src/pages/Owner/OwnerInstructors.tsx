@@ -3,6 +3,17 @@ import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
 
 import { api } from "../../lib/api";
+// GET /studios/:id/instructors. `classes_per_week` sale de un COUNT, asi que
+// Postgres lo manda como texto.
+type Instructor = {
+  id: number;
+  name: string;
+  last_name: string;
+  studio_id: number;
+  created_at: string;
+  classes_per_week: string;
+};
+
 function OwnerInstructors() {
   //Obtener datos del estudio
   type Studio = {
@@ -15,17 +26,19 @@ function OwnerInstructors() {
     api(`/studios/owner/${owner.id}`)
       .then((res) => res.json())
       .then((data) => setStudio(data));
-  }, []);
+  }, [owner.id]);
   const studioId = studio?.id;
   //Obtener instructores del estudio
-  const [instructors, setInstructors] = useState<any[]>([]);
+  const [instructors, setInstructors] = useState<Instructor[]>([]);
   useEffect(() => {
-    if (studio) {
-      api(`/studios/${studioId}/instructors`)
-        .then((res) => res.json())
-        .then((data) => setInstructors(data));
-    }
-  }, [studio]);
+    // Se guarda y se depende de studioId (un numero) en vez del objeto studio:
+    // la peticion solo necesita el id, y el objeto cambia de identidad en cada
+    // render aunque el id sea el mismo.
+    if (!studioId) return;
+    api(`/studios/${studioId}/instructors`)
+      .then((res) => res.json())
+      .then((data) => setInstructors(data));
+  }, [studioId]);
 
   //Saber desde cuando se unió el instructor al estudio
   const getTimeSince = (date: string) => {
@@ -120,7 +133,7 @@ function OwnerInstructors() {
               id={instructor.id}
               name={instructor.name}
               last_name={instructor.last_name}
-              classes_per_week={instructor.classes_per_week}
+              classes_per_week={Number(instructor.classes_per_week)}
               joined={getTimeSince(instructor.created_at)}
               onDelete={() => setDeleteInstructorId(instructor.id)}
             />

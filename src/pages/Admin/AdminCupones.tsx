@@ -147,19 +147,25 @@ function AdminCupones() {
   const [durationMonths, setDurationMonths] = useState(1);
   const [creando, setCreando] = useState(false);
 
-  const load = async () => {
-    try {
-      setCoupons(await fetchCoupons());
-      setError("");
-    } catch {
-      setError("No pudimos cargar los cupones");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // La carga vive dentro del efecto: no se usa en ningun otro sitio, y tenerla
+  // fuera hacia que el efecto llamara a setState de forma sincrona.
   useEffect(() => {
-    load();
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await fetchCoupons();
+        if (cancelled) return;
+        setCoupons(data);
+        setError("");
+      } catch {
+        if (!cancelled) setError("No pudimos cargar los cupones");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const generar = async () => {

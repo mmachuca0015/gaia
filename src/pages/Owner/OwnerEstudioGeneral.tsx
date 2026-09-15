@@ -2,9 +2,33 @@ import { useState, useEffect } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
-import L from "leaflet";
 
 import { api } from "../../lib/api";
+// Respuesta de api.zippopotam.us: las claves llevan espacio, tal cual las
+// manda ese servicio.
+type ZipPlace = {
+  "place name": string;
+  state: string;
+};
+
+// Mapa para la direccion. Va fuera del componente a proposito: declarado
+// dentro, React lo trataba como un componente nuevo en cada render y el marcador
+// perdia su estado cada vez que se redibujaba el formulario.
+function DraggableMarker({
+  position,
+  setPosition,
+}: {
+  position: [number, number];
+  setPosition: (pos: [number, number]) => void;
+}) {
+  useMapEvents({
+    click(e) {
+      setPosition([e.latlng.lat, e.latlng.lng]);
+    },
+  });
+  return <Marker position={position} />;
+}
+
 function OwnerEstudioGeneral() {
   const navigate = useNavigate();
   type Studio = {
@@ -28,7 +52,7 @@ function OwnerEstudioGeneral() {
     api(`/studios/owner/${owner.id}`)
       .then((res) => res.json())
       .then((data) => setStudio(data));
-  }, []);
+  }, [owner.id]);
 
   //Paso para saber que boton hizo clic
   type EditMode =
@@ -76,7 +100,7 @@ function OwnerEstudioGeneral() {
     setZipData({
       state,
       city,
-      neighborhoods: data.places.map((p: any) => p["place name"]),
+      neighborhoods: data.places.map((p: ZipPlace) => p["place name"]),
     });
     // Actualiza también el editForm
     setEditForm((prev) => ({ ...prev, state, city }));
@@ -112,22 +136,6 @@ function OwnerEstudioGeneral() {
     const data = await res.json();
     return data.secure_url;
   };
-
-  //Mapa para la dirección
-  function DraggableMarker({
-    position,
-    setPosition,
-  }: {
-    position: [number, number];
-    setPosition: (pos: [number, number]) => void;
-  }) {
-    useMapEvents({
-      click(e) {
-        setPosition([e.latlng.lat, e.latlng.lng]);
-      },
-    });
-    return <Marker position={position} />;
-  }
 
   const [markerPosition, setMarkerPosition] = useState<[number, number]>([
     20.6737, -103.348,

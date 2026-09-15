@@ -67,7 +67,6 @@ function ClassCard({
 
   //Función que realiza el pago
   const handlePagar = async () => {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
     const res = await api("/payments/charge", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

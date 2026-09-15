@@ -20,18 +20,30 @@ function AdminEstudios() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  // `loading` es derivado en vez de un estado propio: mientras la pagina ya
+  // cargada no sea la que se pide, estamos esperando. Asi desaparece el
+  // setLoading(true) sincrono del efecto, que provocaba un render de mas.
+  const [loadedPage, setLoadedPage] = useState(0);
+  const loading = loadedPage !== page;
 
   useEffect(() => {
-    setLoading(true);
+    // Si el usuario cambia de pagina antes de que llegue la respuesta anterior,
+    // esa respuesta tardia no debe pisar los datos de la pagina actual.
+    let cancelled = false;
     api(`/admin/studios?page=${page}`)
       .then((res) => res.json())
       .then((data) => {
+        if (cancelled) return;
         setStudios(data.studios);
         setTotalPages(data.totalPages);
         setTotal(data.total);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoadedPage(page);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [page]);
 
   const [studioDetails, setStudioDetails] = useState<StudioDetails | null>(

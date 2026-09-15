@@ -1,7 +1,9 @@
 type ClassManagementCardProps = {
   id: number;
   name: string;
-  instructor_name: string;
+  // El COALESCE del backend se queda en null si la clase no tiene instructor
+  // asignado ni nombre suelto escrito a mano.
+  instructor_name: string | null;
   capacity: number;
   price: number;
   onEdit: () => void;
@@ -9,7 +11,6 @@ type ClassManagementCardProps = {
 };
 
 function ClassManagementCard({
-  id,
   name,
   instructor_name,
   capacity,
@@ -21,7 +22,9 @@ function ClassManagementCard({
     <div className="bg-white rounded-2xl p-5 border border-slate-100">
       <div className="mb-3">
         <p className="font-medium text-slate-800">{name}</p>
-        <p className="text-md text-slate-600">con {instructor_name}</p>
+        <p className="text-md text-slate-600">
+          {instructor_name ? `con ${instructor_name}` : "Sin instructor"}
+        </p>
       </div>
       <div className="flex gap-2 mb-4">
         <span className="text-md bg-[#e8eef7] text-[#1b2c44] px-3 py-1 rounded-full">

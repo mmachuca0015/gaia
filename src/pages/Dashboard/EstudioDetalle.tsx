@@ -1,8 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import {
-  Star,
   MapPin,
   ArrowLeft,
   Heart,
@@ -85,19 +84,20 @@ function EstudioDetalle() {
   };
 
   const [classes, setClasses] = useState<Class[]>([]);
-  const fetchClases = () => {
+  // useCallback para que la funcion solo cambie de identidad cuando cambian el
+  // estudio o el dia. Sin el, el efecto de abajo se relanzaria en cada render.
+  const fetchClases = useCallback(() => {
     api(`/studios/${id}/clases?day=${selectedDay}`)
       .then((res) => res.json())
       .then((data) => setClasses(data));
-  };
+  }, [id, selectedDay]);
 
   useEffect(() => {
     fetchClases();
-  }, [selectedDay]);
+  }, [fetchClases]);
 
   //Agregar a favoritos
   const [isFavorite, setIsFavorite] = useState(false);
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
   const handleAddToFavorite = () => {
     api(`/studios/favorites/${id}`, { method: "POST" });
   };
@@ -130,11 +130,10 @@ function EstudioDetalle() {
   const [userBookings, setUserBookings] = useState<number[]>([]);
 
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
     api("/bookings")
       .then((res) => res.json())
       .then((data) => {
-        setUserBookings(data.map((b: any) => b.schedule_id));
+        setUserBookings(data.map((b: { schedule_id: number }) => b.schedule_id));
       });
   }, []);
 

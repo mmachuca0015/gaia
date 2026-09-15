@@ -20,7 +20,7 @@ function Favoritos() {
     api(`/studios/favorites/${user.id}`)
       .then((res) => res.json())
       .then((data) => setStudios(data));
-  }, []);
+  }, [user.id]);
 
   return (
     <div className="p-4 md:p-8">

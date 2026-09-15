@@ -14,7 +14,12 @@ function AgregarTarjeta() {
     last4: string;
   };
 
-  const [hasCard, setHasCard] = useState<boolean>(false);
+  // Si el usuario ya tiene tarjeta se sabe desde el primer render, leyendo el
+  // localStorage: es estado inicial, no algo que un efecto tenga que corregir
+  // despues pintando una vez la pantalla equivocada.
+  const [hasCard, setHasCard] = useState<boolean>(
+    () => !!JSON.parse(localStorage.getItem("user") || "{}").stripe_customer_id,
+  );
   const [showForm, setShowForm] = useState<boolean>(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [cardData, setCardData] = useState<CardData | null>(null);
@@ -30,13 +35,13 @@ function AgregarTarjeta() {
   }, [showForm]);
 
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    if (user.stripe_customer_id) {
-      setHasCard(true);
-      api("/payments/card")
-        .then((res) => res.json())
-        .then((data) => setCardData(data));
-    }
+    if (!hasCard) return;
+    api("/payments/card")
+      .then((res) => res.json())
+      .then((data) => setCardData(data));
+    // Solo al montar: la tarjeta recien guardada la pone el onSuccess del
+    // formulario, no hace falta volver a pedirla aqui.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleDeleteCard = async () => {
@@ -107,9 +112,6 @@ function AgregarTarjeta() {
                     >
                       <PaymentForm
                         onSuccess={() => {
-                          const user = JSON.parse(
-                            localStorage.getItem("user") || "{}",
-                          );
                           api("/payments/card")
                             .then((res) => res.json())
                             .then((data) => {

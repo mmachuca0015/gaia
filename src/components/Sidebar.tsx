@@ -1,4 +1,4 @@
-import { Compass, CalendarDays, User, LogOut, Heart, Bell } from "lucide-react";
+import { Compass, CalendarDays, User, LogOut, Heart } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 
 import { logout } from "../lib/api";

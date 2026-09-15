@@ -3,9 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Lock,
   CreditCard,
-  Bell,
   SquarePen,
-  CircleQuestionMark,
   ChevronRight,
   LogOut,
 } from "lucide-react";
@@ -42,7 +40,7 @@ function OwnerEstudio() {
     api(`/studios/owner/${owner.id}`)
       .then((res) => res.json())
       .then((data) => setStudio(data));
-  }, []);
+  }, [owner.id]);
 
   if (!studio) return null;
   return (
