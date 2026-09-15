@@ -2,13 +2,21 @@ import { useState } from "react";
 
 import { api } from "../../../lib/api";
 
+// Pagina de reservas de Google Calendar. Sale de una variable de entorno y no
+// del codigo porque no existe hasta que Workspace esta contratado y el horario
+// de citas creado.
+//
+// Mientras este vacia, la seccion se queda como estaba: pide el correo y lo
+// guarda en la waitlist para agendar a mano. Asi la landing en produccion
+// sigue funcionando entre hoy y el dia que se pegue la URL, sin desplegar
+// codigo nuevo: basta con llenar la variable en Render.
+const BOOKING_URL = import.meta.env.VITE_DEMO_BOOKING_URL || "";
+
 function DemoCta() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
 
-  /* Reusa el endpoint de waitlist que ya existe: guarda el correo y desde ahi
-     se agenda el demo a mano. */
   const handleDemo = async () => {
     if (!email) return;
     setError("");
@@ -33,14 +41,32 @@ function DemoCta() {
         >
           Conoce Wellco
           <br />
-          <span className="italic">en 15 minutos</span>
+          <span className="italic">en 30 minutos</span>
         </h2>
         <p className="text-slate-400 mb-10 leading-relaxed">
           Te mostramos el panel con tus propios horarios y resolvemos cualquier
           duda. Gratis y sin compromiso.
         </p>
 
-        {sent ? (
+        {BOOKING_URL ? (
+          <>
+            {/* Google pide el nombre y el correo en su propia pantalla, crea la
+                videollamada y manda la invitacion a las dos partes. Pedir aqui
+                el correo obligaria a escribirlo dos veces. */}
+            <a
+              href={BOOKING_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block px-7 py-3.5 rounded-full bg-white text-ink text-sm font-medium hover:bg-slate-200 transition-colors cursor-pointer"
+            >
+              Elige el dia y la hora
+            </a>
+            <p className="text-slate-500 text-xs mt-5">
+              Se abre el calendario de Wellco. Recibes la invitacion con el
+              enlace de la videollamada en tu correo.
+            </p>
+          </>
+        ) : sent ? (
           <p className="text-white font-medium">
             Listo. Te escribimos para agendar tu demo.
           </p>

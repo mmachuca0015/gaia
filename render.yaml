@@ -63,6 +63,10 @@ services:
       # modos hace que el pago falle justo al confirmarse en el navegador.
       - key: VITE_STRIPE_PUBLIC_KEY
         sync: false
+      # Pagina de reservas de Google Calendar para las demos. Si se deja vacia,
+      # la landing vuelve a pedir el correo y guardarlo en la waitlist.
+      - key: VITE_DEMO_BOOKING_URL
+        sync: false
       - key: VITE_CLOUDINARY_CLOUD_NAME
         sync: false
       - key: VITE_CLOUDINARY_UPLOAD_PRESET

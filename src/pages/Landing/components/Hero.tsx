@@ -27,8 +27,8 @@ function Hero() {
 
         <p className="text-base md:text-lg text-slate-500 max-w-2xl mx-auto mb-10 leading-relaxed">
           Wellco es la plataforma que conecta estudios de ejercicio con quienes
-          quieren moverse. Encuentra, reserva y paga en segundos — y si tienes un
-          estudio, gestiónalo completo desde un solo panel.
+          quieren moverse. Encuentra, reserva y paga en segundos — y si tienes
+          un estudio, gestiónalo completo desde un solo panel.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">
@@ -37,7 +37,7 @@ function Hero() {
             to="/login"
             className="bg-ink text-white px-8 py-4 rounded-full text-sm font-medium hover:bg-ink-soft transition-colors"
           >
-            Soy atleta
+            Soy alumno
           </Link>
           <a
             href="#estudios"
