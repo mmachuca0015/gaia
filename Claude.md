@@ -205,6 +205,7 @@ marketing. Si migras una pantalla nueva, no le pongas `italic` al encabezado.
 
 ## Variables de entorno
 
-- Frontend (`.env`): `VITE_API_URL`, `VITE_STRIPE_PUBLIC_KEY`, `VITE_CLOUDINARY_*`
+- Frontend (`.env`): `VITE_API_URL`, `VITE_STRIPE_PUBLIC_KEY`, `VITE_CLOUDINARY_*`, `VITE_DEMO_BOOKING_URL`
+- `VITE_DEMO_BOOKING_URL` es la página de reservas de Google Calendar (cuenta de Google creada con el correo de Zoho de `wellcoapp.com`). Si está vacía, `DemoCta.tsx` vuelve a pedir el correo para la waitlist. Como Vite la integra al compilar, cambiarla en Render exige reconstruir `wellco-web`.
 - Backend (`backend/.env`, ver `backend/.env.example`): `DB_*`, `PORT`, `NODE_ENV`, `FRONTEND_URL`, `RESEND_API_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
 - En producción: `NODE_ENV=production` (activa la cookie `Secure`) y `FRONTEND_URL` con el dominio real (controla CORS y los enlaces de los correos).
