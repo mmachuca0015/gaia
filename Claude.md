@@ -84,7 +84,7 @@ La comisión real de Stripe varía según la tarjeta (internacional, AmEx, etc.)
 así que el neto de Wellco es aproximado, no exacto al centavo.
 - Suscripción mensual para estudios: plan Light y plan Pro
 - 50% de descuento en el primer mes (`intro_discount`, por plan) — **solo plan mensual**
-- 25% de descuento por pagar el año completo (`annual_discount`, por plan; se edita en `/admin/suscripciones`, no en el código)
+- 15% de descuento por pagar el año completo (`annual_discount`, por plan; se edita en `/admin/suscripciones`, no en el código)
 - **Los dos descuentos no se acumulan**: quien paga anual no recibe el de bienvenida
 - Gratis para los clientes que reservan
 
