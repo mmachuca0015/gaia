@@ -84,7 +84,7 @@ La comisión real de Stripe varía según la tarjeta (internacional, AmEx, etc.)
 así que el neto de Wellco es aproximado, no exacto al centavo.
 - Suscripción mensual para estudios: plan Light y plan Pro
 - 50% de descuento en el primer mes (`intro_discount`, por plan) — **solo plan mensual**
-- 15% de descuento por pagar el año completo (`annual_discount`, por plan)
+- 25% de descuento por pagar el año completo (`annual_discount`, por plan; se edita en `/admin/suscripciones`, no en el código)
 - **Los dos descuentos no se acumulan**: quien paga anual no recibe el de bienvenida
 - Gratis para los clientes que reservan
 
@@ -137,6 +137,50 @@ de producto, no un olvido. Se habla de ella en el demo.
   `PLANS_QUERY`). Es el mismo número que se le manda a Stripe, así que lo que se
   muestra no puede diferir de lo que se cobra. No lo recalcules en el cliente.
 - Un plan con suscripciones no se borra, se desactiva (`is_active = false`).
+- **Cancelar y cambiar de plan nunca surte efecto al momento** (pantalla
+  `/owner/estudio/suscripcion`, rutas `/subscriptions/cancel`, `/resume` y
+  `/change-plan`). El periodo pagado se respeta completo:
+  - Cancelar pone `cancel_at_period_end` en Stripe. La suscripción sigue
+    `activa` hasta `current_period_end`; ahí Stripe la borra y el webhook
+    `customer.subscription.deleted` la pasa a `cancelada`.
+  - Cambiar de plan cambia el precio en Stripe **con `proration_behavior:
+    "none"`** (no hay cobro extra; el precio nuevo sale en la renovación) y
+    guarda el plan en `pending_plan_id`. `plan_id` solo cambia en el
+    `invoice.paid` con `billing_reason = subscription_cycle`. No muevas
+    `plan_id` antes: el dueño ya pagó el periodo del plan anterior.
+  - Cancelar deshace un cambio de plan programado.
+- **Qué estudios se publican** (`backend/services/catalog.js`,
+  `STUDIO_PUBLISHED`): `activa` sí; `pendiente` y `vencida` solo hasta
+  `paid_until`; `cancelada` no; sin fila (heredados) sí. Si no se publica, no
+  sale en `GET /studios` y `/payments/charge` rechaza la reserva.
+- **`paid_until` ≠ `current_period_end`.** `paid_until` es el último día
+  cubierto por un cobro exitoso y lo escribe `invoice.paid` con el fin del
+  periodo de las líneas de la factura (no `invoice.period_end`, que en una
+  renovación apunta al periodo anterior). `current_period_end` lo avanza
+  Stripe aunque la renovación falle; no lo uses para decidir visibilidad.
+- **Un estudio cancelado sigue entrando a su cuenta** y elige plan de nuevo
+  (`POST /subscriptions/select-plan`, solo con status `cancelada`) antes de
+  pagar por `/payment-intent`. Quien ya pagó alguna vez (`started_at` no nulo)
+  **no** recibe bienvenida ni cupón al volver.
+- Si una renovación falla (`past_due`/`unpaid`), `/payment-intent` cobra la
+  factura abierta de esa misma suscripción. No crea otra: cobraría dos veces.
+
+## Cuentas demo (leer antes de tocar el catálogo o `/payments/charge`)
+
+- `studios.is_demo` y `users.is_demo`. Se activan con el interruptor "Demo" en
+  `/admin/estudios` y `/admin/usuarios` (`PATCH /admin/{studios|users}/:id/demo`).
+  Un dueño es demo por su estudio.
+- **Un estudio demo solo existe para los usuarios demo**: catálogo, detalle,
+  clases y favoritos responden como si no existiera para cualquier otro
+  visitante (`studioVisibleTo` y `viewerIsDemo` en `services/catalog.js`,
+  `demoHiddenFrom` en `routes/studios.js`). Lo decide el servidor con la sesión
+  (`optionalAuth`); no hay código secreto que se pueda filtrar.
+- **Usuario demo + estudio demo = reserva sin Stripe** (`simulated` en
+  `/payments/charge`). Cualquier mezcla se rechaza: un usuario demo no reserva
+  en estudios reales. No relajes eso: con llaves live el cobro sería real.
+- El estudio demo no tiene suscripción: `/subscriptions/me` responde `demo` y
+  las rutas de cobro, cancelación y cambio de plan lo rechazan.
+- Las reservas de estudios demo no cuentan en `/admin/metrics` ni `/admin/charts`.
 
 ## Diseño / branding
 
@@ -174,7 +218,8 @@ marketing. Si migras una pantalla nueva, no le pongas `italic` al encabezado.
 - `middleware/auth.js` — `requireAuth`, `requireRole`, `requireStudioOwner`
 - `services/stripePlans.js` — puente con Stripe: crea Products, Prices y el cupón de bienvenida
 - `routes/plans.js` — lectura pública de planes y CRUD del admin
-- `routes/subscriptions.js` — Checkout, estado y el webhook de Stripe
+- `routes/subscriptions.js` — cobro, estado, cancelación, cambio de plan y el webhook de Stripe
+- `services/catalog.js` — qué estudios están publicados para los clientes
 - `migrations/` — SQL versionado; se aplica con `node migrations/run.js`
 - `index.js` — archivo principal del backend
 

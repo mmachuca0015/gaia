@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Lock,
   CreditCard,
+  BadgeCheck,
   SquarePen,
   ChevronRight,
   LogOut,
@@ -17,6 +18,11 @@ function OwnerEstudio() {
       icon: CreditCard,
       label: "Pagos",
       path: "/owner/estudio/pagos",
+    },
+    {
+      icon: BadgeCheck,
+      label: "Suscripción",
+      path: "/owner/estudio/suscripcion",
     },
     { icon: Lock, label: "Seguridad", path: "/owner/estudio/seguridad" },
     //   {

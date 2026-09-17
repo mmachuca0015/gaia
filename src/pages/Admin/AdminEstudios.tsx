@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Store } from "lucide-react";
 import AdminStudioModal from "../../components/AdminStudioModal";
+import DemoToggle from "../../components/DemoToggle";
 import type { StudioDetails } from "../../components/AdminStudioModal";
 
 import { api } from "../../lib/api";
@@ -13,6 +14,7 @@ type Studio = {
   country: string;
   city: string | null;
   plan: string;
+  is_demo: boolean;
 };
 
 function AdminEstudios() {
@@ -119,6 +121,12 @@ function AdminEstudios() {
                     <th className="text-left px-6 py-4 text-sm font-semibold text-slate-600">
                       Plan
                     </th>
+                    <th
+                      className="text-left px-6 py-4 text-sm font-semibold text-slate-600"
+                      title="Solo lo ven las cuentas de usuario demo y sus reservas no se cobran"
+                    >
+                      Demo
+                    </th>
                     <th className="text-right px-6 py-4 text-sm font-semibold text-slate-600">
                       &nbsp;
                     </th>
@@ -150,6 +158,13 @@ function AdminEstudios() {
                       </td>
                       <td className="px-6 py-4 text-slate-600">
                         {studio.plan}
+                      </td>
+                      <td className="px-6 py-4">
+                        <DemoToggle
+                          path={`/admin/studios/${studio.id}/demo`}
+                          value={studio.is_demo}
+                          label={`Estudio demo: ${studio.studio_name}`}
+                        />
                       </td>
                       <td className="px-6 py-4 text-right">
                         <button

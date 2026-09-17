@@ -6,6 +6,7 @@ const { Resend } = require("resend");
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const { requireAuth, requireRole } = require("../middleware/auth");
+const { STUDIO_PUBLISHED, viewerIsDemo } = require("../services/catalog");
 
 // Del 7.2% que se va en cada transaccion, Stripe se queda 3.6% por su cuenta
 // y este 3.6% es la comision de Wellco. Por eso aqui solo aparece la mitad:
@@ -216,7 +217,9 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
     // el cliente decidia cuanto pagar por la clase.
     const classInfo = await client.query(
       `SELECT classes.price, classes.id AS class_id,
-              studios.id AS studio_id, studios.stripe_account_id
+              studios.id AS studio_id, studios.stripe_account_id,
+              studios.is_demo AS studio_is_demo,
+              ${STUDIO_PUBLISHED} AS published
        FROM schedules
        JOIN classes ON classes.id = schedules.class_id
        JOIN studios ON studios.id = classes.studio_id
@@ -231,15 +234,24 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
       price,
       studio_id: studioId,
       stripe_account_id: stripeAccountId,
+      studio_is_demo: studioIsDemo,
+      published,
     } = classInfo.rows[0];
-    if (
-      !stripeAccountId ||
-      !(await studioCanReceive(studioId, stripeAccountId))
-    ) {
+
+    // Cuentas demo. Estudio demo y usuario demo: la reserva es real en la base
+    // pero no se cobra. Cualquier mezcla se rechaza: un usuario real no debe
+    // ver el estudio demo, y un usuario demo no debe llenar lugares de un
+    // estudio real (ni pagar con una tarjeta de verdad).
+    const userIsDemo = await viewerIsDemo(req.user);
+    if (studioIsDemo && !userIsDemo) {
+      return res.status(404).json({ error: "Clase no encontrada" });
+    }
+    if (userIsDemo && !studioIsDemo) {
       return res
         .status(400)
-        .json({ error: "El estudio aun no puede recibir pagos" });
+        .json({ error: "Las cuentas demo solo pueden reservar en estudios demo" });
     }
+    const simulated = studioIsDemo && userIsDemo;
 
     const classCents = Math.round(Number(price) * 100);
     if (!Number.isFinite(classCents) || classCents <= 0) {
@@ -250,19 +262,39 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
     // comisiones, la de Stripe y la de Wellco.
     const amountCents = classCents + TRANSACTION_FEE_CENTS;
 
-    const customerId = await getCustomerId(userId);
-    if (!customerId) {
-      return res.status(400).json({ error: "No tienes una tarjeta guardada" });
-    }
+    let customerId = null;
+    let paymentMethodId = null;
+    if (!simulated) {
+      // Se valida aqui y no solo en el catalogo: alguien pudo dejar abierta la
+      // pagina del estudio antes de que terminara su suscripcion.
+      if (!published) {
+        return res
+          .status(400)
+          .json({ error: "Este estudio ya no esta recibiendo reservas" });
+      }
+      if (
+        !stripeAccountId ||
+        !(await studioCanReceive(studioId, stripeAccountId))
+      ) {
+        return res
+          .status(400)
+          .json({ error: "El estudio aun no puede recibir pagos" });
+      }
 
-    const paymentMethods = await stripe.paymentMethods.list({
-      customer: customerId,
-      type: "card",
-    });
-    if (paymentMethods.data.length === 0) {
-      return res.status(400).json({ error: "No tienes una tarjeta guardada" });
+      customerId = await getCustomerId(userId);
+      if (!customerId) {
+        return res.status(400).json({ error: "No tienes una tarjeta guardada" });
+      }
+
+      const paymentMethods = await stripe.paymentMethods.list({
+        customer: customerId,
+        type: "card",
+      });
+      if (paymentMethods.data.length === 0) {
+        return res.status(400).json({ error: "No tienes una tarjeta guardada" });
+      }
+      paymentMethodId = paymentMethods.data[0].id;
     }
-    const paymentMethodId = paymentMethods.data[0].id;
 
     // Reserva y lugar disponible se tocan dentro de una transaccion, con el
     // renglon del horario bloqueado: sin esto dos peticiones simultaneas
@@ -315,25 +347,27 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
         .json({ error: "El precio de la clase es demasiado bajo para cobrarse" });
     }
 
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: amountCents,
-      currency: "mxn",
-      customer: customerId,
-      payment_method: paymentMethodId,
-      confirm: true,
-      off_session: true,
-      transfer_data: {
-        destination: stripeAccountId,
-        amount: studioAmount,
-      },
-      metadata: {
-        clase_centavos: String(classCents),
-        cuota_fija_centavos: String(TRANSACTION_FEE_CENTS),
-        comision_wellco_centavos: String(wellcoCommission),
-        stripe_porcentual_centavos: String(stripePercentFee),
-        estudio_centavos: String(studioAmount),
-      },
-    });
+    const paymentIntent = simulated
+      ? null
+      : await stripe.paymentIntents.create({
+          amount: amountCents,
+          currency: "mxn",
+          customer: customerId,
+          payment_method: paymentMethodId,
+          confirm: true,
+          off_session: true,
+          transfer_data: {
+            destination: stripeAccountId,
+            amount: studioAmount,
+          },
+          metadata: {
+            clase_centavos: String(classCents),
+            cuota_fija_centavos: String(TRANSACTION_FEE_CENTS),
+            comision_wellco_centavos: String(wellcoCommission),
+            stripe_porcentual_centavos: String(stripePercentFee),
+            estudio_centavos: String(studioAmount),
+          },
+        });
 
     const bookingResult = await client.query(
       "INSERT INTO bookings (user_id, schedule_id, status, class_date) VALUES ($1, $2, 'activa', $3) RETURNING id",
@@ -394,7 +428,9 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
     <p><strong>Estudio:</strong> ${booking.studio_name}</p>
     <p><strong>Día:</strong> ${booking.day}</p>
     <p><strong>Hora:</strong> ${booking.time.slice(0, 5)}</p>
-    <p><strong>Total pagado:</strong> $${booking.price} MXN</p>
+    <p><strong>Total pagado:</strong> ${
+      simulated ? "Reserva de demostración, sin cobro" : `$${booking.price} MXN`
+    }</p>
     <br>
     <p>¡Nos vemos en clase!</p>
     <p>El equipo de Wellco</p>
@@ -404,7 +440,11 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
       console.error("Error enviando email:", error);
     }
 
-    res.json({ message: "Pago exitoso", paymentIntentId: paymentIntent.id });
+    res.json({
+      message: simulated ? "Reserva demo confirmada" : "Pago exitoso",
+      paymentIntentId: paymentIntent?.id ?? null,
+      simulated,
+    });
   } catch (err) {
     await client.query("ROLLBACK").catch(() => {});
     console.error(err);

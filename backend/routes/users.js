@@ -39,6 +39,9 @@ const USER_FIELDS = [
   "state",
   "country",
   "stripe_customer_id",
+  // Cuenta de demostracion: el frontend no le pide tarjeta para reservar.
+  // Solo cambia lo que se muestra; quien decide si se cobra es el backend.
+  "is_demo",
 ];
 const OWNER_FIELDS = ["id", "name", "last_name", "email"];
 

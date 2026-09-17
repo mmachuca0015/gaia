@@ -2,7 +2,7 @@ import { Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { api } from "../lib/api";
+import { api, getCachedUser } from "../lib/api";
 import { fetchTransactionFee } from "../lib/fees";
 type ClassCardProps = {
   hour: string;
@@ -56,9 +56,12 @@ function ClassCard({
   const fee = (feeCents ?? 0) / 100;
   const total = Number(price) + fee;
 
+  // Las cuentas demo reservan sin tarjeta: el backend no les cobra.
+  const isDemo = getCachedUser()?.is_demo === true;
+
   const handleReservar = () => {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
-    if (!user.stripe_customer_id) {
+    if (!isDemo && !user.stripe_customer_id) {
       setShowPopup(true);
     } else {
       setShowConfirmPopUp(true);
@@ -192,7 +195,9 @@ function ClassCard({
             </div>
 
             <p className="text-xs text-slate-400">
-              Se cobrará a tu tarjeta guardada al confirmar.
+              {isDemo
+                ? "Cuenta demo: la reserva se confirma sin ningún cobro."
+                : "Se cobrará a tu tarjeta guardada al confirmar."}
             </p>
             <div className="flex gap-3 mt-2">
               <button

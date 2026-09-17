@@ -1,50 +1,72 @@
 import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { AlertCircle, X } from "lucide-react";
 
-import { apiJson } from "../lib/api";
+import {
+  fetchOwnerSubscription,
+  formatLongDate,
+  stillPublished,
+  type OwnerSubscription,
+} from "../lib/subscription";
 import SubscriptionPayment from "./SubscriptionPayment";
 
-type SubscriptionStatus = {
-  status: "pendiente" | "activa" | "vencida" | "cancelada" | "heredada";
-  plan_name?: string;
-  billing_interval?: "month" | "year";
-};
+const SUBSCRIPTION_PATH = "/owner/estudio/suscripcion";
 
-/* Aviso de suscripcion sin pagar.
+/* Aviso de suscripcion sin pagar o terminada.
    El estado lo manda el backend a partir del webhook de Stripe: haber
    confirmado en el navegador no prueba que el cobro cerro. */
 function SubscriptionBanner() {
-  const [sub, setSub] = useState<SubscriptionStatus | null>(null);
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const [sub, setSub] = useState<OwnerSubscription | null>(null);
   const [paying, setPaying] = useState(false);
 
   const load = () =>
-    apiJson<SubscriptionStatus>("/subscriptions/me")
+    fetchOwnerSubscription()
       .then(setSub)
       .catch(() => setSub(null));
 
+  // Se relee al cambiar de pantalla: la de suscripcion puede haber cambiado
+  // el estado (por ejemplo, al reactivar).
   useEffect(() => {
     load();
-  }, []);
+  }, [pathname]);
 
   // 'heredada' son los dueños que existian antes de que hubiera planes: no se
   // les bloquea ni se les molesta con un aviso.
-  if (!sub || sub.status === "activa" || sub.status === "heredada") return null;
+  if (
+    !sub ||
+    sub.status === "activa" ||
+    sub.status === "heredada" ||
+    sub.status === "demo"
+  ) {
+    return null;
+  }
+  // En la pantalla de suscripcion el aviso sobra: ahi mismo se resuelve.
+  if (sub.status === "cancelada" && pathname === SUBSCRIPTION_PATH) return null;
+
+  const visibleUntil =
+    stillPublished(sub) && sub.paid_until ? formatLongDate(sub.paid_until) : null;
 
   const copy = {
     pendiente: {
       title: "Tu suscripción está pendiente de pago",
-      body: "Tu estudio ya está creado, pero no aparecerá en el marketplace hasta que completes el pago.",
+      body: visibleUntil
+        ? `Tu estudio seguirá visible hasta el ${visibleUntil}. Completa el pago para que no desaparezca del catálogo.`
+        : "Tu estudio ya está creado, pero no aparecerá en el catálogo hasta que completes el pago.",
       cta: "Completar pago",
     },
     vencida: {
       title: "No pudimos cobrar tu suscripción",
-      body: "Actualiza tu método de pago para que tu estudio siga publicado.",
+      body: visibleUntil
+        ? `Tu estudio seguirá visible hasta el ${visibleUntil}. Actualiza tu método de pago para que no desaparezca del catálogo.`
+        : "Tu estudio ya no aparece en el catálogo. Actualiza tu método de pago para volver a publicarlo.",
       cta: "Actualizar pago",
     },
     cancelada: {
-      title: "Tu suscripción está cancelada",
-      body: "Reactívala cuando quieras para volver a publicar tu estudio.",
-      cta: "Reactivar",
+      title: "Tu suscripción terminó",
+      body: "Tu estudio no aparece en el catálogo. Elige una suscripción para volver a publicarlo.",
+      cta: "Elegir suscripción",
     },
   }[sub.status];
 
@@ -57,7 +79,13 @@ function SubscriptionBanner() {
           <p className="text-sm text-amber-800 mt-0.5">{copy.body}</p>
         </div>
         <button
-          onClick={() => setPaying(true)}
+          onClick={() =>
+            // Quien vuelve elige plan e intervalo antes de pagar; eso vive en
+            // la pantalla de suscripcion.
+            sub.status === "cancelada"
+              ? navigate(SUBSCRIPTION_PATH)
+              : setPaying(true)
+          }
           className="px-5 py-2.5 rounded-full bg-[#1b2c44] text-white text-sm font-medium hover:bg-[#33506f] transition-colors cursor-pointer whitespace-nowrap"
         >
           {copy.cta}

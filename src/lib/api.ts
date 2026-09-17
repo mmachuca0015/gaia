@@ -27,6 +27,8 @@ export interface SessionUser {
   state?: string;
   country?: string;
   stripe_customer_id?: string | null;
+  /** Cuenta de demostracion: sus reservas en estudios demo no se cobran. */
+  is_demo?: boolean;
 }
 
 export function getCachedUser(): SessionUser | null {

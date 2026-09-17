@@ -19,6 +19,7 @@ import OwnerInstructores from "./pages/Owner/OwnerInstructors";
 import OwnerEstudioGeneral from "./pages/Owner/OwnerEstudioGeneral";
 import OwnerEstudioPagos from "./pages/Owner/OwnerEstudioPagos";
 import OwnerEstudioSeguridad from "./pages/Owner/OwnerEstudioSeguridad";
+import OwnerEstudioSuscripcion from "./pages/Owner/OwnerEstudioSuscripcion";
 import OwnerReservas from "./pages/Owner/OwnerReservas";
 import AdminLayout from "./layouts/AdminLayout";
 import AdminDashboard from "./pages/Admin/AdminDashboard";
@@ -63,6 +64,10 @@ function App() {
             <Route
               path="/owner/estudio/pagos"
               element={<OwnerEstudioPagos />}
+            />
+            <Route
+              path="/owner/estudio/suscripcion"
+              element={<OwnerEstudioSuscripcion />}
             />
             <Route
               path="/owner/estudio/seguridad"

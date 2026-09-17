@@ -15,6 +15,8 @@ type PlanPickerProps = {
   onSelect: (id: number) => void;
   interval: BillingInterval;
   onIntervalChange: (interval: BillingInterval) => void;
+  /** Si aplica el descuento del primer mes. Un estudio que vuelve no lo tiene. */
+  introEligible?: boolean;
 };
 
 /* Tarjetas de plan del registro. Los datos son los mismos que pinta la
@@ -25,6 +27,7 @@ function PlanPicker({
   onSelect,
   interval,
   onIntervalChange,
+  introEligible = true,
 }: PlanPickerProps) {
   if (plans.length === 0) {
     return (
@@ -138,7 +141,7 @@ function PlanPicker({
                   ${formatMoney(annualTotal(plan))} al año · {plan.annual_discount}%
                   menos
                 </p>
-              ) : plan.intro_discount > 0 ? (
+              ) : introEligible && plan.intro_discount > 0 ? (
                 <p className="text-xs text-[#1b2c44] bg-[#e8eef7] rounded-lg px-2 py-1 inline-block mb-3">
                   Primer mes ${formatMoney(introPrice(plan))} ·{" "}
                   {plan.intro_discount}% menos

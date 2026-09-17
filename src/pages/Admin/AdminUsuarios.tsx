@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Users } from "lucide-react";
 
 import { api } from "../../lib/api";
+import DemoToggle from "../../components/DemoToggle";
 type User = {
   id: number;
   name: string;
@@ -11,6 +12,7 @@ type User = {
   country: string | null;
   city: string | null;
   created_at: string;
+  is_demo: boolean;
 };
 
 const PER_PAGE = 25;
@@ -148,6 +150,12 @@ function AdminUsuarios() {
                     <th className="text-left px-6 py-4 text-sm font-semibold text-slate-600">
                       Fecha de registro
                     </th>
+                    <th
+                      className="text-left px-6 py-4 text-sm font-semibold text-slate-600"
+                      title="Las cuentas demo ven los estudios demo y reservan sin cobro"
+                    >
+                      Demo
+                    </th>
                   </tr>
                 </thead>
                 <tbody
@@ -180,6 +188,21 @@ function AdminUsuarios() {
                       </td>
                       <td className="px-6 py-4 text-slate-600 text-sm whitespace-nowrap">
                         {formatDate(user.created_at)}
+                      </td>
+                      <td className="px-6 py-4">
+                        {/* Un dueño es demo por su estudio: se marca en la
+                            lista de estudios, aqui solo se ve. */}
+                        {user.role === "user" ? (
+                          <DemoToggle
+                            path={`/admin/users/${user.id}/demo`}
+                            value={user.is_demo}
+                            label={`Usuario demo: ${user.name} ${user.last_name}`}
+                          />
+                        ) : user.is_demo ? (
+                          <span className="text-xs text-[#1b2c44]">Estudio demo</span>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
                       </td>
                     </tr>
                   ))}

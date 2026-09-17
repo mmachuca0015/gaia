@@ -10,12 +10,13 @@ router.use(requireAuth, requireRole("admin"));
 // Métricas generales
 router.get("/metrics", async (req, res) => {
   try {
+    // Las reservas de estudios demo no mueven dinero: no cuentan en metricas.
     const transactions = await pool.query(
-      "SELECT COUNT(*) AS total, SUM(classes.price) AS total_amount FROM bookings JOIN schedules ON bookings.schedule_id = schedules.id JOIN classes ON schedules.class_id = classes.id WHERE bookings.status = 'activa'",
+      "SELECT COUNT(*) AS total, SUM(classes.price) AS total_amount FROM bookings JOIN schedules ON bookings.schedule_id = schedules.id JOIN classes ON schedules.class_id = classes.id JOIN studios ON studios.id = classes.studio_id WHERE bookings.status = 'activa' AND NOT studios.is_demo",
     );
 
     const pilaCommission = await pool.query(
-      "SELECT SUM(classes.price * 0.036) AS commission FROM bookings JOIN schedules ON bookings.schedule_id = schedules.id JOIN classes ON schedules.class_id = classes.id WHERE bookings.status = 'activa'",
+      "SELECT SUM(classes.price * 0.036) AS commission FROM bookings JOIN schedules ON bookings.schedule_id = schedules.id JOIN classes ON schedules.class_id = classes.id JOIN studios ON studios.id = classes.studio_id WHERE bookings.status = 'activa' AND NOT studios.is_demo",
     );
 
     const newStudios = await pool.query(
@@ -69,8 +70,10 @@ router.get("/charts", async (req, res) => {
       FROM bookings
       JOIN schedules ON bookings.schedule_id = schedules.id
       JOIN classes ON schedules.class_id = classes.id
+      JOIN studios ON studios.id = classes.studio_id
       WHERE bookings.created_at >= NOW() - ${dateFilter}
       AND bookings.status = 'activa'
+      AND NOT studios.is_demo
       GROUP BY 1 ORDER BY 1 ASC
     `);
 
@@ -124,7 +127,8 @@ router.get("/users", async (req, res) => {
            'user'::text AS role,
            users.country,
            NULLIF(users.state, '') AS city,
-           users.created_at
+           users.created_at,
+           users.is_demo
          FROM users
          UNION ALL
          SELECT
@@ -135,10 +139,12 @@ router.get("/users", async (req, res) => {
            'owner'::text AS role,
            estudio.country,
            COALESCE(NULLIF(estudio.city, ''), NULLIF(estudio.state, '')) AS city,
-           studio_owners.created_at
+           studio_owners.created_at,
+           -- Un dueño es demo por su estudio; se marca en la lista de estudios.
+           COALESCE(estudio.is_demo, FALSE) AS is_demo
          FROM studio_owners
          LEFT JOIN LATERAL (
-           SELECT studios.country, studios.city, studios.state
+           SELECT studios.country, studios.city, studios.state, studios.is_demo
            FROM studios
            WHERE studios.owner_id = studio_owners.id
            ORDER BY studios.created_at ASC
@@ -183,7 +189,8 @@ router.get("/studios", async (req, res) => {
          studios.email,
          studios.country,
          COALESCE(NULLIF(studios.city, ''), studios.state) AS city,
-         'Sin plan' AS plan
+         'Sin plan' AS plan,
+         studios.is_demo
        FROM studios
        JOIN studio_owners ON studio_owners.id = studios.owner_id
        ORDER BY studios.created_at DESC
@@ -202,6 +209,30 @@ router.get("/studios", async (req, res) => {
     res.status(500).json({ error: "Error al obtener estudios" });
   }
 });
+
+// Marca o desmarca una cuenta demo. Un estudio demo sale del catalogo publico
+// y solo lo ven los usuarios demo; sus reservas con usuarios demo no se cobran.
+async function setDemo(table, req, res) {
+  if (typeof req.body.is_demo !== "boolean") {
+    return res.status(400).json({ error: "is_demo debe ser true o false" });
+  }
+  try {
+    const { rows } = await pool.query(
+      `UPDATE ${table} SET is_demo = $1 WHERE id = $2 RETURNING id, is_demo`,
+      [req.body.is_demo, req.params.id],
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "No encontrado" });
+    }
+    res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "No se pudo actualizar la cuenta demo" });
+  }
+}
+
+router.patch("/studios/:id/demo", (req, res) => setDemo("studios", req, res));
+router.patch("/users/:id/demo", (req, res) => setDemo("users", req, res));
 
 router.get("/studios/:id/details", async (req, res) => {
   const { id } = req.params;

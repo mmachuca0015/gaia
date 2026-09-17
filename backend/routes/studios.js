@@ -6,18 +6,31 @@ const bcrypt = require("bcrypt");
 const { createSession } = require("../auth/sessions");
 const {
   requireAuth,
+  optionalAuth,
   requireRole,
   requireStudioOwner,
 } = require("../middleware/auth");
 const { redeemCoupon } = require("./coupons");
+const { studioVisibleTo, viewerIsDemo } = require("../services/catalog");
+
+// Los estudios demo solo existen para los usuarios demo. Para cualquier otro
+// visitante se responde igual que si el id no existiera.
+async function demoHiddenFrom(req, studioId) {
+  const { rows } = await pool.query("SELECT is_demo FROM studios WHERE id = $1", [
+    studioId,
+  ]);
+  return rows[0]?.is_demo === true && !(await viewerIsDemo(req.user));
+}
 
 const BCRYPT_ROUNDS = 12;
 const MIN_PASSWORD_LENGTH = 8;
 
-router.get("/", async (req, res) => {
+router.get("/", optionalAuth, async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT * FROM studios ORDER BY is_active DESC, created_at ASC",
+      `SELECT * FROM studios WHERE ${studioVisibleTo("$1")}
+       ORDER BY is_active DESC, created_at ASC`,
+      [await viewerIsDemo(req.user)],
     );
     res.json(result.rows);
   } catch (err) {
@@ -140,9 +153,12 @@ router.post("/register-studio", async (req, res) => {
 });
 
 //Ver estudio por ID
-router.get("/:id", async (req, res) => {
+router.get("/:id", optionalAuth, async (req, res) => {
   const { id } = req.params;
   try {
+    if (await demoHiddenFrom(req, id)) {
+      return res.status(404).json({ error: "Estudio no encontrado" });
+    }
     const result = await pool.query("SELECT * FROM studios WHERE id = $1", [
       id,
     ]);
@@ -154,11 +170,14 @@ router.get("/:id", async (req, res) => {
 });
 
 //Ver clases de un estudio
-router.get("/:id/clases", async (req, res) => {
+router.get("/:id/clases", optionalAuth, async (req, res) => {
   const { id } = req.params;
   const { day } = req.query;
 
   try {
+    if (await demoHiddenFrom(req, id)) {
+      return res.status(404).json({ error: "Estudio no encontrado" });
+    }
     const result = await pool.query(
       `
       SELECT
@@ -194,6 +213,9 @@ router.post(
   requireRole("user"),
   async (req, res) => {
     try {
+      if (await demoHiddenFrom(req, req.params.id)) {
+        return res.status(404).json({ error: "Estudio no encontrado" });
+      }
       const result = await pool.query(
         `INSERT INTO favorites (user_id, studio_id) VALUES ($1, $2)
        ON CONFLICT DO NOTHING RETURNING *`,

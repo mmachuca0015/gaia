@@ -20,6 +20,20 @@ async function requireAuth(req, res, next) {
   }
 }
 
+// Para rutas publicas que muestran algo distinto con sesion (el catalogo con
+// estudios demo). Deja req.user si hay sesion valida; sin ella sigue igual,
+// sin responder 401.
+async function optionalAuth(req, res, next) {
+  try {
+    const session = await readSession(req.cookies?.[COOKIE_NAME]);
+    if (session) req.user = { id: session.userId, role: session.role };
+    next();
+  } catch (err) {
+    console.error("Error al leer la sesion:", err);
+    res.status(500).json({ error: "Error del servidor" });
+  }
+}
+
 // Exige que el rol de la sesion sea uno de los permitidos.
 function requireRole(...roles) {
   return (req, res, next) => {
@@ -59,4 +73,4 @@ function requireStudioOwner(paramName = "id") {
   };
 }
 
-module.exports = { requireAuth, requireRole, requireStudioOwner };
+module.exports = { requireAuth, optionalAuth, requireRole, requireStudioOwner };
