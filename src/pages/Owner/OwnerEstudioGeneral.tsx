@@ -300,6 +300,27 @@ function OwnerEstudioGeneral() {
                   <p className="text-slate-800">{item.value || "—"}</p>
                 </div>
               ))}
+              <div className="flex justify-end">
+                <button
+                  onClick={() => {
+                    setEditMode("address");
+                    setEditForm({
+                      ...editForm,
+                      street: studio?.street || "",
+                      ext_number: studio?.ext_number || "",
+                      int_number: studio?.int_number || "",
+                      neighborhood: studio?.neighborhood || "",
+                      city: studio?.city || "",
+                      state: studio?.state || "",
+                      country: "MX",
+                      zip_code: studio?.zip_code || "",
+                    });
+                  }}
+                  className="text-md text-[#1b2c44] font-medium cursor-pointer hover:underline"
+                >
+                  Editar dirección
+                </button>
+              </div>
               <div className="flex items-center justify-between pt-3 mt-1 border-t border-slate-100">
                 <div>
                   <p className="text-md text-slate-600">Teléfono</p>
@@ -320,27 +341,6 @@ function OwnerEstudioGeneral() {
                     Editar
                   </button>
                 </div>
-              </div>
-              <div className="flex justify-end mt-2">
-                <button
-                  onClick={() => {
-                    setEditMode("address");
-                    setEditForm({
-                      ...editForm,
-                      street: studio?.street || "",
-                      ext_number: studio?.ext_number || "",
-                      int_number: studio?.int_number || "",
-                      neighborhood: studio?.neighborhood || "",
-                      city: studio?.city || "",
-                      state: studio?.state || "",
-                      country: "MX",
-                      zip_code: studio?.zip_code || "",
-                    });
-                  }}
-                  className="text-md text-[#1b2c44] font-medium cursor-pointer hover:underline"
-                >
-                  Editar dirección
-                </button>
               </div>
             </div>
           </div>

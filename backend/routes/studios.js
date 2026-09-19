@@ -19,7 +19,12 @@ const {
   viewerIsDemo,
 } = require("../services/catalog");
 const { parseHours, replaceHours } = require("../services/hours");
-const { REVENUE_ROWS } = require("../services/revenue");
+const {
+  REVENUE_ROWS,
+  NOW_MX,
+  periodOf,
+  localTime,
+} = require("../services/revenue");
 
 // Telefono de contacto que ve el alumno: 10 a 15 digitos, se aceptan
 // espacios, guiones, parentesis y un + al inicio. Se guarda tal cual lo
@@ -341,23 +346,37 @@ router.get(
   requireStudioOwner(),
   async (req, res) => {
     try {
-      const today = new Date().getDay();
+      // "Hoy" es el dia de Mexico: las permanentes de este dia de la semana y
+      // las unicas con fecha de hoy. Lo ocupado se cuenta con las reservas de
+      // HOY, no con schedules.available_spots, que es un contador que se
+      // acumula entre semanas.
       const result = await pool.query(
         `
       SELECT
         classes.id AS class_id,
         schedules.id AS schedule_id,
         classes.name,
-        classes.instructor,
+        COALESCE(instructors.name || ' ' || instructors.last_name,
+                 classes.instructor) AS instructor,
         classes.price,
-        schedules.time,
-        schedules.available_spots,
-        classes.capacity
+        to_char(schedules.time, 'HH24:MI') AS time,
+        classes.capacity,
+        (SELECT COUNT(*)::int FROM bookings b
+         WHERE b.schedule_id = schedules.id
+           AND b.class_date = ${NOW_MX}::date
+           AND b.status IN ('activa', 'pasada')) AS booked
       FROM classes
       JOIN schedules ON classes.id = schedules.class_id
-      WHERE classes.studio_id = $1 AND schedules.day = $2
+      LEFT JOIN instructors ON instructors.id = classes.instructor_id
+      WHERE classes.studio_id = $1
+        AND (
+          (schedules.is_permanent
+            AND schedules.day = EXTRACT(DOW FROM ${NOW_MX}))
+          OR (NOT schedules.is_permanent
+            AND schedules.date = ${NOW_MX}::date)
+        )
       ORDER BY schedules.time ASC`,
-        [req.params.id, today],
+        [req.params.id],
       );
       res.json(result.rows);
     } catch (err) {
@@ -756,34 +775,26 @@ router.get(
   requireAuth,
   requireStudioOwner(),
   async (req, res) => {
-    const { id } = req.params;
-    const { period } = req.query;
-
-    let since = "";
-    if (period === "hoy") since = "CURRENT_DATE";
-    else if (period === "semana") since = "CURRENT_DATE - INTERVAL '7 days'";
-    else if (period === "mes") since = "CURRENT_DATE - INTERVAL '1 month'";
-    else if (period === "semestral")
-      since = "CURRENT_DATE - INTERVAL '6 months'";
-    const after = (column) => (since ? `AND ${column} >= ${since}` : "");
-
+    const period = periodOf(req.query.period);
     try {
-      // El dinero sale de los cobros (clases pagadas con tarjeta y paquetes
-      // vendidos); el conteo, de todas las reservas, incluidas las de paquete.
+      // Dinero: cobros de clases con tarjeta y paquetes vendidos
+      // (services/revenue.js). Reservas: todas, incluidas las de paquete.
+      // Mismo inicio de periodo que la grafica, en hora de Mexico.
       const result = await pool.query(
         `
       SELECT
-        (SELECT SUM(amount) FROM ${REVENUE_ROWS}
-         WHERE money.studio_id = $1 ${after("money.created_at")}) AS total,
+        (SELECT COALESCE(SUM(amount), 0) FROM ${REVENUE_ROWS}
+         WHERE money.studio_id = $1
+           AND ${localTime("money.created_at")} >= ${period.start}) AS total,
         (SELECT COUNT(bookings.id)
          FROM bookings
          JOIN schedules ON bookings.schedule_id = schedules.id
          JOIN classes ON schedules.class_id = classes.id
          WHERE classes.studio_id = $1
-         AND bookings.status = 'activa'
-         ${after("bookings.created_at")}) AS reservas
+           AND bookings.status IN ('activa', 'pasada')
+           AND ${localTime("bookings.created_at")} >= ${period.start}) AS reservas
     `,
-        [id],
+        [req.params.id],
       );
       res.json(result.rows[0]);
     } catch (err) {
@@ -798,41 +809,32 @@ router.get(
   requireAuth,
   requireStudioOwner(),
   async (req, res) => {
-    const { id } = req.params;
-    const { period } = req.query;
-
-    let groupBy = "";
-    let dateFilter = "";
-
-    if (period === "hoy") {
-      groupBy = "EXTRACT(HOUR FROM money.created_at)";
-      dateFilter = "AND money.created_at >= CURRENT_DATE";
-    } else if (period === "semana") {
-      groupBy = "DATE(money.created_at)";
-      dateFilter = "AND money.created_at >= CURRENT_DATE - INTERVAL '7 days'";
-    } else if (period === "mes") {
-      groupBy = "DATE_TRUNC('week', money.created_at)";
-      dateFilter = "AND money.created_at >= CURRENT_DATE - INTERVAL '1 month'";
-    } else if (period === "semestral") {
-      groupBy = "DATE_TRUNC('month', money.created_at)";
-      dateFilter =
-        "AND money.created_at >= CURRENT_DATE - INTERVAL '6 months'";
-    }
-
+    const period = periodOf(req.query.period);
     try {
-      // Cobros de clases y paquetes (services/revenue.js).
+      // Un punto por hora, dia o mes del periodo, AUNQUE no haya ingresos:
+      // generate_series arma todos los puntos y el LEFT JOIN los llena. Sin
+      // eso, un periodo sin ventas devolvia una lista vacia y la grafica
+      // quedaba en blanco.
       const result = await pool.query(
         `
-      SELECT
-        ${groupBy} AS periodo,
-        SUM(amount) AS total
-      FROM ${REVENUE_ROWS}
-      WHERE money.studio_id = $1
-      ${dateFilter}
-      GROUP BY periodo
-      ORDER BY periodo ASC
+      WITH buckets AS (
+        SELECT generate_series(${period.start}, ${period.end},
+                               INTERVAL '${period.step}') AS bucket
+      ),
+      money_local AS (
+        SELECT date_trunc('${period.unit}', ${localTime("money.created_at")}) AS bucket,
+               amount
+        FROM ${REVENUE_ROWS}
+        WHERE money.studio_id = $1
+      )
+      SELECT to_char(b.bucket, 'YYYY-MM-DD"T"HH24:MI') AS periodo,
+             COALESCE(SUM(m.amount), 0) AS total
+      FROM buckets b
+      LEFT JOIN money_local m ON m.bucket = b.bucket
+      GROUP BY b.bucket
+      ORDER BY b.bucket
     `,
-        [id],
+        [req.params.id],
       );
       res.json(result.rows);
     } catch (err) {
@@ -847,53 +849,47 @@ router.get(
   requireAuth,
   requireStudioOwner(),
   async (req, res) => {
-    const { id } = req.params;
     try {
-      const reservas = await pool.query(
+      // Todo lo que pasa en el estudio, lo mas reciente primero: reservas
+      // (con tarjeta o con paquete), paquetes comprados y favoritos.
+      const { rows } = await pool.query(
         `
-      SELECT
-        users.name,
-        users.last_name,
-        classes.name AS class_name,
-        schedules.day,
-        schedules.time,
-        bookings.created_at,
-        'reserva' AS tipo
-      FROM bookings
-      JOIN schedules ON bookings.schedule_id = schedules.id
-      JOIN classes ON schedules.class_id = classes.id
-      JOIN users ON bookings.user_id = users.id
-      WHERE classes.studio_id = $1
-      ORDER BY bookings.created_at DESC
-      LIMIT 5
+      SELECT * FROM (
+        SELECT 'reserva' AS tipo, users.name, users.last_name,
+               classes.name AS class_name,
+               to_char(bookings.class_date, 'YYYY-MM-DD') AS class_date,
+               to_char(schedules.time, 'HH24:MI') AS time,
+               bookings.package_purchase_id IS NOT NULL AS con_paquete,
+               NULL::text AS package_name,
+               bookings.created_at
+        FROM bookings
+        JOIN schedules ON bookings.schedule_id = schedules.id
+        JOIN classes ON schedules.class_id = classes.id
+        JOIN users ON bookings.user_id = users.id
+        WHERE classes.studio_id = $1
+
+        UNION ALL
+
+        SELECT 'paquete', users.name, users.last_name,
+               NULL, NULL, NULL, NULL, pp.name, pp.created_at
+        FROM package_purchases pp
+        JOIN users ON pp.user_id = users.id
+        WHERE pp.studio_id = $1
+
+        UNION ALL
+
+        SELECT 'favorito', users.name, users.last_name,
+               NULL, NULL, NULL, NULL, NULL, favorites.created_at
+        FROM favorites
+        JOIN users ON favorites.user_id = users.id
+        WHERE favorites.studio_id = $1
+      ) actividad
+      ORDER BY created_at DESC
+      LIMIT 15
     `,
-        [id],
+        [req.params.id],
       );
-
-      const favoritos = await pool.query(
-        `
-      SELECT
-        users.name,
-        users.last_name,
-        favorites.created_at,
-        'favorito' AS tipo
-      FROM favorites
-      JOIN users ON favorites.user_id = users.id
-      WHERE favorites.studio_id = $1
-      ORDER BY favorites.created_at DESC
-      LIMIT 5
-    `,
-        [id],
-      );
-
-      const actividad = [...reservas.rows, ...favoritos.rows]
-        .sort(
-          (a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-        )
-        .slice(0, 8);
-
-      res.json(actividad);
+      res.json(rows);
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: "Error al obtener actividad reciente" });

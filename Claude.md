@@ -216,6 +216,19 @@ así que el neto de Wellco es aproximado, no exacto al centavo.
   con paquete (`bookings.package_purchase_id`) **no** suma ingreso, o se
   contaría dos veces. Todo pasa por `REVENUE_ROWS` (`services/revenue.js`).
 
+## Panel de control del dueño (`PanelControl.tsx`)
+
+- Ingresos = `REVENUE_ROWS`: reservas `activa` **y** `pasada` (solo activas
+  hacía desaparecer el ingreso al terminar la clase) + paquetes vendidos.
+- Periodos en `PERIODS` (`services/revenue.js`), en **hora de México**. El
+  total y la gráfica usan el mismo inicio; la gráfica rellena con ceros
+  (`generate_series`) para que un periodo sin ventas no quede en blanco.
+- "Clases de hoy" cuenta lo ocupado con las reservas de la fecha de hoy.
+  **No uses `schedules.available_spots` para eso**: es un solo contador por
+  horario que se acumula entre semanas en las clases permanentes.
+- Actividad reciente: reservas, compras de paquete y favoritos. El panel se
+  refresca solo cada minuto y al volver a la pestaña.
+
 ## Cuentas demo (leer antes de tocar el catálogo o `/payments/charge`)
 
 - `studios.is_demo` y `users.is_demo`. Se activan con el interruptor "Demo" en
