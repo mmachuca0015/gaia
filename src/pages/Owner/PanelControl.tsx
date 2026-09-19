@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CalendarCheck, Heart, Package } from "lucide-react";
 import { Line } from "react-chartjs-2";
 import {
@@ -22,9 +22,14 @@ ChartJS.register(
   Tooltip,
 );
 
-// GET /studios/:id/actividad-reciente: todo lo que pasa en el estudio.
+// GET /studios/:id/actividad-reciente: todo lo que pasa en el estudio en los
+// ultimos 7 dias, de 20 en 20.
 type Actividad = {
   tipo: "reserva" | "paquete" | "favorito";
+  /** Id de la reserva, compra o favorito; con `tipo` forma la llave. */
+  id: number;
+  /** Fecha exacta como texto: se manda de vuelta como `before`. */
+  cursor: string;
   name: string;
   last_name: string;
   /** Solo reservas. */
@@ -61,6 +66,14 @@ const PERIOD_LABEL: Record<Period, string> = {
 
 // Cada cuanto se vuelve a pedir el panel mientras esta abierto.
 const REFRESH_MS = 60_000;
+
+// Alto de cada renglon de "Clases de hoy": se ven 5 y el resto con scroll.
+const CLASS_ROW_PX = 72;
+const VISIBLE_CLASSES = 5;
+
+const activityKey = (a: Actividad) => `${a.tipo}-${a.id}`;
+
+type ActivityPage = { items: Actividad[]; has_more: boolean };
 
 const MONTHS = [
   "ene",
@@ -123,6 +136,68 @@ function PanelControl() {
   >([]);
   const [todayClasses, setTodayClasses] = useState<TodayClass[]>([]);
   const [actividad, setActividad] = useState<Actividad[]>([]);
+  const [activityHasMore, setActivityHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Primera pagina de la actividad. Al refrescar no se reemplaza la lista
+  // (el dueño pudo haber bajado y cargado mas): solo se agregan arriba los
+  // elementos nuevos.
+  const loadActivity = useCallback(() => {
+    if (!studioId) return;
+    api(`/studios/${studioId}/actividad-reciente`)
+      .then((res) => res.json())
+      .then((page: ActivityPage) => {
+        setActividad((current) => {
+          if (current.length === 0) {
+            setActivityHasMore(page.has_more);
+            return page.items;
+          }
+          const known = new Set(current.map(activityKey));
+          const fresh = page.items.filter((a) => !known.has(activityKey(a)));
+          return fresh.length ? [...fresh, ...current] : current;
+        });
+      });
+  }, [studioId]);
+
+  // Siguientes 20, a partir del ultimo que ya se ve.
+  const loadMoreActivity = useCallback(() => {
+    const last = actividad[actividad.length - 1];
+    if (!studioId || !last || !activityHasMore || loadingMore) return;
+    setLoadingMore(true);
+    api(
+      `/studios/${studioId}/actividad-reciente?before=${encodeURIComponent(last.cursor)}`,
+    )
+      .then((res) => res.json())
+      .then((page: ActivityPage) => {
+        setActividad((current) => {
+          const known = new Set(current.map(activityKey));
+          return [
+            ...current,
+            ...page.items.filter((a) => !known.has(activityKey(a))),
+          ];
+        });
+        setActivityHasMore(page.has_more);
+      })
+      .finally(() => setLoadingMore(false));
+  }, [studioId, actividad, activityHasMore, loadingMore]);
+
+  // Cuando el final de la lista entra a la vista (dentro del bloque con
+  // scroll), se piden los siguientes.
+  const activityScrollRef = useRef<HTMLDivElement | null>(null);
+  const activityEndRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const root = activityScrollRef.current;
+    const end = activityEndRef.current;
+    if (!root || !end || !activityHasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadMoreActivity();
+      },
+      { root, rootMargin: "80px" },
+    );
+    observer.observe(end);
+    return () => observer.disconnect();
+  }, [loadMoreActivity, activityHasMore]);
 
   const loadToday = useCallback(() => {
     if (!studioId) return;
@@ -132,10 +207,8 @@ function PanelControl() {
     api(`/studios/${studioId}/clases-hoy`)
       .then((res) => res.json())
       .then((data) => setTodayClasses(data));
-    api(`/studios/${studioId}/actividad-reciente`)
-      .then((res) => res.json())
-      .then((data) => setActividad(data));
-  }, [studioId]);
+    loadActivity();
+  }, [studioId, loadActivity]);
 
   const loadPeriod = useCallback(() => {
     if (!studioId) return;
@@ -285,6 +358,8 @@ function PanelControl() {
                         backgroundColor: "rgba(27,44,68,0.06)",
                         fill: true,
                         tension: 0.35,
+                        // Monotona: la curva no se pasa de los valores reales ni baja de cero.
+                        cubicInterpolationMode: "monotone",
                         pointRadius: graficaData.length > 12 ? 0 : 3,
                         pointHoverRadius: 4,
                         pointBackgroundColor: "#1b2c44",
@@ -345,13 +420,17 @@ function PanelControl() {
                   No tienes clases programadas para hoy.
                 </p>
               ) : (
-                <div className="flex flex-col gap-3">
+                <div
+                  className="flex flex-col overflow-y-auto pr-1"
+                  style={{ maxHeight: CLASS_ROW_PX * VISIBLE_CLASSES }}
+                >
                   {todayClasses.map((clase) => {
                     const full = clase.booked >= clase.capacity;
                     return (
                       <div
                         key={clase.schedule_id}
-                        className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0"
+                        className="flex items-center justify-between gap-3 border-b border-slate-100 last:border-0 shrink-0"
+                        style={{ height: CLASS_ROW_PX }}
                       >
                         <div className="flex items-center gap-4">
                           <p
@@ -390,58 +469,88 @@ function PanelControl() {
             </div>
           </div>
 
-          {/* Actividad reciente */}
-          <div className="bg-white rounded-2xl p-5 h-fit">
-            <p className="font-semibold text-slate-800 border-b border-slate-100 pb-4 mb-4">
-              Actividad reciente
-            </p>
-            {actividad.length === 0 ? (
-              <p className="text-md text-slate-500 py-6 text-center">
-                Aquí verás las reservas, compras de paquetes y favoritos de tu
-                estudio.
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-4">
-                {actividad.map((item) => (
-                  <li
-                    key={`${item.tipo}-${item.created_at}-${item.name}`}
-                    className="flex items-start gap-3 border-b border-slate-100 last:border-0 pb-4"
-                  >
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                        item.tipo === "favorito"
-                          ? "bg-[#faeeda]"
-                          : "bg-[#e8eef7]"
-                      }`}
-                    >
-                      {item.tipo === "reserva" ? (
-                        <CalendarCheck size={15} className="text-[#1b2c44]" />
-                      ) : item.tipo === "paquete" ? (
-                        <Package size={15} className="text-[#1b2c44]" />
-                      ) : (
-                        <Heart size={15} className="text-amber-700" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-md text-slate-800">
-                        <span className="font-medium">
-                          {item.name} {item.last_name}
-                        </span>
-                        {activityText(item)}
-                      </p>
-                      <p className="text-md text-slate-400">
-                        {new Date(item.created_at).toLocaleDateString("es-MX", {
-                          day: "numeric",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+          {/* Actividad reciente. En pantalla grande mide lo mismo que la
+              columna izquierda (termina donde termina "Clases de hoy") y el
+              resto se ve con scroll dentro del bloque. */}
+          <div className="relative h-[560px] lg:h-auto">
+            <div className="bg-white rounded-2xl p-5 flex flex-col absolute inset-0">
+              <div className="border-b border-slate-100 pb-4 mb-4">
+                <p className="font-semibold text-slate-800">
+                  Actividad reciente
+                </p>
+                <p className="text-sm text-slate-400">Últimos 7 días</p>
+              </div>
+              <div
+                ref={activityScrollRef}
+                className="flex-1 min-h-0 overflow-y-auto pr-1"
+              >
+                {actividad.length === 0 ? (
+                  <p className="text-md text-slate-500 py-6 text-center">
+                    Aquí verás las reservas, compras de paquetes y favoritos de
+                    tu estudio de los últimos 7 días.
+                  </p>
+                ) : (
+                  <ul className="flex flex-col gap-4">
+                    {actividad.map((item) => (
+                      <li
+                        key={activityKey(item)}
+                        className="flex items-start gap-3 border-b border-slate-100 last:border-0 pb-4"
+                      >
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            item.tipo === "favorito"
+                              ? "bg-[#faeeda]"
+                              : "bg-[#e8eef7]"
+                          }`}
+                        >
+                          {item.tipo === "reserva" ? (
+                            <CalendarCheck
+                              size={15}
+                              className="text-[#1b2c44]"
+                            />
+                          ) : item.tipo === "paquete" ? (
+                            <Package size={15} className="text-[#1b2c44]" />
+                          ) : (
+                            <Heart size={15} className="text-amber-700" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-md text-slate-800">
+                            <span className="font-medium">
+                              {item.name} {item.last_name}
+                            </span>
+                            {activityText(item)}
+                          </p>
+                          <p className="text-md text-slate-400">
+                            {new Date(item.created_at).toLocaleDateString(
+                              "es-MX",
+                              {
+                                day: "numeric",
+                                month: "short",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              },
+                            )}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {/* Al verse este final, se cargan los siguientes 20 */}
+                <div ref={activityEndRef} />
+                {loadingMore && (
+                  <p className="text-sm text-slate-400 text-center py-3">
+                    Cargando…
+                  </p>
+                )}
+                {!activityHasMore && actividad.length > 0 && (
+                  <p className="text-sm text-slate-400 text-center py-3">
+                    Eso es todo de los últimos 7 días
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>

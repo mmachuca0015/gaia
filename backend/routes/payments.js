@@ -14,6 +14,7 @@ const {
   savedCard,
 } = require("../services/charges");
 const { sendBookingConfirmation } = require("../services/bookingEmail");
+const { lockSpot } = require("../services/spots");
 
 const FRONTEND_URL = (process.env.FRONTEND_URL || "http://localhost:5173")
   .split(",")[0]
@@ -144,7 +145,7 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
 
   const client = await pool.connect();
   try {
-    if (!scheduleId || !classDate) {
+    if (!scheduleId || !/^\d{4}-\d{2}-\d{2}$/.test(String(classDate || ""))) {
       return res.status(400).json({ error: "Faltan datos de la reserva" });
     }
 
@@ -225,13 +226,12 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
     // podian vender el mismo ultimo lugar dos veces.
     await client.query("BEGIN");
 
-    const schedule = await client.query(
-      "SELECT available_spots FROM schedules WHERE id = $1 FOR UPDATE",
-      [scheduleId],
-    );
-    if (schedule.rows[0].available_spots <= 0) {
+    // Lugar en ESA fecha (services/spots.js): bloquea el horario y cuenta
+    // las reservas del dia, no un contador que se acumula entre semanas.
+    const spot = await lockSpot(client, scheduleId, classDate);
+    if (spot.error) {
       await client.query("ROLLBACK");
-      return res.status(400).json({ error: "Ya no hay lugares disponibles" });
+      return res.status(400).json({ error: spot.error });
     }
 
     const existingBooking = await client.query(
@@ -273,10 +273,6 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
       [userId, scheduleId, classDate],
     );
 
-    await client.query(
-      "UPDATE schedules SET available_spots = available_spots - 1 WHERE id = $1",
-      [scheduleId],
-    );
 
     await client.query("COMMIT");
 

@@ -30,6 +30,13 @@ Historial de nombres: GAIA Wellness -> GAIA -> PILA -> **wellco** (nombre actual
 - Campos de dirección estructurados (no un solo string de dirección)
 - Contraseñas con bcrypt (12 rondas)
 - Las reservas usan `class_date` como campo de fecha
+- **Lugares por fecha** (`services/spots.js`): los lugares libres de una clase
+  son `capacity` menos las reservas de **esa fecha**. `schedules.available_spots`
+  ya no se usa: era un contador por horario que se acumulaba entre semanas y
+  dejaba "llenas" para siempre las clases permanentes. Reservar (con tarjeta o
+  con paquete) pasa por `lockSpot`, que bloquea el horario, valida que la clase
+  se dé ese día y no sea pasada, y cuenta. `GET /studios/:id/clases` pide
+  `?date=` y devuelve lugares y `already_booked` de esa fecha.
 - `schedules.day` son enteros, donde 0 = domingo
 - Job de `node-cron` corre cada hora para marcar reservas pasadas
 - Sistema de login en tres tablas secuenciales (`users`, `studio_owners`, `admins`) — revisar antes de tocar el flujo de auth
@@ -226,8 +233,11 @@ así que el neto de Wellco es aproximado, no exacto al centavo.
 - "Clases de hoy" cuenta lo ocupado con las reservas de la fecha de hoy.
   **No uses `schedules.available_spots` para eso**: es un solo contador por
   horario que se acumula entre semanas en las clases permanentes.
-- Actividad reciente: reservas, compras de paquete y favoritos. El panel se
-  refresca solo cada minuto y al volver a la pestaña.
+- Actividad reciente: reservas, compras de paquete y favoritos de los últimos
+  7 días, de 20 en 20 con cursor (`?before=` = `cursor` del último, la fecha
+  como texto con microsegundos). El panel se refresca solo cada minuto y al
+  volver a la pestaña; el refresco agrega arriba lo nuevo sin perder lo ya
+  cargado.
 
 ## Cuentas demo (leer antes de tocar el catálogo o `/payments/charge`)
 

@@ -19,6 +19,7 @@ const {
   viewerIsDemo,
 } = require("../services/catalog");
 const { parseHours, replaceHours } = require("../services/hours");
+const { scheduleOnDate, bookedOnDate } = require("../services/spots");
 const {
   REVENUE_ROWS,
   NOW_MX,
@@ -209,9 +210,16 @@ router.get("/:id", optionalAuth, async (req, res) => {
 });
 
 //Ver clases de un estudio
+// Clases de un estudio en una FECHA (?date=YYYY-MM-DD): las permanentes de
+// ese dia de la semana y las unicas de esa fecha, con los lugares libres de
+// ese dia y si el alumno de la sesion ya la reservo.
 router.get("/:id/clases", optionalAuth, async (req, res) => {
   const { id } = req.params;
-  const { day } = req.query;
+  const date = String(req.query.date || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({ error: "Falta la fecha" });
+  }
+  const viewerId = req.user?.role === "user" ? req.user.id : null;
 
   try {
     if (await demoHiddenFrom(req, id)) {
@@ -223,18 +231,25 @@ router.get("/:id/clases", optionalAuth, async (req, res) => {
         classes.id AS class_id,
         schedules.id AS schedule_id,
         classes.name,
-        classes.instructor,
+        COALESCE(instructors.name || ' ' || instructors.last_name,
+                 classes.instructor) AS instructor,
         classes.capacity,
         classes.price,
         classes.studio_id,
         schedules.day,
         schedules.time,
-        schedules.available_spots
+        GREATEST(classes.capacity - ${bookedOnDate("$2")}, 0) AS available_spots,
+        EXISTS (
+          SELECT 1 FROM bookings b
+          WHERE b.schedule_id = schedules.id AND b.class_date = $2::date
+            AND b.user_id = $3 AND b.status = 'activa'
+        ) AS already_booked
       FROM classes
       JOIN schedules ON classes.id = schedules.class_id
-      WHERE classes.studio_id = $1 AND schedules.day = $2
+      LEFT JOIN instructors ON instructors.id = classes.instructor_id
+      WHERE classes.studio_id = $1 AND ${scheduleOnDate("$2")}
       ORDER BY schedules.time ASC`,
-      [id, day],
+      [id, date, viewerId],
     );
     res.json(result.rows);
   } catch (error) {
@@ -844,18 +859,27 @@ router.get(
   },
 );
 
+// Tamaño de cada pagina de la actividad reciente.
+const ACTIVITY_PAGE = 20;
+
 router.get(
   "/:id/actividad-reciente",
   requireAuth,
   requireStudioOwner(),
   async (req, res) => {
+    // Paginacion por cursor: `before` es el `cursor` del ultimo elemento que
+    // ya tiene el panel, y la respuesta trae los 20 anteriores. El cursor es
+    // la fecha como texto con microsegundos: un Date de JavaScript los
+    // recortaria y se repetirian o perderian elementos entre paginas.
+    const before = req.query.before ? String(req.query.before) : null;
     try {
-      // Todo lo que pasa en el estudio, lo mas reciente primero: reservas
-      // (con tarjeta o con paquete), paquetes comprados y favoritos.
+      // Todo lo que pasa en el estudio en los ultimos 7 dias, lo mas
+      // reciente primero: reservas (con tarjeta o con paquete), paquetes
+      // comprados y favoritos.
       const { rows } = await pool.query(
         `
-      SELECT * FROM (
-        SELECT 'reserva' AS tipo, users.name, users.last_name,
+      SELECT *, created_at::text AS cursor FROM (
+        SELECT 'reserva' AS tipo, bookings.id, users.name, users.last_name,
                classes.name AS class_name,
                to_char(bookings.class_date, 'YYYY-MM-DD') AS class_date,
                to_char(schedules.time, 'HH24:MI') AS time,
@@ -870,7 +894,7 @@ router.get(
 
         UNION ALL
 
-        SELECT 'paquete', users.name, users.last_name,
+        SELECT 'paquete', pp.id, users.name, users.last_name,
                NULL, NULL, NULL, NULL, pp.name, pp.created_at
         FROM package_purchases pp
         JOIN users ON pp.user_id = users.id
@@ -878,18 +902,24 @@ router.get(
 
         UNION ALL
 
-        SELECT 'favorito', users.name, users.last_name,
+        SELECT 'favorito', favorites.id, users.name, users.last_name,
                NULL, NULL, NULL, NULL, NULL, favorites.created_at
         FROM favorites
         JOIN users ON favorites.user_id = users.id
         WHERE favorites.studio_id = $1
       ) actividad
+      WHERE created_at >= NOW() - INTERVAL '7 days'
+        AND ($2::timestamptz IS NULL OR created_at < $2::timestamptz)
       ORDER BY created_at DESC
-      LIMIT 15
+      LIMIT ${ACTIVITY_PAGE + 1}
     `,
-        [req.params.id],
+        [req.params.id, before],
       );
-      res.json(rows);
+      // Se pide uno de mas solo para saber si hay otra pagina.
+      res.json({
+        items: rows.slice(0, ACTIVITY_PAGE),
+        has_more: rows.length > ACTIVITY_PAGE,
+      });
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: "Error al obtener actividad reciente" });

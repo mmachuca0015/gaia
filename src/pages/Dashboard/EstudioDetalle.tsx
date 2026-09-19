@@ -78,8 +78,18 @@ function EstudioDetalle() {
 
   const days = ["DOM", "LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB"];
   const months = [
-    "ENE", "FEB", "MAR", "ABR", "MAY", "JUN",
-    "JUL", "AGO", "SEP", "OCT", "NOV", "DIC",
+    "ENE",
+    "FEB",
+    "MAR",
+    "ABR",
+    "MAY",
+    "JUN",
+    "JUL",
+    "AGO",
+    "SEP",
+    "OCT",
+    "NOV",
+    "DIC",
   ];
 
   const dateAt = (offset: number) => {
@@ -99,8 +109,14 @@ function EstudioDetalle() {
     };
   });
 
-  // Dia de la semana (0 = domingo) que se le pide al backend.
-  const selectedDay = dateAt(selectedOffset).getDay();
+  // Fecha local YYYY-MM-DD. Con toISOString (UTC), despues de las 6 de la
+  // tarde en Mexico la reserva quedaba con la fecha del dia siguiente.
+  const getSelectedDate = () => {
+    const date = dateAt(selectedOffset);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  };
+  const selectedDate = getSelectedDate();
 
   // Al cambiar de semana se selecciona su primer dia.
   const goToWeek = (week: number) => {
@@ -127,17 +143,21 @@ function EstudioDetalle() {
     price: number;
     time: string;
     schedule_id: number;
+    /** Lugares libres en la fecha elegida. */
     available_spots: number;
+    /** El alumno ya reservo esta clase en esta fecha. */
+    already_booked: boolean;
   };
 
   const [classes, setClasses] = useState<Class[]>([]);
+  // Clases de la FECHA elegida, con sus lugares libres de ese dia.
   // useCallback para que la funcion solo cambie de identidad cuando cambian el
-  // estudio o el dia. Sin el, el efecto de abajo se relanzaria en cada render.
+  // estudio o la fecha. Sin el, el efecto de abajo se relanzaria en cada render.
   const fetchClases = useCallback(() => {
-    api(`/studios/${id}/clases?day=${selectedDay}`)
+    api(`/studios/${id}/clases?date=${selectedDate}`)
       .then((res) => res.json())
       .then((data) => setClasses(data));
-  }, [id, selectedDay]);
+  }, [id, selectedDate]);
 
   useEffect(() => {
     fetchClases();
@@ -165,26 +185,7 @@ function EstudioDetalle() {
       });
   }, [id]);
 
-  // Fecha local YYYY-MM-DD. Con toISOString (UTC), despues de las 6 de la
-  // tarde en Mexico la reserva quedaba con la fecha del dia siguiente.
-  const getSelectedDate = () => {
-    const date = dateAt(selectedOffset);
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-  };
-
-  const [userBookings, setUserBookings] = useState<number[]>([]);
-
-  useEffect(() => {
-    api("/bookings")
-      .then((res) => res.json())
-      .then((data) => {
-        setUserBookings(data.map((b: { schedule_id: number }) => b.schedule_id));
-      });
-  }, []);
-
   if (!studio) return null;
-  console.log(userBookings);
 
   return (
     <div className="relative h-72 w-full">
@@ -334,8 +335,8 @@ function EstudioDetalle() {
                 price={classItem.price}
                 schedule_id={classItem.schedule_id}
                 onReservaExitosa={() => fetchClases()}
-                classDate={getSelectedDate() ?? ""}
-                alreadyBooked={userBookings.includes(classItem.schedule_id)}
+                classDate={selectedDate}
+                alreadyBooked={classItem.already_booked}
               />
             ))}
           </div>
@@ -410,7 +411,9 @@ function EstudioDetalle() {
                       <div
                         key={day}
                         className={`flex justify-between text-md ${
-                          isToday ? "text-slate-800 font-medium" : "text-slate-500"
+                          isToday
+                            ? "text-slate-800 font-medium"
+                            : "text-slate-500"
                         }`}
                       >
                         <span>{DAY_NAMES[day]}</span>

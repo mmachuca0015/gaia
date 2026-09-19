@@ -33,6 +33,7 @@ const {
   usablePurchases,
 } = require("../services/packages");
 const { sendBookingConfirmation } = require("../services/bookingEmail");
+const { lockSpot } = require("../services/spots");
 
 const ownerRouter = express.Router();
 const userRouter = express.Router();
@@ -586,13 +587,12 @@ userRouter.post("/redeem", requireAuth, requireRole("user"), async (req, res) =>
         .json({ error: "Este estudio ya no esta recibiendo reservas" });
     }
 
-    const schedule = await client.query(
-      "SELECT available_spots FROM schedules WHERE id = $1 FOR UPDATE",
-      [scheduleId],
-    );
-    if (schedule.rows[0].available_spots <= 0) {
+    // Lugar en ESA fecha (services/spots.js): bloquea el horario y cuenta
+    // las reservas del dia, no un contador que se acumula entre semanas.
+    const spot = await lockSpot(client, scheduleId, classDate);
+    if (spot.error) {
       await client.query("ROLLBACK");
-      return res.status(400).json({ error: "Ya no hay lugares disponibles" });
+      return res.status(400).json({ error: spot.error });
     }
 
     const existing = await client.query(
@@ -612,10 +612,6 @@ userRouter.post("/redeem", requireAuth, requireRole("user"), async (req, res) =>
     await client.query(
       "UPDATE package_purchases SET classes_used = classes_used + 1 WHERE id = $1",
       [purchaseId],
-    );
-    await client.query(
-      "UPDATE schedules SET available_spots = available_spots - 1 WHERE id = $1",
-      [scheduleId],
     );
     await client.query("COMMIT");
 
