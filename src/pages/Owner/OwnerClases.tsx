@@ -27,6 +27,7 @@ type Horario = {
   schedule_id: number | null;
   day: number | null;
   time: string | null;
+  end_time: string | null;
   is_permanent: boolean | null;
   date: string | null;
 };
@@ -49,6 +50,16 @@ const DEFAULT_TO = 22;
 /** La hora de un "HH:MM" (o "HH:MM:SS"). */
 function hourAt(time: string) {
   return Number(time.slice(0, 2));
+}
+
+/**
+ * La hora de fin de un horario. Los creados antes de que el dueño la pudiera
+ * elegir duraban una hora, asi que sin ella se sigue suponiendo eso.
+ */
+function endTimeOf(s: { time: string; end_time: string | null }) {
+  if (s.end_time) return s.end_time;
+  const mins = Math.min(minutesAt(s.time) + 60, 23 * 60 + 59);
+  return `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
 }
 
 /** Los minutos desde la medianoche de un "HH:MM". */
@@ -80,15 +91,15 @@ function closingHour(time: string) {
 
 function calendarHours(
   hours: StudioHour[],
-  schedules: { time: string }[],
+  schedules: { time: string; end_time: string | null }[],
 ): number[] {
   const froms = hours.length ? hours.map((h) => hourAt(h.opens)) : [DEFAULT_FROM];
   const tos = hours.length ? hours.map((h) => closingHour(h.closes)) : [DEFAULT_TO];
   for (const s of schedules) {
     froms.push(hourAt(s.time));
-    // Una clase dura una hora: la que empieza a las 9:30 termina a las 10:30 y
-    // necesita que exista la fila de las 10.
-    tos.push(hourAt(s.time) + (minutesAt(s.time) % 60 >= 30 ? 1 : 0));
+    // La fila de la hora en que termina la clase tiene que existir: una de
+    // 9:30 a 10:30 se dibuja tambien sobre la de las 10.
+    tos.push(hourAt(endTimeOf(s)) + (minutesAt(endTimeOf(s)) % 60 >= 30 ? 1 : 0));
   }
   const from = Math.min(...froms);
   const to = Math.max(...tos);
@@ -198,6 +209,7 @@ function OwnerClases() {
     selectedDate: "",
     selectedDays: [] as string[],
     selectedTime: "6:00 AM",
+    selectedEndTime: "7:00 AM",
     // Deja elegir cualquier hora del dia, para una clase que cae fuera del
     // horario normal del estudio.
     specialTime: false,
@@ -271,9 +283,18 @@ function OwnerClases() {
       !newClassForm.capacity ||
       !newClassForm.price ||
       !newClassForm.classType ||
-      !newClassForm.selectedTime
+      !newClassForm.selectedTime ||
+      !newClassForm.selectedEndTime
     ) {
       alert("Por favor llena todos los campos");
+      return;
+    }
+
+    if (
+      minutesAt(convertTo24h(newClassForm.selectedEndTime)) <=
+      minutesAt(convertTo24h(newClassForm.selectedTime))
+    ) {
+      alert("La clase tiene que terminar después de empezar");
       return;
     }
 
@@ -304,6 +325,7 @@ function OwnerClases() {
         selectedDate: newClassForm.selectedDate,
         selectedDays: newClassForm.selectedDays.map((d) => dayMap[d]),
         selectedTime: convertTo24h(newClassForm.selectedTime),
+        selectedEndTime: convertTo24h(newClassForm.selectedEndTime),
       }),
     });
     const data = await res.json();
@@ -319,6 +341,7 @@ function OwnerClases() {
         selectedDate: "",
         selectedDays: [] as string[],
         selectedTime: normalTimes[0] ?? "6:00 AM",
+        selectedEndTime: normalTimes[2] ?? "7:00 AM",
         specialTime: false,
       });
       api(`/studios/${studio?.id}/classes`)
@@ -349,6 +372,7 @@ function OwnerClases() {
         selectedDate: newClassForm.selectedDate,
         selectedDays: newClassForm.selectedDays.map((d) => dayMap[d]),
         selectedTime: convertTo24h(newClassForm.selectedTime),
+        selectedEndTime: convertTo24h(newClassForm.selectedEndTime),
       }),
     });
     const data = await res.json();
@@ -413,9 +437,42 @@ function OwnerClases() {
         Math.max(...studioHours.map((h) => minutesAt(h.closes))),
       )
     : timeOptions(DEFAULT_FROM * 60, DEFAULT_TO * 60);
+  // El dia entero llega hasta las 11:00 PM y no hasta las 11:30: asi siempre
+  // queda al menos una media hora por delante para la hora de fin.
   const times = newClassForm.specialTime
-    ? timeOptions(0, 23 * 60 + 30)
+    ? timeOptions(0, 23 * 60)
     : normalTimes;
+
+  // La clase termina despues de empezar, asi que la segunda lista arranca
+  // media hora despues de la hora elegida. El maximo se estira si hace falta:
+  // una clase que empieza justo a la hora de cierre tiene que poder terminar.
+  const startMinutes = minutesAt(convertTo24h(newClassForm.selectedTime));
+  const lastMinutes = newClassForm.specialTime
+    ? 23 * 60 + 30
+    : minutesAt(convertTo24h(times[times.length - 1] ?? "10:00 PM"));
+  const endTimes = timeOptions(
+    startMinutes + 30,
+    Math.max(lastMinutes, startMinutes + 60),
+  );
+
+  // Cambiar la hora de inicio, o salir del horario especial, puede dejar la de
+  // fin antes que la de inicio o fuera de la lista. Se empuja una hora adelante.
+  const conHoras = (inicio: string, fin: string, special: boolean) => {
+    const i = minutesAt(convertTo24h(inicio));
+    const max = special
+      ? 23 * 60 + 30
+      : Math.max(
+          minutesAt(
+            convertTo24h(normalTimes[normalTimes.length - 1] ?? "10:00 PM"),
+          ),
+          i + 60,
+        );
+    const f = minutesAt(convertTo24h(fin));
+    return {
+      selectedTime: inicio,
+      selectedEndTime: f > i && f <= max ? fin : to12h(Math.min(i + 60, max)),
+    };
+  };
 
   // La semana que se esta viendo, de lunes a domingo.
   const today = new Date();
@@ -506,6 +563,7 @@ function OwnerClases() {
               setNewClassForm((f) => ({
                 ...f,
                 selectedTime: normalTimes[0] ?? f.selectedTime,
+                selectedEndTime: normalTimes[2] ?? f.selectedEndTime,
                 specialTime: false,
               }));
             }}
@@ -572,10 +630,21 @@ function OwnerClases() {
                       const isPermanent = classSchedules[0]?.is_permanent;
                       // La hora guardada viene como "HH:MM:SS"; el formulario
                       // trabaja con "7:30 AM".
-                      const hora = classSchedules[0]?.time;
-                      const selectedTime = hora
-                        ? to12h(minutesAt(hora))
+                      const horario = classSchedules[0];
+                      const selectedTime = horario?.time
+                        ? to12h(minutesAt(horario.time))
                         : (normalTimes[0] ?? "6:00 AM");
+                      const selectedEndTime =
+                        horario?.time
+                          ? to12h(
+                              minutesAt(
+                                endTimeOf({
+                                  time: horario.time,
+                                  end_time: horario.end_time,
+                                }),
+                              ),
+                            )
+                          : (normalTimes[2] ?? "7:00 AM");
                       setPopupMode("edit");
                       setEditingClass(clase);
                       setClassPopup(true);
@@ -608,7 +677,10 @@ function OwnerClases() {
                         // las 6:00 AM, y si cae fuera del horario del estudio
                         // el formulario abre ya con "horario especial".
                         selectedTime,
-                        specialTime: !normalTimes.includes(selectedTime),
+                        selectedEndTime,
+                        specialTime:
+                          !normalTimes.includes(selectedTime) ||
+                          !normalTimes.includes(selectedEndTime),
                       });
                     }}
                   />
@@ -728,7 +800,15 @@ function OwnerClases() {
                     ];
                     const tabs = clases.length - 1;
                     const top = (startMinutes - gridStart) * pxPerMinute;
-                    const height = 60 * pxPerMinute - tabs * TAB_HEIGHT;
+                    // El monton mide lo que la mas larga de las que empiezan a
+                    // esa hora: son un solo folder.
+                    const duracion = Math.max(
+                      ...clases.map((c) => minutesAt(endTimeOf(c)) - startMinutes),
+                    );
+                    const height = Math.max(
+                      duracion * pxPerMinute - tabs * TAB_HEIGHT,
+                      TAB_HEIGHT,
+                    );
 
                     return ordered.map((s, k) => {
                       const indexInGroup = (frontIndex + 1 + k) % clases.length;
@@ -927,42 +1007,76 @@ function OwnerClases() {
                     />
                   </div>
                   <div>
-                    <label className="text-md text-slate-600 block mb-1.5">
-                      Hora
-                    </label>
-                    <select
-                      value={newClassForm.selectedTime}
-                      onChange={(e) =>
-                        setNewClassForm({
-                          ...newClassForm,
-                          selectedTime: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none text-slate-600"
-                    >
-                      {times.map((h) => (
-                        <option key={h} value={h}>
-                          {h}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-md text-slate-600 block mb-1.5">
+                          Empieza
+                        </label>
+                        <select
+                          value={newClassForm.selectedTime}
+                          onChange={(e) =>
+                            setNewClassForm({
+                              ...newClassForm,
+                              ...conHoras(
+                                e.target.value,
+                                newClassForm.selectedEndTime,
+                                newClassForm.specialTime,
+                              ),
+                            })
+                          }
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none text-slate-600"
+                        >
+                          {times.map((h) => (
+                            <option key={h} value={h}>
+                              {h}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-md text-slate-600 block mb-1.5">
+                          Termina
+                        </label>
+                        <select
+                          value={newClassForm.selectedEndTime}
+                          onChange={(e) =>
+                            setNewClassForm({
+                              ...newClassForm,
+                              selectedEndTime: e.target.value,
+                            })
+                          }
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none text-slate-600"
+                        >
+                          {endTimes.map((h) => (
+                            <option key={h} value={h}>
+                              {h}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
                     <label className="flex items-center gap-2 mt-2 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={newClassForm.specialTime}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          // Al volver al horario normal, una hora que ya no
+                          // esta en la lista dejaria el select en blanco.
+                          const inicio =
+                            e.target.checked ||
+                            normalTimes.includes(newClassForm.selectedTime)
+                              ? newClassForm.selectedTime
+                              : (normalTimes[0] ?? newClassForm.selectedTime);
                           setNewClassForm({
                             ...newClassForm,
                             specialTime: e.target.checked,
-                            // Al volver al horario normal, una hora que ya no
-                            // esta en la lista dejaria el select en blanco.
-                            selectedTime:
-                              e.target.checked ||
-                              normalTimes.includes(newClassForm.selectedTime)
-                                ? newClassForm.selectedTime
-                                : (normalTimes[0] ?? newClassForm.selectedTime),
-                          })
-                        }
+                            ...conHoras(
+                              inicio,
+                              newClassForm.selectedEndTime,
+                              e.target.checked,
+                            ),
+                          });
+                        }}
                         className="accent-[#1b2c44]"
                       />
                       <span className="text-md text-slate-600">
@@ -1015,42 +1129,76 @@ function OwnerClases() {
                     </div>
                   </div>
                   <div>
-                    <label className="text-md text-slate-600 block mb-1.5">
-                      Hora
-                    </label>
-                    <select
-                      value={newClassForm.selectedTime}
-                      onChange={(e) =>
-                        setNewClassForm({
-                          ...newClassForm,
-                          selectedTime: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none text-slate-600"
-                    >
-                      {times.map((h) => (
-                        <option key={h} value={h}>
-                          {h}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-md text-slate-600 block mb-1.5">
+                          Empieza
+                        </label>
+                        <select
+                          value={newClassForm.selectedTime}
+                          onChange={(e) =>
+                            setNewClassForm({
+                              ...newClassForm,
+                              ...conHoras(
+                                e.target.value,
+                                newClassForm.selectedEndTime,
+                                newClassForm.specialTime,
+                              ),
+                            })
+                          }
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none text-slate-600"
+                        >
+                          {times.map((h) => (
+                            <option key={h} value={h}>
+                              {h}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-md text-slate-600 block mb-1.5">
+                          Termina
+                        </label>
+                        <select
+                          value={newClassForm.selectedEndTime}
+                          onChange={(e) =>
+                            setNewClassForm({
+                              ...newClassForm,
+                              selectedEndTime: e.target.value,
+                            })
+                          }
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none text-slate-600"
+                        >
+                          {endTimes.map((h) => (
+                            <option key={h} value={h}>
+                              {h}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
                     <label className="flex items-center gap-2 mt-2 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={newClassForm.specialTime}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          // Al volver al horario normal, una hora que ya no
+                          // esta en la lista dejaria el select en blanco.
+                          const inicio =
+                            e.target.checked ||
+                            normalTimes.includes(newClassForm.selectedTime)
+                              ? newClassForm.selectedTime
+                              : (normalTimes[0] ?? newClassForm.selectedTime);
                           setNewClassForm({
                             ...newClassForm,
                             specialTime: e.target.checked,
-                            // Al volver al horario normal, una hora que ya no
-                            // esta en la lista dejaria el select en blanco.
-                            selectedTime:
-                              e.target.checked ||
-                              normalTimes.includes(newClassForm.selectedTime)
-                                ? newClassForm.selectedTime
-                                : (normalTimes[0] ?? newClassForm.selectedTime),
-                          })
-                        }
+                            ...conHoras(
+                              inicio,
+                              newClassForm.selectedEndTime,
+                              e.target.checked,
+                            ),
+                          });
+                        }}
                         className="accent-[#1b2c44]"
                       />
                       <span className="text-md text-slate-600">

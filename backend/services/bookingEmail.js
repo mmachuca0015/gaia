@@ -17,7 +17,9 @@ async function sendBookingConfirmation(bookingId, paymentLine) {
     users.email,
     classes.name AS class_name,
     COALESCE(instructors.name || ' ' || instructors.last_name, classes.instructor) AS instructor,
-    CASE schedules.day
+    -- Una clase unica no tiene dia de la semana, tiene fecha: el dia sale de
+    -- ahi, o el correo llegaria sin dia.
+    CASE COALESCE(schedules.day, EXTRACT(DOW FROM schedules.date)::int)
       WHEN 0 THEN 'Domingo'
       WHEN 1 THEN 'Lunes'
       WHEN 2 THEN 'Martes'

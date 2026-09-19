@@ -48,6 +48,25 @@ async function demoHiddenFrom(req, studioId) {
   return rows[0]?.is_demo === true && !(await viewerIsDemo(req.user));
 }
 
+// Los minutos desde medianoche de un "HH:MM" (o "HH:MM:SS").
+function minutesOf(time) {
+  const [h, m] = String(time).split(":");
+  return Number(h) * 60 + Number(m);
+}
+
+// La hora de fin de un horario. Los horarios creados antes de que el dueño
+// pudiera elegirla duraban una hora, asi que sin `end` se sigue suponiendo eso.
+// Devuelve null si la de fin no es posterior a la de inicio, que es lo que
+// tambien comprueba la base (schedules_end_after_start).
+function endOf(start, end) {
+  if (!start) return null;
+  if (!end) {
+    const mins = Math.min(minutesOf(start) + 60, 23 * 60 + 59);
+    return `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
+  }
+  return minutesOf(end) > minutesOf(start) ? end : null;
+}
+
 const BCRYPT_ROUNDS = 12;
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -419,6 +438,7 @@ router.get(
         schedules.id AS schedule_id,
         schedules.day,
         schedules.time,
+        schedules.end_time,
         schedules.is_permanent,
         schedules.date
       FROM classes
@@ -473,6 +493,16 @@ router.post(
       const { name, instructor_id, capacity, price } = req.body;
       const { classType, selectedDate, selectedDays, selectedTime } = req.body;
 
+      // Una clase ya no dura siempre una hora: el dueño elige cuando empieza
+      // y cuando termina. Lo de antes se creo suponiendo la hora, asi que sin
+      // hora de fin se sigue suponiendo.
+      const endTime = endOf(selectedTime, req.body.selectedEndTime);
+      if (!endTime) {
+        return res
+          .status(400)
+          .json({ error: "La hora de fin debe ser después de la de inicio" });
+      }
+
       // El studio_id sale del parametro ya verificado, no del body: antes se
       // comprobaba un estudio y se insertaba en otro.
       const studio_id = req.params.id;
@@ -485,14 +515,14 @@ router.post(
 
       if (classType === "única") {
         await pool.query(
-          "INSERT INTO schedules (date, time, class_id, available_spots, is_permanent) VALUES ($1, $2, $3, $4, false)",
-          [selectedDate, selectedTime, classId, capacity],
+          "INSERT INTO schedules (date, time, end_time, class_id, available_spots, is_permanent) VALUES ($1, $2, $3, $4, $5, false)",
+          [selectedDate, selectedTime, endTime, classId, capacity],
         );
       } else if (classType === "permanente") {
         for (const day of selectedDays) {
           await pool.query(
-            "INSERT INTO schedules (day, time, class_id, available_spots, is_permanent) VALUES ($1, $2, $3, $4, true)",
-            [day, selectedTime, classId, capacity],
+            "INSERT INTO schedules (day, time, end_time, class_id, available_spots, is_permanent) VALUES ($1, $2, $3, $4, $5, true)",
+            [day, selectedTime, endTime, classId, capacity],
           );
         }
       }
@@ -580,6 +610,13 @@ router.put(
       selectedTime,
     } = req.body;
 
+    const endTime = endOf(selectedTime, req.body.selectedEndTime);
+    if (!endTime) {
+      return res
+        .status(400)
+        .json({ error: "La hora de fin debe ser después de la de inicio" });
+    }
+
     try {
       const owned = await pool.query(
         "SELECT 1 FROM classes WHERE id = $1 AND studio_id = $2",
@@ -601,14 +638,14 @@ router.put(
       // Insertar nuevos horarios
       if (classType === "única") {
         await pool.query(
-          "INSERT INTO schedules (date, time, class_id, available_spots, is_permanent) VALUES ($1, $2, $3, $4, false)",
-          [selectedDate, selectedTime, classId, capacity],
+          "INSERT INTO schedules (date, time, end_time, class_id, available_spots, is_permanent) VALUES ($1, $2, $3, $4, $5, false)",
+          [selectedDate, selectedTime, endTime, classId, capacity],
         );
       } else {
         for (const day of selectedDays) {
           await pool.query(
-            "INSERT INTO schedules (day, time, class_id, available_spots, is_permanent) VALUES ($1, $2, $3, $4, true)",
-            [day, selectedTime, classId, capacity],
+            "INSERT INTO schedules (day, time, end_time, class_id, available_spots, is_permanent) VALUES ($1, $2, $3, $4, $5, true)",
+            [day, selectedTime, endTime, classId, capacity],
           );
         }
       }
