@@ -853,20 +853,51 @@ router.post(
   requireAuth,
   requireStudioOwner(),
   async (req, res) => {
+    const client = await pool.connect();
     try {
       const { id } = req.params;
       const { name, last_name } = req.body;
       if (!name || !last_name) {
         return res.status(400).json({ error: "Faltan campos obligatorios" });
       }
-      await pool.query(
-        "INSERT INTO instructors (studio_id, name, last_name) VALUES ($1, $2, $3)",
-        [id, name, last_name],
-      );
-      res.json({ success: true });
+
+      // Un instructor es de una sucursal. `also_studio_ids` lo da de alta de
+      // una vez en las demas, para no capturar a la misma persona tres veces.
+      // Los ids se filtran contra las sucursales del dueño: el cuerpo de la
+      // peticion no decide en que estudio se escribe.
+      const extra = Array.isArray(req.body.also_studio_ids)
+        ? req.body.also_studio_ids.map(Number).filter(Number.isInteger)
+        : [];
+
+      await client.query("BEGIN");
+
+      const destinos = [Number(id)];
+      if (extra.length > 0) {
+        const { rows } = await client.query(
+          `SELECT id FROM studios
+            WHERE id = ANY($1::int[]) AND owner_id = $2 AND deleted_at IS NULL`,
+          [extra, req.user.id],
+        );
+        for (const row of rows) {
+          if (!destinos.includes(row.id)) destinos.push(row.id);
+        }
+      }
+
+      for (const studioId of destinos) {
+        await client.query(
+          "INSERT INTO instructors (studio_id, name, last_name) VALUES ($1, $2, $3)",
+          [studioId, name, last_name],
+        );
+      }
+
+      await client.query("COMMIT");
+      res.json({ success: true, studios: destinos.length });
     } catch (err) {
+      await client.query("ROLLBACK").catch(() => {});
       console.error(err);
       res.status(500).json({ error: "Error al agregar instructor" });
+    } finally {
+      client.release();
     }
   },
 );

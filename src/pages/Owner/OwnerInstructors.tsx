@@ -4,7 +4,7 @@ import { Plus } from "lucide-react";
 
 import { api } from "../../lib/api";
 import BranchTabs from "../../components/BranchTabs";
-import { useBranches } from "../../lib/branches";
+import { branchLabel, useBranches } from "../../lib/branches";
 // GET /studios/:id/instructors. `classes_per_week` sale de un COUNT, asi que
 // Postgres lo manda como texto.
 type Instructor = {
@@ -54,6 +54,14 @@ function OwnerInstructors() {
     last_name: "",
   });
 
+  // Las demas sucursales del dueño, para dar de alta al instructor en varias
+  // de una vez. Con una sola sucursal la lista queda vacia y la opcion no se
+  // pinta.
+  const otherBranches = branches
+    .map((branch, i) => ({ branch, label: branchLabel(branch, i) }))
+    .filter(({ branch }) => branch.id !== studio?.id);
+  const [alsoIn, setAlsoIn] = useState<number[]>([]);
+
   const handleAddInstructor = async () => {
     if (!newInstructorForm.name || !newInstructorForm.last_name) {
       alert("Por favor llena todos los campos");
@@ -62,11 +70,15 @@ function OwnerInstructors() {
     const res = await api(`/studios/${studio?.id}/instructors`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(newInstructorForm),
+      body: JSON.stringify({
+        ...newInstructorForm,
+        also_studio_ids: alsoIn,
+      }),
     });
     if (res.ok) {
       setShowInstructorForm(false);
       setNewInstructorForm({ name: "", last_name: "" });
+      setAlsoIn([]);
       api(`/studios/${studio?.id}/instructors`)
         .then((res) => res.json())
         .then((data) => setInstructors(data));
@@ -111,7 +123,10 @@ function OwnerInstructors() {
             </span>
           </h1>
           <button
-            onClick={() => setShowInstructorForm(true)}
+            onClick={() => {
+              setAlsoIn([]);
+              setShowInstructorForm(true);
+            }}
             className="flex items-center gap-2 bg-[#1b2c44] text-white px-5 py-2.5 rounded-xl text-md font-medium hover:bg-[#33506f] transition-colors cursor-pointer"
           >
             <Plus size={20} />
@@ -182,6 +197,43 @@ function OwnerInstructors() {
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none focus:border-slate-400 transition-colors"
                 />
               </div>
+
+              {otherBranches.length > 0 && (
+                <div>
+                  <p className="text-md text-slate-600 mb-2">
+                    Agregar también a
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {otherBranches.map(({ branch, label }) => (
+                      <label
+                        key={branch.id}
+                        className="flex items-center gap-2 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={alsoIn.includes(branch.id)}
+                          onChange={(e) =>
+                            setAlsoIn((current) =>
+                              e.target.checked
+                                ? [...current, branch.id]
+                                : current.filter((id) => id !== branch.id),
+                            )
+                          }
+                          className="accent-[#1b2c44]"
+                        />
+                        <span className="text-md text-slate-700">
+                          {label}
+                          <span className="text-slate-400"> · {branch.name}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-2">
+                    Se da de alta por separado en cada una, así puedes
+                    borrarlo de una sin tocar las demás.
+                  </p>
+                </div>
+              )}
 
               <div className="flex gap-3 mt-2">
                 <button
