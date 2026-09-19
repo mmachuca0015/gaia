@@ -3,6 +3,7 @@ import StudioCard from "../../components/StudioCard";
 import { Search } from "lucide-react";
 
 import { api } from "../../lib/api";
+import { distanceKm, getUserLocation, type Coords } from "../../lib/location";
 function Explorar() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   type Studio = {
@@ -14,6 +15,8 @@ function Explorar() {
     rating: number;
     price_from: number;
     neighborhood: string;
+    latitude: string | null;
+    longitude: string | null;
   };
   const [studios, setStudios] = useState<Studio[]>([]);
   useEffect(() => {
@@ -25,6 +28,24 @@ function Explorar() {
   const filters = ["Más cerca", "Mejor rating", "Mayor precio", "Menor precio"];
   const [activeFilter, setActiveFilter] = useState("Más cerca");
   const [search, setSearch] = useState("");
+
+  // Ubicacion del alumno, solo para "Más cerca". Se pide al elegir el filtro
+  // (que es el de entrada); si no da permiso, el orden queda como estaba.
+  const [coords, setCoords] = useState<Coords | null>(null);
+  const [locationDenied, setLocationDenied] = useState(false);
+  const [locationAttempt, setLocationAttempt] = useState(0);
+  useEffect(() => {
+    if (activeFilter !== "Más cerca" || coords) return;
+    getUserLocation()
+      .then((c) => {
+        setCoords(c);
+        setLocationDenied(false);
+      })
+      .catch(() => setLocationDenied(true));
+  }, [activeFilter, coords, locationAttempt]);
+
+  const distanceTo = (studio: Studio) =>
+    coords ? distanceKm(coords, studio.latitude, studio.longitude) : null;
 
   const sortedStudios = [...studios]
     .filter((studio) => {
@@ -40,7 +61,11 @@ function Explorar() {
       if (activeFilter === "Mejor rating") return b.rating - a.rating;
       if (activeFilter === "Menor precio") return a.price_from - b.price_from;
       if (activeFilter === "Mayor precio") return b.price_from - a.price_from;
-      return 0;
+      // Más cerca: el mas cercano primero; los que no tienen ubicacion, al
+      // final.
+      const da = distanceTo(a) ?? Infinity;
+      const db = distanceTo(b) ?? Infinity;
+      return da - db;
     });
 
   return (
@@ -86,7 +111,11 @@ function Explorar() {
         {filters.map((filter) => (
           <button
             key={filter}
-            onClick={() => setActiveFilter(filter)}
+            onClick={() => {
+              setActiveFilter(filter);
+              // Volver a elegir "Más cerca" reintenta si antes no hubo permiso.
+              if (filter === "Más cerca") setLocationAttempt((n) => n + 1);
+            }}
             className={`px-5 py-2 rounded-full text-sm transition-colors ${
               activeFilter === filter
                 ? "bg-[#1b2c44] text-white"
@@ -97,6 +126,13 @@ function Explorar() {
           </button>
         ))}
       </div>
+
+      {activeFilter === "Más cerca" && locationDenied && (
+        <p className="text-sm text-slate-500 bg-white border border-slate-200 rounded-xl px-4 py-3 mb-6 max-w-xl">
+          Para ver primero los estudios más cercanos, permite que el navegador
+          use tu ubicación y vuelve a elegir «Más cerca».
+        </p>
+      )}
 
       {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -110,6 +146,7 @@ function Explorar() {
               rating={studio.rating}
               price_from={studio.price_from}
               neighborhood={studio.neighborhood}
+              distanceKm={distanceTo(studio)}
             />
           </div>
         ))}

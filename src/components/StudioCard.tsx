@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { formatDistance } from "../lib/location";
 
 type StudioCardProps = {
   id: number;
@@ -8,6 +9,8 @@ type StudioCardProps = {
   rating: number;
   price_from: number;
   neighborhood: string;
+  /** Distancia desde el alumno; null si no compartio su ubicacion. */
+  distanceKm?: number | null;
 };
 
 function Studiocard({
@@ -17,6 +20,7 @@ function Studiocard({
   name,
   price_from,
   neighborhood,
+  distanceKm,
 }: StudioCardProps) {
   const navigate = useNavigate();
 
@@ -44,10 +48,16 @@ function Studiocard({
           </div> */}
         </div>
 
-        <div className="flex items-center gap-2 text-sm text-slate-400 mb-4">
+        <div className="flex flex-wrap items-center gap-x-2 text-sm text-slate-400 mb-4">
           <span>Desde ${price_from} / clase</span>
           <span>·</span>
           <span>{neighborhood}</span>
+          {distanceKm != null && (
+            <>
+              <span>·</span>
+              <span className="text-slate-500">{formatDistance(distanceKm)}</span>
+            </>
+          )}
         </div>
 
         <button

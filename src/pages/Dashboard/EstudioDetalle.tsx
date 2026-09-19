@@ -12,6 +12,12 @@ import {
 import ClassCard from "../../components/ClassCard";
 import StudioPackages from "../../components/StudioPackages";
 import ShareStudioButton from "../../components/ShareStudioButton";
+import {
+  distanceKm,
+  formatDistance,
+  getUserLocation,
+  type Coords,
+} from "../../lib/location";
 
 import { api } from "../../lib/api";
 function EstudioDetalle() {
@@ -43,6 +49,14 @@ function EstudioDetalle() {
     phone: string;
   };
   const [studio, setStudio] = useState<Studio | null>(null);
+
+  // Distancia desde el alumno. Si no comparte su ubicacion, no se muestra.
+  const [coords, setCoords] = useState<Coords | null>(null);
+  useEffect(() => {
+    getUserLocation()
+      .then(setCoords)
+      .catch(() => setCoords(null));
+  }, []);
 
   {
     /*Calendario*/
@@ -203,10 +217,19 @@ function EstudioDetalle() {
             <Star size={14} className="fill-white" />
             <span>{studio.rating}</span>
           </div> */}
-          <div className="flex items-center gap-1">
-            <MapPin size={14} />
-            <span>0.8 km</span>
-          </div>
+          {coords &&
+            distanceKm(coords, studio.latitude, studio.longitude) != null && (
+              <div className="flex items-center gap-1">
+                <MapPin size={14} />
+                <span>
+                  A{" "}
+                  {formatDistance(
+                    distanceKm(coords, studio.latitude, studio.longitude)!,
+                  )}{" "}
+                  de ti
+                </span>
+              </div>
+            )}
         </div>
       </div>
 

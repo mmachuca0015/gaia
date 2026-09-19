@@ -506,12 +506,17 @@ function OwnerPaquetes() {
                   />
                   <span className="text-sm text-slate-700">Indefinido</span>
                 </label>
-                {form.indefinite && (
+                {/* Pausar la venta solo tiene sentido en un paquete que ya
+                    existe: uno nuevo nace a la venta. */}
+                {form.indefinite && editing && (
                   <label className="flex items-center justify-between gap-3 px-4 py-2.5 cursor-pointer">
                     <span className="text-sm text-slate-700">
                       Desactivar paquete
-                      <span className="block text-xs text-slate-400">
-                        Deja de venderse hasta que lo vuelvas a activar.
+                      <span className="block text-xs text-slate-400 mt-0.5">
+                        Mientras esta casilla esté marcada, el paquete no
+                        aparece en tu estudio y nadie lo puede comprar.
+                        Desmárcala para volver a venderlo. Quien ya lo compró
+                        puede seguir reservando con él.
                       </span>
                     </span>
                     <input
