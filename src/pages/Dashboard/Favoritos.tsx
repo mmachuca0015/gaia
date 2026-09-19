@@ -8,7 +8,8 @@ function Favoritos() {
     street: string;
     name: string;
     cover_url: string;
-    is_open: boolean;
+    /** Abierto ahora, segun su horario. */
+    open_now: boolean;
     rating: number;
     /** Clase mas barata del estudio; null si aun no tiene clases. */
     min_price: number | null;
@@ -48,7 +49,7 @@ function Favoritos() {
             <StudioCard
               id={studio.studio_id}
               cover_url={studio.cover_url}
-              is_open={studio.is_open}
+              is_open={studio.open_now}
               name={studio.name}
               rating={studio.rating}
               price_from={studio.min_price}

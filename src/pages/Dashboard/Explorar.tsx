@@ -3,7 +3,24 @@ import StudioCard from "../../components/StudioCard";
 import { ChevronDown, Search } from "lucide-react";
 
 import { api } from "../../lib/api";
-import { distanceKm, getUserLocation, type Coords } from "../../lib/location";
+import {
+  cachedUserLocation,
+  distanceKm,
+  getUserLocation,
+  type Coords,
+} from "../../lib/location";
+
+// Orden aleatorio (Fisher-Yates) para que ningun estudio salga siempre
+// primero mientras el alumno no elija un filtro.
+function shuffle<T>(items: T[]): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j]!, out[i]!];
+  }
+  return out;
+}
+
 function Explorar() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   type Studio = {
@@ -11,7 +28,8 @@ function Explorar() {
     name: string;
     street: string;
     cover_url: string;
-    is_open: boolean;
+    /** Abierto ahora, segun su horario (o el interruptor viejo). */
+    open_now: boolean;
     rating: number;
     /** Clase mas barata del estudio; null si aun no tiene clases. */
     min_price: number | null;
@@ -23,18 +41,21 @@ function Explorar() {
   useEffect(() => {
     api("/studios")
       .then((res) => res.json())
-      .then((data) => setStudios(data));
+      .then((data) => setStudios(shuffle(data)));
   }, []);
 
+  // Sin filtro, los estudios salen en orden aleatorio (se barajan una vez al
+  // entrar). Al elegir uno, se ordenan con ese criterio.
   type Filter = "Más cerca" | "Menor precio" | "Mayor precio";
-  const [activeFilter, setActiveFilter] = useState<Filter>("Más cerca");
+  const [activeFilter, setActiveFilter] = useState<Filter | null>(null);
   const [priceMenuOpen, setPriceMenuOpen] = useState(false);
-  const priceActive = activeFilter !== "Más cerca";
+  const priceActive =
+    activeFilter === "Menor precio" || activeFilter === "Mayor precio";
   const [search, setSearch] = useState("");
 
-  // Ubicacion del alumno, solo para "Más cerca". Se pide al elegir el filtro
-  // (que es el de entrada); si no da permiso, el orden queda como estaba.
-  const [coords, setCoords] = useState<Coords | null>(null);
+  // Ubicacion del alumno. Se pide solo al elegir "Más cerca"; si ya la dio
+  // antes, se usa desde el principio para mostrar la distancia.
+  const [coords, setCoords] = useState<Coords | null>(cachedUserLocation);
   const [locationDenied, setLocationDenied] = useState(false);
   const [locationAttempt, setLocationAttempt] = useState(0);
   useEffect(() => {
@@ -60,7 +81,9 @@ function Explorar() {
       );
     })
     .sort((a, b) => {
-      if (a.is_open !== b.is_open) return a.is_open ? -1 : 1;
+      // Sin filtro se respeta el orden aleatorio (sort es estable).
+      if (!activeFilter) return 0;
+      if (a.open_now !== b.open_now) return a.open_now ? -1 : 1;
       // Por precio: los que aun no tienen clases van al final en los dos
       // sentidos.
       if (priceActive) {
@@ -126,7 +149,7 @@ function Explorar() {
             setLocationAttempt((n) => n + 1);
           }}
           className={`px-5 py-2 rounded-full text-sm transition-colors cursor-pointer ${
-            !priceActive
+            activeFilter === "Más cerca"
               ? "bg-[#1b2c44] text-white"
               : "bg-white text-slate-600 border border-slate-200 hover:border-slate-400"
           }`}
@@ -194,7 +217,7 @@ function Explorar() {
             <StudioCard
               id={studio.id}
               cover_url={studio.cover_url}
-              is_open={studio.is_open}
+              is_open={studio.open_now}
               name={studio.name}
               rating={studio.rating}
               price_from={studio.min_price}

@@ -162,6 +162,12 @@ así que el neto de Wellco es aproximado, no exacto al centavo.
   `STUDIO_PUBLISHED`): `activa` sí; `pendiente` y `vencida` solo hasta
   `paid_until`; `cancelada` no; sin fila (heredados) sí. Si no se publica, no
   sale en `GET /studios` y `/payments/charge` rechaza la reserva.
+- **Horario y "Abierto/Cerrado"**: tabla `studio_hours` (un rango por día,
+  `day` 0 = domingo, sin cruzar medianoche; migración 010). Se pide al
+  registrar el estudio y se edita en Estudio > General (`PUT
+  /studios/:id/hours`). `open_now` (`STUDIO_OPEN_NOW`) se calcula con la hora
+  de México; los estudios sin horario caen al interruptor viejo
+  `studios.is_open`. Usa `open_now`, no `is_open`.
 - **"Desde $X / clase"** del catálogo y favoritos es `min_price`
   (`STUDIO_PRICE_FROM` en `services/catalog.js`): la clase más barata con
   horario, calculada en cada consulta. La columna `studios.price_from` es un

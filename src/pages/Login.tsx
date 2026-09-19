@@ -14,6 +14,8 @@ import {
 } from "../lib/plans";
 import { validateCoupon, type CouponCheck } from "../lib/coupons";
 import PlanPicker from "../components/PlanPicker";
+import StudioHoursEditor from "../components/StudioHoursEditor";
+import { defaultWeek, toPayload, validateWeek } from "../lib/hours";
 import SubscriptionPayment from "../components/SubscriptionPayment";
 
 type Step =
@@ -82,6 +84,10 @@ function Login() {
     password: "",
     confirmPassword: "",
   });
+
+  // Horario de atencion del estudio: con el, el marketplace sabe cuando
+  // esta abierto de verdad.
+  const [studioHours, setStudioHours] = useState(defaultWeek);
 
   {
     /*Formulario de recuperar contraseña */
@@ -257,6 +263,12 @@ function Login() {
       return;
     }
 
+    const hoursError = validateWeek(studioHours);
+    if (hoursError) {
+      alert(hoursError);
+      return;
+    }
+
     setStep("Elegir plan");
     if (plans.length === 0) {
       try {
@@ -286,6 +298,7 @@ function Login() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...registerStudioForm,
+          hours: toPayload(studioHours),
           plan_id: selectedPlanId,
           billing_interval: billingInterval,
           coupon_code: coupon?.code ?? null,
@@ -835,6 +848,18 @@ function Login() {
                 </div>
               </div>
             </div>
+
+            <div>
+              <p className="text-sm font-medium text-slate-800">
+                Horario del estudio
+              </p>
+              <p className="text-xs text-slate-400 mb-3">
+                Marca los días que abres y a qué hora. Así tus alumnos saben
+                cuándo estás abierto. Lo puedes cambiar después.
+              </p>
+              <StudioHoursEditor value={studioHours} onChange={setStudioHours} />
+            </div>
+
             <button
               onClick={handleStudioFormNext}
               className="block mx-auto bg-[#1b2c44] text-white py-3 px-30 rounded-xl text-sm font-medium hover:bg-[#33506f] transition-colors mt-auto cursor-pointer"

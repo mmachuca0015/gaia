@@ -6,12 +6,19 @@ import {
   ArrowLeft,
   Heart,
   Phone,
+  Clock,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
 import ClassCard from "../../components/ClassCard";
 import StudioPackages from "../../components/StudioPackages";
 import ShareStudioButton from "../../components/ShareStudioButton";
+import {
+  DAY_NAMES,
+  WEEK_ORDER,
+  formatRange,
+  type StudioHour,
+} from "../../lib/hours";
 import {
   distanceKm,
   formatDistance,
@@ -33,7 +40,10 @@ function EstudioDetalle() {
     name: string;
     street: string;
     cover_url: string;
-    is_open: boolean;
+    /** Abierto ahora, segun su horario. */
+    open_now: boolean;
+    /** Horario de atencion; vacio si el estudio aun no lo captura. */
+    hours: StudioHour[];
     rating: number;
     price_from: number;
     neighborhood: string;
@@ -217,6 +227,15 @@ function EstudioDetalle() {
             <Star size={14} className="fill-white" />
             <span>{studio.rating}</span>
           </div> */}
+          <span
+            className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
+              studio.open_now
+                ? "bg-white text-[#1b2c44]"
+                : "bg-white/80 text-slate-500"
+            }`}
+          >
+            {studio.open_now ? "Abierto ahora" : "Cerrado ahora"}
+          </span>
           {coords &&
             distanceKm(coords, studio.latitude, studio.longitude) != null && (
               <div className="flex items-center gap-1">
@@ -373,6 +392,37 @@ function EstudioDetalle() {
                 <p className="text-slate-500 text-md">{studio.phone}</p>
               </div>
             </div>
+
+            {studio.hours?.length > 0 && (
+              <div className="flex items-start gap-3">
+                <Clock
+                  size={18}
+                  className="text-[#1b2c44] mt-0.5 flex-shrink-0"
+                />
+                <div className="flex-1 max-w-xs">
+                  <p className="text-lg font-medium text-slate-800 mb-1">
+                    Horario
+                  </p>
+                  {WEEK_ORDER.map((day) => {
+                    const h = studio.hours.find((x) => x.day === day);
+                    const isToday = day === new Date().getDay();
+                    return (
+                      <div
+                        key={day}
+                        className={`flex justify-between text-md ${
+                          isToday ? "text-slate-800 font-medium" : "text-slate-500"
+                        }`}
+                      >
+                        <span>{DAY_NAMES[day]}</span>
+                        <span>
+                          {h ? formatRange(h.opens, h.closes) : "Cerrado"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Mapa */}

@@ -53,9 +53,41 @@ const STUDIO_PRICE_FROM = `(
     AND EXISTS (SELECT 1 FROM schedules s WHERE s.class_id = c.id)
 )`;
 
+// Hora actual en Mexico. La base de Render corre en UTC.
+const NOW_MX = `(NOW() AT TIME ZONE 'America/Mexico_City')`;
+
+// ¿Esta abierto el estudio en este momento? Con horario capturado
+// (studio_hours) se calcula con el dia y la hora de Mexico. Los estudios
+// registrados antes del horario no tienen filas y siguen usando el
+// interruptor viejo studios.is_open.
+const STUDIO_OPEN_NOW = `(
+  CASE WHEN EXISTS (SELECT 1 FROM studio_hours h WHERE h.studio_id = studios.id)
+    THEN EXISTS (
+      SELECT 1 FROM studio_hours h
+      WHERE h.studio_id = studios.id
+        AND h.day = EXTRACT(DOW FROM ${NOW_MX})
+        AND ${NOW_MX}::time >= h.opens
+        AND ${NOW_MX}::time <  h.closes)
+    ELSE COALESCE(studios.is_open, FALSE)
+  END
+)`;
+
+// Horario del estudio como [{ day, opens: "HH:MM", closes: "HH:MM" }].
+const STUDIO_HOURS_JSON = `COALESCE(
+  (SELECT json_agg(json_build_object(
+            'day', h.day,
+            'opens', to_char(h.opens, 'HH24:MI'),
+            'closes', to_char(h.closes, 'HH24:MI'))
+          ORDER BY h.day)
+   FROM studio_hours h WHERE h.studio_id = studios.id),
+  '[]'::json
+)`;
+
 module.exports = {
   STUDIO_PUBLISHED,
   STUDIO_PRICE_FROM,
+  STUDIO_OPEN_NOW,
+  STUDIO_HOURS_JSON,
   studioVisibleTo,
   viewerIsDemo,
 };

@@ -38,6 +38,11 @@ function writeCache(coords: Coords) {
   }
 }
 
+/** Ubicacion ya conocida, sin pedir permiso. Null si no hay. */
+export function cachedUserLocation(): Coords | null {
+  return readCache();
+}
+
 /** Pide la ubicacion. Falla si el alumno no da permiso o no se puede obtener. */
 export function getUserLocation(): Promise<Coords> {
   const cached = readCache();

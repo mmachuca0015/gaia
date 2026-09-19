@@ -13,10 +13,25 @@ const {
 const { redeemCoupon } = require("./coupons");
 const {
   STUDIO_PRICE_FROM,
+  STUDIO_OPEN_NOW,
+  STUDIO_HOURS_JSON,
   studioVisibleTo,
   viewerIsDemo,
 } = require("../services/catalog");
+const { parseHours, replaceHours } = require("../services/hours");
 const { REVENUE_ROWS } = require("../services/revenue");
+
+// Telefono de contacto que ve el alumno: 10 a 15 digitos, se aceptan
+// espacios, guiones, parentesis y un + al inicio. Se guarda tal cual lo
+// escribio el dueño, solo sin espacios de sobra.
+function parsePhone(value) {
+  const phone = String(value || "").trim().replace(/\s+/g, " ");
+  const digits = phone.replace(/\D/g, "");
+  if (!/^\+?[\d\s()-]+$/.test(phone) || digits.length < 10 || digits.length > 15) {
+    return null;
+  }
+  return phone;
+}
 
 // Los estudios demo solo existen para los usuarios demo. Para cualquier otro
 // visitante se responde igual que si el id no existiera.
@@ -33,7 +48,8 @@ const MIN_PASSWORD_LENGTH = 8;
 router.get("/", optionalAuth, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT studios.*, ${STUDIO_PRICE_FROM} AS min_price
+      `SELECT studios.*, ${STUDIO_PRICE_FROM} AS min_price,
+              ${STUDIO_OPEN_NOW} AS open_now
        FROM studios WHERE ${studioVisibleTo("$1")}
        ORDER BY is_active DESC, created_at ASC`,
       [await viewerIsDemo(req.user)],
@@ -59,6 +75,7 @@ router.post("/register-studio", async (req, res) => {
     plan_id,
     billing_interval,
     coupon_code,
+    hours,
   } = req.body;
 
   const normalizedEmail =
@@ -68,6 +85,13 @@ router.post("/register-studio", async (req, res) => {
   try {
     if (!name || !last_name || !studio_name || !normalizedEmail || !country) {
       return res.status(400).json({ error: "Faltan campos obligatorios" });
+    }
+
+    // El horario se pide desde el registro: con el, el marketplace sabe
+    // cuando el estudio esta abierto de verdad.
+    const parsedHours = parseHours(hours);
+    if (parsedHours.error) {
+      return res.status(400).json({ error: parsedHours.error });
     }
 
     // Sin plan no hay estudio. Se valida contra la base y no solo su
@@ -118,6 +142,7 @@ router.post("/register-studio", async (req, res) => {
       "INSERT INTO studios ( name, country, state, phone, owner_id) VALUES ($1, $2, $3, $4, $5) RETURNING *",
       [studio_name, country, state, phone, ownerId],
     );
+    await replaceHours(client, result.rows[0].id, parsedHours.hours);
 
     const interval = billing_interval === "year" ? "year" : "month";
 
@@ -165,9 +190,12 @@ router.get("/:id", optionalAuth, async (req, res) => {
     if (await demoHiddenFrom(req, id)) {
       return res.status(404).json({ error: "Estudio no encontrado" });
     }
-    const result = await pool.query("SELECT * FROM studios WHERE id = $1", [
-      id,
-    ]);
+    const result = await pool.query(
+      `SELECT studios.*, ${STUDIO_OPEN_NOW} AS open_now,
+              ${STUDIO_HOURS_JSON} AS hours
+       FROM studios WHERE id = $1`,
+      [id],
+    );
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -271,7 +299,7 @@ router.get("/favorites/:userId", requireAuth, async (req, res) => {
       studios.cover_url,
       studios.neighborhood,
       studios.rating,
-      ${STUDIO_PRICE_FROM} AS min_price, studios.is_open
+      ${STUDIO_PRICE_FROM} AS min_price, ${STUDIO_OPEN_NOW} AS open_now
       FROM favorites
       JOIN studios ON studios.id = favorites.studio_id
       WHERE favorites.user_id = $1
@@ -295,7 +323,8 @@ router.get("/owner/:ownerId", requireAuth, async (req, res) => {
       return res.status(403).json({ error: "No autorizado" });
     }
     const result = await pool.query(
-      "SELECT * FROM studios WHERE owner_id = $1",
+      `SELECT studios.*, ${STUDIO_HOURS_JSON} AS hours
+       FROM studios WHERE owner_id = $1`,
       [req.params.ownerId],
     );
     res.json(result.rows[0]);
@@ -621,6 +650,31 @@ router.delete(
   },
 );
 
+// Reemplaza el horario de atencion completo del estudio.
+router.put(
+  "/:id/hours",
+  requireAuth,
+  requireStudioOwner(),
+  async (req, res) => {
+    const { error, hours } = parseHours(req.body.hours);
+    if (error) return res.status(400).json({ error });
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await replaceHours(client, req.params.id, hours);
+      await client.query("COMMIT");
+      res.json({ success: true });
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => {});
+      console.error(err);
+      res.status(500).json({ error: "Error al guardar el horario" });
+    } finally {
+      client.release();
+    }
+  },
+);
+
 router.put("/:id", requireAuth, requireStudioOwner(), async (req, res) => {
   const { id } = req.params;
   const {
@@ -638,7 +692,20 @@ router.put("/:id", requireAuth, requireStudioOwner(), async (req, res) => {
     logo_url,
     latitude,
     longitude,
+    phone,
   } = req.body;
+
+  // El telefono es opcional en esta ruta (cada pantalla manda solo lo que
+  // edita), pero si viene tiene que ser valido.
+  let cleanPhone = "";
+  if (phone != null && phone !== "") {
+    cleanPhone = parsePhone(phone);
+    if (!cleanPhone) {
+      return res
+        .status(400)
+        .json({ error: "Escribe un teléfono válido de 10 dígitos" });
+    }
+  }
   try {
     await pool.query(
       `UPDATE studios SET 
@@ -655,7 +722,8 @@ router.put("/:id", requireAuth, requireStudioOwner(), async (req, res) => {
         cover_url = CASE WHEN $11 != '' THEN $11 ELSE cover_url END,
         logo_url = CASE WHEN $12 != '' THEN $12 ELSE logo_url END,
         latitude = CASE WHEN $13::float IS NOT NULL AND $13::float != 0 THEN $13::float ELSE latitude END,
-longitude = CASE WHEN $14::float IS NOT NULL AND $14::float != 0 THEN $14::float ELSE longitude END
+longitude = CASE WHEN $14::float IS NOT NULL AND $14::float != 0 THEN $14::float ELSE longitude END,
+        phone = CASE WHEN $16 != '' THEN $16 ELSE phone END
       WHERE id = $15`,
       [
         name ?? "",
@@ -673,6 +741,7 @@ longitude = CASE WHEN $14::float IS NOT NULL AND $14::float != 0 THEN $14::float
         latitude ?? 0,
         longitude ?? 0,
         id,
+        cleanPhone,
       ],
     );
     res.json({ success: true });
