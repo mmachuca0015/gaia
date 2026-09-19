@@ -5,6 +5,40 @@ const pool = require("../db");
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+const DIAS = [
+  "Domingo",
+  "Lunes",
+  "Martes",
+  "Miércoles",
+  "Jueves",
+  "Viernes",
+  "Sábado",
+];
+
+const MESES = [
+  "enero",
+  "febrero",
+  "marzo",
+  "abril",
+  "mayo",
+  "junio",
+  "julio",
+  "agosto",
+  "septiembre",
+  "octubre",
+  "noviembre",
+  "diciembre",
+];
+
+// "Jueves 1 de octubre de 2026" a partir de un "YYYY-MM-DD". Se arma aqui y no
+// con to_char, que para los nombres depende del locale del servidor: el de
+// Render esta en ingles y saldria "Thursday".
+function fechaLarga(ymd) {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dia = DIAS[new Date(y, m - 1, d).getDay()];
+  return `${dia} ${d} de ${MESES[m - 1]} de ${y}`;
+}
+
 // Nunca truena: un correo que no sale no debe tumbar una reserva ya cobrada.
 async function sendBookingConfirmation(bookingId, paymentLine) {
   try {
@@ -17,8 +51,11 @@ async function sendBookingConfirmation(bookingId, paymentLine) {
     users.email,
     classes.name AS class_name,
     COALESCE(instructors.name || ' ' || instructors.last_name, classes.instructor) AS instructor,
-    -- Una clase unica no tiene dia de la semana, tiene fecha: el dia sale de
-    -- ahi, o el correo llegaria sin dia.
+    -- La fecha de la clase reservada, que es la que le importa al alumno:
+    -- una permanente se da muchas veces y el correo tiene que decir cual.
+    to_char(bookings.class_date, 'YYYY-MM-DD') AS class_date,
+    -- Solo por si una reserva vieja no tiene class_date. Una clase unica no
+    -- tiene dia de la semana, tiene fecha: de ahi sale el dia.
     CASE COALESCE(schedules.day, EXTRACT(DOW FROM schedules.date)::int)
       WHEN 0 THEN 'Domingo'
       WHEN 1 THEN 'Lunes'
@@ -53,7 +90,9 @@ async function sendBookingConfirmation(bookingId, paymentLine) {
     <p><strong>Clase:</strong> ${booking.class_name}</p>
     <p><strong>Instructor:</strong> ${booking.instructor}</p>
     <p><strong>Estudio:</strong> ${booking.studio_name}</p>
-    <p><strong>Día:</strong> ${booking.day}</p>
+    <p><strong>Día:</strong> ${
+      booking.class_date ? fechaLarga(booking.class_date) : booking.day
+    }</p>
     <p><strong>Hora:</strong> ${booking.time.slice(0, 5)}</p>
     <p><strong>Pago:</strong> ${paymentLine}</p>
     <br>

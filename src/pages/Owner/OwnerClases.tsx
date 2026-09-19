@@ -151,6 +151,11 @@ const TONES = [
 // que dar para una linea de texto completa, o el nombre se corta a la mitad.
 const TAB_HEIGHT = 18;
 
+// El hueco que se le quita a cada tarjeta por abajo. Sin el, una clase que
+// termina justo cuando empieza la siguiente se pega a ella y las dos parecen
+// una sola tarjeta.
+const CARD_GAP = 3;
+
 // Alto de una hora. Una clase dura una hora, asi que ese es tambien el alto de
 // su tarjeta: 56 es lo justo para el nombre y el instructor sin que la semana
 // entera pida media pantalla de scroll. Con dos encaramadas a la de delante le
@@ -806,7 +811,7 @@ function OwnerClases() {
                       ...clases.map((c) => minutesAt(endTimeOf(c)) - startMinutes),
                     );
                     const height = Math.max(
-                      duracion * pxPerMinute - tabs * TAB_HEIGHT,
+                      duracion * pxPerMinute - tabs * TAB_HEIGHT - CARD_GAP,
                       TAB_HEIGHT,
                     );
 
