@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
   <title>Wellco</title>
-  <rect width="64" height="64" fill="#ffffff"/>
+  <rect width="64" height="64" rx="14" fill="#ffffff"/>
   <!-- La W del logotipo: el contorno del glifo de Cormorant Garamond SemiBold,
        no texto. Un <text> con font-family no serviria: el navegador dibuja el
        favicon sin cargar la fuente de Google y saldria un Times cualquiera. -->
