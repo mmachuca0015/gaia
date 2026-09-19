@@ -11,6 +11,10 @@
 // y como el cron pasa cada reserva a 'pasada' al terminar la clase, el
 // ingreso desaparecia de las graficas en cuanto se daba la clase.
 //
+// Las compras simuladas (usuario demo en estudio demo) si cuentan, igual que
+// las reservas demo: asi el panel del estudio demo muestra la venta. Nunca
+// llegan a las metricas del admin, que excluye is_demo.
+//
 // Columnas: created_at, amount (pesos), studio_id, is_demo.
 const REVENUE_ROWS = `(
   SELECT bookings.created_at, classes.price::numeric AS amount,
@@ -28,7 +32,6 @@ const REVENUE_ROWS = `(
          pp.studio_id, studios.is_demo
   FROM package_purchases pp
   JOIN studios ON studios.id = pp.studio_id
-  WHERE NOT pp.simulated
 ) AS money`;
 
 // Hora local de Mexico (timestamp sin zona). La base de Render corre en UTC:
