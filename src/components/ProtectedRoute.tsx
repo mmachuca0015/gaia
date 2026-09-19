@@ -40,8 +40,11 @@ function ProtectedRoute({ allow }: Props) {
     );
   }
 
+  // Se recuerda a donde queria entrar (por ejemplo, el link compartido de
+  // un estudio) para mandarlo ahi despues de iniciar sesion o registrarse.
   if (!session) {
-    return <Navigate to="/login" replace />;
+    const redirect = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/login?redirect=${redirect}`} replace />;
   }
 
   // Rol equivocado: se manda a cada quien a su propia pantalla de inicio en

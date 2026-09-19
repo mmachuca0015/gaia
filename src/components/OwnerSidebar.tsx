@@ -22,8 +22,8 @@ function OwnerSidebar() {
     { icon: CalendarDays, label: "Clases", path: "/owner/clases" },
     { icon: Package, label: "Paquetes", path: "/owner/paquetes" },
     { icon: Users, label: "Instructores", path: "/owner/instructores" },
-    { icon: Store, label: "Estudio", path: "/owner/estudio" },
     { icon: Check, label: "Reservas", path: "/owner/reservas" },
+    { icon: Store, label: "Estudio", path: "/owner/estudio" },
   ];
 
   return (

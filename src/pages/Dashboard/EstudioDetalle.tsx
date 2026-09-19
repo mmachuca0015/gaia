@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import ClassCard from "../../components/ClassCard";
 import StudioPackages from "../../components/StudioPackages";
+import ShareStudioButton from "../../components/ShareStudioButton";
 
 import { api } from "../../lib/api";
 function EstudioDetalle() {
@@ -190,7 +191,7 @@ function EstudioDetalle() {
       </div>
 
       {/*Tabs*/}
-      <div className="flex gap-2 px-6 py-4">
+      <div className="flex flex-wrap items-center gap-2 px-6 py-4">
         {tabs.map((tab) => (
           <button
             key={tab}
@@ -204,6 +205,12 @@ function EstudioDetalle() {
             {tab}
           </button>
         ))}
+        <ShareStudioButton
+          studioId={studio.id}
+          studioName={studio.name}
+          mode="share"
+          label="Compartir estudio"
+        />
       </div>
 
       {/*Clases*/}

@@ -13,8 +13,8 @@ const navItems = [
   { icon: Compass, label: "Explorar", path: "/explorar" },
   { icon: CalendarDays, label: "Mis Clases", path: "/clases" },
   { icon: Package, label: "Mis paquetes", path: "/mis-paquetes" },
-  { icon: User, label: "Perfil", path: "/perfil" },
   { icon: Heart, label: "Favoritos", path: "/favoritos" },
+  { icon: User, label: "Perfil", path: "/perfil" },
   // { icon: Bell, label: "Notificaciones", path: "/notificaciones" },
 ];
 

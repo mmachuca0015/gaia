@@ -351,6 +351,19 @@ userRouter.get("/mine", requireAuth, requireRole("user"), async (req, res) => {
        FROM package_purchases pp
        JOIN studios ON studios.id = pp.studio_id
        WHERE pp.user_id = $1
+         -- Uno que ya no sirve (vencido o sin clases) se sigue mostrando,
+         -- opaco, solo 3 meses despues de que termino: al vencer, o al
+         -- canjear su ultima clase si se acabo antes.
+         AND (
+           (pp.expires_at > NOW() AND pp.classes_used < pp.classes_total)
+           OR CASE
+                WHEN pp.classes_used >= pp.classes_total THEN COALESCE(
+                  (SELECT MAX(b.created_at) FROM bookings b
+                   WHERE b.package_purchase_id = pp.id),
+                  pp.expires_at)
+                ELSE pp.expires_at
+              END > NOW() - INTERVAL '3 months'
+         )
        ORDER BY (pp.expires_at < NOW() OR pp.classes_used >= pp.classes_total),
                 pp.expires_at`,
       [req.user.id],

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Dumbbell, Store, ArrowLeft, Ticket, Check, X } from "lucide-react";
 import { estados } from "../data/estados.js";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { api, setCachedUser } from "../lib/api";
 import {
@@ -25,8 +25,20 @@ type Step =
   | "Pagar"
   | "Recuperar contraseña";
 
+// A donde volver despues de entrar, si llego desde una pagina protegida (por
+// ejemplo, el link compartido de un estudio). Solo rutas internas: aceptar
+// cualquier URL convertiria el login en un redirector hacia otro sitio.
+function safeRedirect(value: string | null) {
+  return value && value.startsWith("/") && !value.startsWith("//")
+    ? value
+    : null;
+}
+
 function Login() {
   const [step, setStep] = useState<Step>("Iniciar sesión");
+  const [searchParams] = useSearchParams();
+  const redirectTo = safeRedirect(searchParams.get("redirect"));
+  const fromStudioLink = redirectTo?.startsWith("/studios/") ?? false;
 
   {
     /*Formulario de inicio de sesión */
@@ -169,7 +181,9 @@ function Login() {
       } else if (data.role === "owner") {
         navigate("/panel-de-control");
       } else {
-        navigate("/explorar");
+        // El redirect es de la interfaz del alumno: dueños y admins van a
+        // su propio inicio aunque hayan llegado por un link.
+        navigate(redirectTo ?? "/explorar");
       }
     } else {
       setLoginError(data.error || "No pudimos iniciar sesión");
@@ -208,7 +222,7 @@ function Login() {
     const data = await res.json();
     if (res.ok) {
       setCachedUser(data);
-      navigate("/explorar");
+      navigate(redirectTo ?? "/explorar");
     } else {
       alert(data.error || "No pudimos crear tu cuenta");
     }
@@ -333,6 +347,12 @@ function Login() {
             Wellco
           </Link>
         </div>
+
+        {fromStudioLink && (
+          <p className="text-sm text-[#1b2c44] bg-[#e8eef7] rounded-xl px-4 py-3 mb-6 text-center">
+            Inicia sesión o crea tu cuenta para ver el estudio.
+          </p>
+        )}
 
         {/* Switch tabs */}
         <div className="relative flex bg-[#eef2f7] rounded-xl p-1 mb-6">

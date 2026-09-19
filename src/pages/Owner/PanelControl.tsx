@@ -12,6 +12,7 @@ import {
 } from "chart.js";
 
 import { api } from "../../lib/api";
+import ShareStudioButton from "../../components/ShareStudioButton";
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -116,7 +117,7 @@ function PanelControl() {
   return (
     <div>
       <div className="p-4 md:p-8">
-        <div className="mb-8">
+        <div className="mb-8 flex flex-wrap items-center gap-x-5 gap-y-3">
           <h1
             className="text-4xl md:text-6xl font-semibold text-slate-800"
             style={{ fontFamily: "Cormorant Garamond, serif" }}
@@ -129,6 +130,15 @@ function PanelControl() {
               {studio?.name}
             </span>
           </h1>
+          {/* Link publico para sus redes, su pagina, WhatsApp... */}
+          {studio && (
+            <ShareStudioButton
+              studioId={studio.id}
+              studioName={studio.name}
+              mode="copy"
+              label="Copiar link del estudio"
+            />
+          )}
         </div>
 
         {/* Layout de dos columnas */}
