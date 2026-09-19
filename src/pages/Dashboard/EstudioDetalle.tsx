@@ -47,21 +47,42 @@ function EstudioDetalle() {
   {
     /*Calendario*/
   }
-  const today = new Date();
-  const [selectedDay, setSelectedDay] = useState(today.getDay());
+  // El calendario empieza HOY y avanza de 7 en 7 dias: no se puede ir a dias
+  // pasados. Todo se cuenta en dias desde hoy.
   const [weekOffset, setWeekOffset] = useState(0);
+  const [selectedOffset, setSelectedOffset] = useState(0);
 
   const days = ["DOM", "LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB"];
+  const months = [
+    "ENE", "FEB", "MAR", "ABR", "MAY", "JUN",
+    "JUL", "AGO", "SEP", "OCT", "NOV", "DIC",
+  ];
+
+  const dateAt = (offset: number) => {
+    const date = new Date();
+    date.setDate(date.getDate() + offset);
+    return date;
+  };
 
   const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() - today.getDay() + i + weekOffset * 7);
+    const offset = weekOffset * 7 + i;
+    const date = dateAt(offset);
     return {
-      name: days[i],
+      offset,
+      name: days[date.getDay()],
       number: date.getDate(),
-      dayIndex: i,
+      month: months[date.getMonth()],
     };
   });
+
+  // Dia de la semana (0 = domingo) que se le pide al backend.
+  const selectedDay = dateAt(selectedOffset).getDay();
+
+  // Al cambiar de semana se selecciona su primer dia.
+  const goToWeek = (week: number) => {
+    setWeekOffset(week);
+    setSelectedOffset(week * 7);
+  };
 
   {
     /*Datos generales del estudio*/
@@ -120,13 +141,12 @@ function EstudioDetalle() {
       });
   }, [id]);
 
+  // Fecha local YYYY-MM-DD. Con toISOString (UTC), despues de las 6 de la
+  // tarde en Mexico la reserva quedaba con la fecha del dia siguiente.
   const getSelectedDate = () => {
-    const today = new Date();
-    const date = new Date(today);
-    date.setDate(
-      today.getDate() - today.getDay() + selectedDay + weekOffset * 7,
-    );
-    return date.toISOString().split("T")[0];
+    const date = dateAt(selectedOffset);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
   };
 
   const [userBookings, setUserBookings] = useState<number[]>([]);
@@ -219,7 +239,7 @@ function EstudioDetalle() {
           <div className="flex items-center justify-center gap-2 px-6 py-4">
             {weekOffset > 0 && (
               <button
-                onClick={() => setWeekOffset(weekOffset - 1)}
+                onClick={() => goToWeek(weekOffset - 1)}
                 className="p-2 rounded-full hover:bg-slate-100 transition-colors"
               >
                 <ChevronLeft
@@ -232,22 +252,27 @@ function EstudioDetalle() {
             <div className="flex gap-2">
               {weekDays.map((day) => (
                 <button
-                  key={day.dayIndex}
-                  onClick={() => setSelectedDay(day.dayIndex)}
+                  key={day.offset}
+                  onClick={() => setSelectedOffset(day.offset)}
                   className={`flex flex-col items-center px-3 py-2 rounded-xl min-w-[52px] transition-colors border border-slate-200 hover:border-slate-400 cursor-pointer ${
-                    selectedDay === day.dayIndex
+                    selectedOffset === day.offset
                       ? "bg-[#1b2c44] text-white"
                       : "bg-white text-slate-600"
                   }`}
                 >
                   <span className="text-xs font-medium">{day.name}</span>
-                  <span className="text-lg font-semibold">{day.number}</span>
+                  <span className="text-lg font-semibold leading-tight">
+                    {day.number}
+                  </span>
+                  <span className="text-[10px] font-medium opacity-70">
+                    {day.month}
+                  </span>
                 </button>
               ))}
             </div>
 
             <button
-              onClick={() => setWeekOffset(weekOffset + 1)}
+              onClick={() => goToWeek(weekOffset + 1)}
               className="p-2 rounded-full hover:bg-slate-100 transition-colors"
             >
               <ChevronRight
