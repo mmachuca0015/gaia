@@ -406,13 +406,24 @@ function Login() {
 
         {/* Formulario iniciar sesión */}
         {step === "Iniciar sesión" && (
-          <div className="flex flex-col gap-4">
+          // Es un <form> de verdad para que Enter entre desde cualquiera de
+          // los dos campos (y para que el navegador ofrezca guardar la
+          // contraseña). El submit nativo recargaria la pagina, de ahi el
+          // preventDefault.
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleLogin();
+            }}
+            className="flex flex-col gap-4"
+          >
             <div>
               <label className="text-xs text-slate-400 block mb-1.5">
                 Correo electrónico
               </label>
               <input
                 type="email"
+                autoComplete="email"
                 placeholder="correo@ejemplo.com"
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                 value={loginForm.email}
@@ -420,7 +431,6 @@ function Login() {
                   setLoginError("");
                   setLoginForm({ ...loginForm, email: e.target.value });
                 }}
-                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               />
             </div>
             <div>
@@ -429,6 +439,7 @@ function Login() {
               </label>
               <input
                 type="password"
+                autoComplete="current-password"
                 placeholder="••••••••"
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                 value={loginForm.password}
@@ -436,7 +447,6 @@ function Login() {
                   setLoginError("");
                   setLoginForm({ ...loginForm, password: e.target.value });
                 }}
-                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               />
             </div>
             {loginError && (
@@ -449,7 +459,7 @@ function Login() {
             )}
 
             <button
-              onClick={handleLogin}
+              type="submit"
               className="w-full bg-[#1b2c44] text-white py-3 rounded-xl text-sm font-medium hover:bg-[#33506f] transition-colors mt-2 cursor-pointer"
             >
               Iniciar sesión
@@ -460,7 +470,7 @@ function Login() {
             >
               ¿Olvidaste tu contraseña?
             </p>
-          </div>
+          </form>
         )}
 
         {/* Botones crear cuenta */}
