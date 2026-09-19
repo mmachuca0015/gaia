@@ -511,39 +511,54 @@ router.delete(
   requireStudioOwner("studioId"),
   async (req, res) => {
     const { studioId, classId } = req.params;
+    const client = await pool.connect();
     try {
+      await client.query("BEGIN");
+
       // La clase tiene que ser de ESTE estudio. Sin esta comprobacion, un dueño
       // podia pasar su propio studioId y el classId de otro estudio.
-      const owned = await pool.query(
+      const owned = await client.query(
         "SELECT 1 FROM classes WHERE id = $1 AND studio_id = $2",
         [classId, studioId],
       );
       if (owned.rows.length === 0) {
+        await client.query("ROLLBACK");
         return res.status(404).json({ error: "Clase no encontrada" });
       }
 
       // Verificar si hay bookings activas
-      const bookings = await pool.query(
-        "SELECT * FROM bookings WHERE schedule_id IN (SELECT id FROM schedules WHERE class_id = $1) AND status = 'activa'",
+      const bookings = await client.query(
+        "SELECT 1 FROM bookings WHERE schedule_id IN (SELECT id FROM schedules WHERE class_id = $1) AND status = 'activa'",
         [classId],
       );
 
       if (bookings.rows.length > 0) {
+        await client.query("ROLLBACK");
         return res.status(400).json({
           error: "No puedes eliminar una clase con alumnos inscritos",
         });
       }
 
-      // Eliminar schedules primero
-      await pool.query("DELETE FROM schedules WHERE class_id = $1", [classId]);
+      // Las reservas ya pasadas o canceladas se van con la clase. Sin esto, la
+      // llave foranea de bookings impedia borrar el horario y la peticion
+      // moria con un 500: cualquier clase que alguna vez tuvo una reserva se
+      // quedaba para siempre. Ojo: ese dinero deja de contar en los ingresos,
+      // que se calculan desde bookings.
+      await client.query(
+        "DELETE FROM bookings WHERE schedule_id IN (SELECT id FROM schedules WHERE class_id = $1)",
+        [classId],
+      );
+      await client.query("DELETE FROM schedules WHERE class_id = $1", [classId]);
+      await client.query("DELETE FROM classes WHERE id = $1", [classId]);
 
-      // Eliminar la clase
-      await pool.query("DELETE FROM classes WHERE id = $1", [classId]);
-
+      await client.query("COMMIT");
       res.json({ message: "Clase eliminada correctamente" });
     } catch (err) {
+      await client.query("ROLLBACK").catch(() => {});
       console.error(err);
       res.status(500).json({ error: "Error al eliminar clase" });
+    } finally {
+      client.release();
     }
   },
 );
