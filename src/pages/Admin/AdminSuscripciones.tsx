@@ -190,7 +190,7 @@ function AdminSuscripciones() {
               {/* Precio */}
               <div className="mb-5">
                 <label className="text-xs text-slate-400 block mb-1.5">
-                  Precio mensual ({plan.currency.toUpperCase()})
+                  Precio mensual ({plan.currency.toUpperCase()}, sin IVA)
                 </label>
                 <div className="flex gap-2">
                   <div className="relative flex-1">

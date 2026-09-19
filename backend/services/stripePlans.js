@@ -40,6 +40,11 @@ async function ensureStripePrice(plan, interval = "month") {
       throw err;
     });
     if (!saved || saved.deleted) productId = null;
+    // El nombre del Product es el que sale en la factura del dueño. Si el
+    // admin renombro el plan (Light -> Basic), se actualiza aqui.
+    else if (saved.name !== `Wellco ${plan.name}`) {
+      await stripe.products.update(productId, { name: `Wellco ${plan.name}` });
+    }
   }
 
   if (!productId) {
@@ -97,6 +102,48 @@ async function ensureStripePrice(plan, interval = "month") {
   );
 
   return price.id;
+}
+
+// IVA de las suscripciones.
+//
+// Los precios de `plans` son SIN IVA ("$499 + IVA"). El 16% se agrega como
+// Tax Rate de Stripe, no inflando el Price: asi la factura desglosa subtotal
+// e IVA, y los cupones descuentan sobre el subtotal (el IVA se calcula sobre
+// lo que de verdad se cobra).
+//
+// `inclusive: false` es lo que hace que se sume encima del precio. Con `true`
+// Stripe lo sacaria del precio y el estudio pagaria $499 en total, no $578.84.
+const IVA_PERCENT = 16;
+
+// El Tax Rate tambien es inmutable y vive en un modo (prueba o live), asi que
+// no se guarda en la base: se busca por metadata y se crea si no existe.
+let ivaTaxRateId = null;
+async function ensureIvaTaxRate() {
+  if (ivaTaxRateId) return ivaTaxRateId;
+
+  for await (const rate of stripe.taxRates.list({ active: true, limit: 100 })) {
+    if (
+      rate.metadata?.wellco === "iva" &&
+      !rate.inclusive &&
+      Number(rate.percentage) === IVA_PERCENT
+    ) {
+      ivaTaxRateId = rate.id;
+      return ivaTaxRateId;
+    }
+  }
+
+  const rate = await stripe.taxRates.create({
+    display_name: "IVA",
+    description: `IVA ${IVA_PERCENT}% México`,
+    percentage: IVA_PERCENT,
+    inclusive: false,
+    country: "MX",
+    jurisdiction: "MX",
+    tax_type: "vat",
+    metadata: { wellco: "iva" },
+  });
+  ivaTaxRateId = rate.id;
+  return ivaTaxRateId;
 }
 
 // Cupon de bienvenida: se aplica una sola vez, al primer recibo. `duration:
@@ -164,5 +211,6 @@ module.exports = {
   ensureStripePrice,
   ensureIntroCoupon,
   ensureCourtesyCoupon,
+  ensureIvaTaxRate,
   annualCents,
 };

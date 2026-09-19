@@ -288,7 +288,7 @@ function OwnerEstudioSuscripcion() {
               </p>
               {currentPrice != null && (
                 <p className="text-sm text-slate-500 mt-1">
-                  ${formatMoney(currentPrice)} {currency} / {perLabel} · pago{" "}
+                  ${formatMoney(currentPrice)} {currency} + IVA / {perLabel} · pago{" "}
                   {cadence}
                 </p>
               )}
@@ -332,7 +332,8 @@ function OwnerEstudioSuscripcion() {
             <p className="text-sm text-ink bg-surface rounded-xl px-4 py-3 mt-6">
               Cambiarás al plan <strong>{sub.pending_plan.name}</strong> {endPhrase}.
               Desde ese día se cobrarán $
-              {formatMoney(renewalPrice(sub.pending_plan, interval))} {currency} de
+              {formatMoney(renewalPrice(sub.pending_plan, interval))} {currency} +
+              IVA de
               forma {cadence}.
             </p>
           )}
@@ -440,7 +441,7 @@ function OwnerEstudioSuscripcion() {
               <div className="flex justify-between gap-4">
                 <dt className="text-slate-500">Pagas hoy</dt>
                 <dd className="font-semibold text-slate-800">
-                  ${formatMoney(chosenToday)} {chosenCurrency}
+                  ${formatMoney(chosenToday)} {chosenCurrency} + IVA
                 </dd>
               </div>
               <div className="flex justify-between gap-4">
@@ -449,7 +450,7 @@ function OwnerEstudioSuscripcion() {
                   {formatLongDate(nextChargeDate(chooseInterval))}
                   <br />
                   <span className="text-slate-500">
-                    ${formatMoney(chosenRenewal)} {chosenCurrency}
+                    ${formatMoney(chosenRenewal)} {chosenCurrency} + IVA
                   </span>
                 </dd>
               </div>
@@ -589,7 +590,7 @@ function OwnerEstudioSuscripcion() {
                         ${formatMoney(renewalPrice(plan, interval))}
                       </span>{" "}
                       <span className="text-xs text-slate-400">
-                        {plan.currency.toUpperCase()} / {perLabel}
+                        {plan.currency.toUpperCase()} + IVA / {perLabel}
                       </span>
                     </p>
                     <ul className="flex flex-col gap-2">
@@ -639,7 +640,8 @@ function OwnerEstudioSuscripcion() {
               <p>
                 Conservarás tu plan <strong>{sub.plan_name}</strong> y se cancela
                 el cambio al plan {sub.pending_plan?.name}. Se seguirán cobrando $
-                {formatMoney(renewalPrice(selectedPlan, interval))} {currency} de
+                {formatMoney(renewalPrice(selectedPlan, interval))} {currency} +
+                IVA de
                 forma {cadence}.
               </p>
             ) : (
@@ -647,7 +649,8 @@ function OwnerEstudioSuscripcion() {
                 Tu cambio al plan <strong>{selectedPlan.name}</strong> será{" "}
                 <strong>{endPhrase}</strong> y se cobrarán{" "}
                 <strong>
-                  ${formatMoney(renewalPrice(selectedPlan, interval))} {currency}
+                  ${formatMoney(renewalPrice(selectedPlan, interval))} {currency} +
+                  IVA
                 </strong>{" "}
                 de forma {cadence}. Hasta ese día conservas tu plan{" "}
                 {sub.plan_name} sin costo adicional.

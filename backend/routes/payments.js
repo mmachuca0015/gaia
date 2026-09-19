@@ -2,24 +2,19 @@ const express = require("express");
 const pool = require("../db");
 const router = express.Router();
 const { stripe, resourceMissing } = require("../services/stripe");
-const { Resend } = require("resend");
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 const { requireAuth, requireRole } = require("../middleware/auth");
 const { STUDIO_PUBLISHED, viewerIsDemo } = require("../services/catalog");
+const {
+  SERVICE_FEE_PERCENT,
+  splitCharge,
+  splitMetadata,
+  getCustomerId,
+  studioCanReceive,
+  savedCard,
+} = require("../services/charges");
+const { sendBookingConfirmation } = require("../services/bookingEmail");
 
-// Del 7.2% que se va en cada transaccion, Stripe se queda 3.6% por su cuenta
-// y este 3.6% es la comision de Wellco. Por eso aqui solo aparece la mitad:
-// la de Stripe nunca pasa por nuestro codigo, la descuenta ella.
-const COMMISSION_RATE = 0.036;
-
-// Cuota fija de Stripe por transaccion ($3 MXN). La paga el cliente encima del
-// precio de la clase, no el estudio.
-//
-// Es POR TRANSACCION, no por clase: si algun dia se reservan varias clases en
-// un mismo cobro, esta cuota se suma una sola vez. Por eso se aplica al armar
-// el PaymentIntent y no dentro del calculo de cada clase.
-const TRANSACTION_FEE_CENTS = 300;
 const FRONTEND_URL = (process.env.FRONTEND_URL || "http://localhost:5173")
   .split(",")[0]
   .trim();
@@ -29,70 +24,10 @@ const FRONTEND_URL = (process.env.FRONTEND_URL || "http://localhost:5173")
 // en su recibo, y evita tener el numero escrito en dos lugares que se puedan
 // desincronizar.
 router.get("/fees", (req, res) => {
-  res.json({ transaction_fee_cents: TRANSACTION_FEE_CENTS });
+  res.json({ service_fee_percent: SERVICE_FEE_PERCENT });
 });
 
-// Devuelve el stripe_customer_id del usuario de la sesion, o null.
-//
-// El id guardado se verifica contra Stripe en vez de devolverse a ciegas. Un
-// `cus_` creado en modo prueba sigue en la base despues del corte a live y
-// alli no existe: sin esta comprobacion, ver la tarjeta o cobrar una clase
-// devolvia 500 y el usuario no tenia forma de salir del hoyo.
-//
-// Cuando el customer ya no existe se limpia la columna y se responde como si
-// el usuario nunca hubiera guardado tarjeta, que es exactamente su situacion:
-// el metodo de pago vivia en la cuenta de Stripe del otro modo.
-async function getCustomerId(userId) {
-  const { rows } = await pool.query(
-    "SELECT stripe_customer_id FROM users WHERE id = $1",
-    [userId],
-  );
-  const customerId = rows[0]?.stripe_customer_id ?? null;
-  if (!customerId) return null;
 
-  const customer = await stripe.customers.retrieve(customerId).catch((err) => {
-    if (resourceMissing(err)) return null;
-    throw err;
-  });
-
-  if (!customer || customer.deleted) {
-    await pool.query(
-      "UPDATE users SET stripe_customer_id = NULL WHERE id = $1",
-      [userId],
-    );
-    return null;
-  }
-
-  return customerId;
-}
-
-// ¿La cuenta Connect del estudio puede recibir su parte del cobro?
-//
-// Se pregunta ANTES de abrir la transaccion y de crear el PaymentIntent. Si se
-// dejara fallar al cobrar, el error de Stripe saldria como 500 generico y el
-// cliente no sabria que el problema es del estudio, no de su tarjeta.
-//
-// Dos casos distintos, misma respuesta para el cliente:
-//   - la cuenta no existe (un `acct_` de modo prueba tras el corte a live),
-//     y entonces se limpia para que el dueño vea de nuevo el boton de alta;
-//   - la cuenta existe pero no tiene activas las transferencias, porque el
-//     dueño no termino el onboarding o Stripe le pidio documentos.
-async function studioCanReceive(studioId, stripeAccountId) {
-  const account = await stripe.accounts.retrieve(stripeAccountId).catch((err) => {
-    if (resourceMissing(err)) return null;
-    throw err;
-  });
-
-  if (!account) {
-    await pool.query(
-      "UPDATE studios SET stripe_account_id = NULL WHERE id = $1",
-      [studioId],
-    );
-    return false;
-  }
-
-  return account.capabilities?.transfers === "active";
-}
 
 router.post(
   "/create-setup-intent",
@@ -258,12 +193,10 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
       return res.status(400).json({ error: "Precio invalido" });
     }
 
-    // Total de la transaccion: es la base sobre la que se calculan LAS DOS
-    // comisiones, la de Stripe y la de Wellco.
-    const amountCents = classCents + TRANSACTION_FEE_CENTS;
+    // Lo que paga el alumno y cuanto se queda cada quien.
+    const split = splitCharge(classCents);
 
-    let customerId = null;
-    let paymentMethodId = null;
+    let card = null;
     if (!simulated) {
       // Se valida aqui y no solo en el catalogo: alguien pudo dejar abierta la
       // pagina del estudio antes de que terminara su suscripcion.
@@ -281,19 +214,10 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
           .json({ error: "El estudio aun no puede recibir pagos" });
       }
 
-      customerId = await getCustomerId(userId);
-      if (!customerId) {
+      card = await savedCard(userId);
+      if (!card) {
         return res.status(400).json({ error: "No tienes una tarjeta guardada" });
       }
-
-      const paymentMethods = await stripe.paymentMethods.list({
-        customer: customerId,
-        type: "card",
-      });
-      if (paymentMethods.data.length === 0) {
-        return res.status(400).json({ error: "No tienes una tarjeta guardada" });
-      }
-      paymentMethodId = paymentMethods.data[0].id;
     }
 
     // Reserva y lugar disponible se tocan dentro de una transaccion, con el
@@ -321,26 +245,7 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
         .json({ error: "Ya tienes una reserva para esta clase" });
     }
 
-    // Reparto del dinero. Las dos comisiones van sobre el TOTAL de la
-    // transaccion (clase + cuota), no sobre el precio de la clase.
-    //
-    //   cliente paga      T = clase + 3
-    //   Stripe se queda   3.6% de T + 3
-    //   Wellco se queda   3.6% de T
-    //   estudio recibe    el resto = clase - 7.2% de T
-    //
-    // Los 3 pesos del cliente cubren justo el cargo fijo de Stripe, asi que a
-    // Wellco le queda limpio su 3.6%.
-    //
-    // La parte porcentual de Stripe se resta de la transferencia porque Stripe
-    // cobra su comision de la cuenta de la plataforma, no de la del estudio:
-    // sin restarla aqui, saldria del bolsillo de Wellco y su comision neta
-    // quedaria en cero.
-    const wellcoCommission = Math.round(amountCents * COMMISSION_RATE);
-    const stripePercentFee = Math.round(amountCents * COMMISSION_RATE);
-    const studioAmount = classCents - wellcoCommission - stripePercentFee;
-
-    if (studioAmount <= 0) {
+    if (split.studioAmount <= 0) {
       await client.query("ROLLBACK");
       return res
         .status(400)
@@ -350,23 +255,17 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
     const paymentIntent = simulated
       ? null
       : await stripe.paymentIntents.create({
-          amount: amountCents,
+          amount: split.amountCents,
           currency: "mxn",
-          customer: customerId,
-          payment_method: paymentMethodId,
+          customer: card.customerId,
+          payment_method: card.paymentMethodId,
           confirm: true,
           off_session: true,
           transfer_data: {
             destination: stripeAccountId,
-            amount: studioAmount,
+            amount: split.studioAmount,
           },
-          metadata: {
-            clase_centavos: String(classCents),
-            cuota_fija_centavos: String(TRANSACTION_FEE_CENTS),
-            comision_wellco_centavos: String(wellcoCommission),
-            stripe_porcentual_centavos: String(stripePercentFee),
-            estudio_centavos: String(studioAmount),
-          },
+          metadata: { tipo: "clase", ...splitMetadata(classCents, split) },
         });
 
     const bookingResult = await client.query(
@@ -381,64 +280,12 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
 
     await client.query("COMMIT");
 
-    // El correo se arma con la reserva recien creada, no con "la ultima del
-    // usuario", que en concurrencia podia ser otra.
-    const emailData = await pool.query(
-      `
-  SELECT
-    users.name,
-    users.email,
-    classes.name AS class_name,
-    COALESCE(instructors.name || ' ' || instructors.last_name, classes.instructor) AS instructor,
-    CASE schedules.day
-      WHEN 0 THEN 'Domingo'
-      WHEN 1 THEN 'Lunes'
-      WHEN 2 THEN 'Martes'
-      WHEN 3 THEN 'Miércoles'
-      WHEN 4 THEN 'Jueves'
-      WHEN 5 THEN 'Viernes'
-      WHEN 6 THEN 'Sábado'
-    END AS day,
-    schedules.time,
-    studios.name AS studio_name,
-    classes.price
-  FROM bookings
-  JOIN users ON users.id = bookings.user_id
-  JOIN schedules ON bookings.schedule_id = schedules.id
-  JOIN classes ON schedules.class_id = classes.id
-  JOIN studios ON classes.studio_id = studios.id
-  LEFT JOIN instructors ON classes.instructor_id = instructors.id
-  WHERE bookings.id = $1
-`,
-      [bookingResult.rows[0].id],
+    await sendBookingConfirmation(
+      bookingResult.rows[0].id,
+      simulated
+        ? "Reserva de demostración, sin cobro"
+        : `$${(split.amountCents / 100).toFixed(2)} MXN`,
     );
-
-    const booking = emailData.rows[0];
-
-    try {
-      await resend.emails.send({
-        from: "Wellco <onboarding@resend.dev>",
-        to: booking.email,
-        subject: "¡Reserva confirmada!",
-        html: `
-    <h2>¡Hola ${booking.name}!</h2>
-    <p>Tu reserva ha sido confirmada.</p>
-    <p><strong>Clase:</strong> ${booking.class_name}</p>
-    <p><strong>Instructor:</strong> ${booking.instructor}</p>
-    <p><strong>Estudio:</strong> ${booking.studio_name}</p>
-    <p><strong>Día:</strong> ${booking.day}</p>
-    <p><strong>Hora:</strong> ${booking.time.slice(0, 5)}</p>
-    <p><strong>Total pagado:</strong> ${
-      simulated ? "Reserva de demostración, sin cobro" : `$${booking.price} MXN`
-    }</p>
-    <br>
-    <p>¡Nos vemos en clase!</p>
-    <p>El equipo de Wellco</p>
-  `,
-      });
-    } catch (error) {
-      console.error("Error enviando email:", error);
-    }
 
     res.json({
       message: simulated ? "Reserva demo confirmada" : "Pago exitoso",

@@ -10,14 +10,15 @@ import {
   ChevronRight,
 } from "lucide-react";
 import ClassCard from "../../components/ClassCard";
+import StudioPackages from "../../components/StudioPackages";
 
 import { api } from "../../lib/api";
 function EstudioDetalle() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const tabs = ["Clases", "Detalles"];
+  const tabs = ["Clases", "Paquetes", "Detalles"];
 
-  type Step = "Clases" | "Detalles";
+  type Step = "Clases" | "Paquetes" | "Detalles";
   const [step, setStep] = useState<Step>("Clases");
 
   type Studio = {
@@ -266,6 +267,9 @@ function EstudioDetalle() {
           </div>
         </div>
       )}
+
+      {/*Paquetes a la venta de este estudio*/}
+      {step === "Paquetes" && id && <StudioPackages studioId={id} />}
 
       {/*Detalles*/}
       {step === "Detalles" && (

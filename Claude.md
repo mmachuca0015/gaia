@@ -47,49 +47,53 @@ Historial de nombres: GAIA Wellness -> GAIA -> PILA -> **wellco** (nombre actual
 
 ## Modelo de negocio
 
-- **Comisión total del 7.2%, partida en dos mitades, ambas sobre el TOTAL de la
-  transacción** (precio de la clase + cuota fija), no sobre el precio de la clase:
-  - 3.6% se lo queda Stripe. Lo descuenta de la cuenta de la plataforma.
-  - 3.6% es la comisión de Wellco (`COMMISSION_RATE` en `backend/routes/payments.js`).
-  - Si ves `0.036` en el código, **no es un error ni está a la mitad**. No lo
-    "corrijas" a `0.072`: duplicarías el cobro.
-- **Cuota fija de $3 MXN por transacción** (`TRANSACTION_FEE_CENTS`), que paga el
-  **cliente** encima del precio de la clase. Cubre el cargo fijo de Stripe.
-  - Es **por transacción, no por clase**. Hoy cada reserva es su propio cobro,
-    así que coincide; si algún día se reservan varias clases en un solo pago, la
-    cuota debe sumarse **una sola vez**.
+- **Wellco cobra por dos lados, ambos sobre el PRECIO de la clase** (o del
+  paquete), no sobre el total (`backend/routes/payments.js`):
+  - **Cargo por servicio de 3%** (`SERVICE_FEE_PERCENT`) que paga el **alumno**
+    encima del precio. Sustituye a la cuota fija de $3 que pagaba antes.
+  - **Comisión de 1.5%** (`COMMISSION_PERCENT`) que se le descuenta al **estudio**.
+- **El estudio absorbe la comisión completa de Stripe** (3.6% del total + $3).
+- La landing lo anuncia así: "1.5% más la de Stripe (3.6% + $3 MXN)". Es lo que
+  paga el estudio; el 3% del alumno se ve en el desglose al reservar.
 
-### El reparto, con T = precio + $3
+### El reparto, con P = precio y T = P + 3% de P
 
 ```
-cliente paga      T
+alumno paga       T
 Stripe se queda   3.6% de T + $3
-Wellco se queda   3.6% de T
-estudio recibe    el resto = precio - 7.2% de T
+Wellco se queda   3% de P + 1.5% de P
+estudio recibe    P - 1.5% de P - (3.6% de T + $3)
 ```
 
-Con una clase de $150: el cliente paga $153.00, el estudio recibe $138.98,
-Stripe cobra $8.51 y a Wellco le quedan **$5.51 netos, justo el 3.6% de T**.
+Con una clase de $150: el alumno paga $154.50, Stripe cobra $8.56, Wellco se
+queda $6.75 y el estudio recibe $139.19.
 
-**La parte porcentual de Stripe se resta de `transfer_data.amount`.** Es lo menos
+**La comisión de Stripe se resta de `transfer_data.amount`.** Es lo menos
 obvio del cálculo: Stripe cobra su comisión de la cuenta de la plataforma, no de
-la del estudio. Si no se resta ahí, sale del bolsillo de Wellco y su comisión
-neta queda en **cero**. No quites esa resta.
+la del estudio. Si no se resta ahí, sale del bolsillo de Wellco. No quites esa
+resta.
 
-El monto de la cuota se expone en `GET /payments/fees` y el frontend lo lee de
-ahí (`src/lib/fees.ts`). **No lo escribas también en el frontend**: dos copias
-acaban desincronizadas y la pantalla diría un precio distinto al cobrado.
+El porcentaje del cargo por servicio se expone en `GET /payments/fees` y el
+frontend lo lee de ahí (`src/lib/fees.ts`, misma fórmula de redondeo que el
+backend). **No lo escribas también en el frontend**: dos copias acaban
+desincronizadas y la pantalla diría un precio distinto al cobrado.
 
 La comisión real de Stripe varía según la tarjeta (internacional, AmEx, etc.),
 así que el neto de Wellco es aproximado, no exacto al centavo.
-- Suscripción mensual para estudios: plan Light y plan Pro
+
+### Suscripción de estudios
+
+- Suscripción mensual para estudios: plan Basic ($499 + IVA) y plan Pro ($1,099 + IVA).
+  El slug de Basic sigue siendo `light` (ver `migrations/008_plans_basic_pro.sql`)
+- **IVA 16% encima del precio del plan.** `price_cents` se guarda **sin IVA**; Stripe
+  lo agrega como Tax Rate (`ensureIvaTaxRate`, `inclusive: false`) vía
+  `default_tax_rates` en la suscripción. No infles el Price con el 16%: se cobraría
+  doble. En pantalla los precios dicen "+ IVA"; el botón de pago muestra el total de
+  la factura de Stripe, ya con IVA
 - 50% de descuento en el primer mes (`intro_discount`, por plan) — **solo plan mensual**
 - 15% de descuento por pagar el año completo (`annual_discount`, por plan; se edita en `/admin/suscripciones`, no en el código)
 - **Los dos descuentos no se acumulan**: quien paga anual no recibe el de bienvenida
-- Gratis para los clientes que reservan
-
-**La comisión por transacción no se menciona en la landing** — es una decisión
-de producto, no un olvido. Se habla de ella en el demo.
+- Los alumnos no pagan suscripción: solo la clase + el 3% de servicio
 
 ## Suscripciones (leer antes de tocar precios o el registro de estudios)
 
@@ -164,6 +168,38 @@ de producto, no un olvido. Se habla de ella en el demo.
   **no** recibe bienvenida ni cupón al volver.
 - Si una renovación falla (`past_due`/`unpaid`), `/payment-intent` cobra la
   factura abierta de esa misma suscripción. No crea otra: cobraría dos veces.
+
+## Paquetes de clases
+
+- **Dueño:** `/owner/paquetes` (`OwnerPaquetes.tsx`), rutas `ownerRouter` de
+  `backend/routes/packages.js` montadas bajo `/studios`. **Alumno:** los
+  compra en la pestaña Paquetes de cada estudio (`components/StudioPackages.tsx`
+  dentro de `EstudioDetalle.tsx`) y ve los suyos en `/mis-paquetes`
+  (`pages/Dashboard/MisPaquetes.tsx`); rutas `userRouter` en `/packages`. No
+  hay catálogo global: `GET /packages` exige `studio_id`. Esquema en
+  `migrations/009_packages.sql`; reglas en `services/packages.js`.
+- Un paquete tiene dos tiempos distintos, no los confundas:
+  - **Periodo de venta** (`sale_starts_on`/`sale_ends_on`, o las dos nulas =
+    indefinido). Al terminar deja de venderse pero **no se borra**: el dueño lo
+    ve opaco y lo puede editar. Solo el indefinido se puede **desactivar**
+    (`is_active`). Estado en `PACKAGE_STATUS`; "hoy" es hora de México
+    (`TODAY_MX`), porque la base de Render corre en UTC.
+  - **Duración** (`validity_value` + `validity_unit`: 7 o 15 días, 1 a 12
+    meses): cuánto tiene el alumno para usarlo desde que lo compra.
+- Borrar = `deleted_at`. Editar o borrar **nunca afecta lo ya vendido**: la
+  compra (`package_purchases` + `package_purchase_classes`) **copia** clases,
+  tipo, precio y vence al pagar. El canje lee la copia, no el paquete.
+- **Canje** (`usablePurchases`): mismo alumno, le quedan clases, la clase es
+  antes del vencimiento, **mismo estudio donde se compró**, clase en la lista
+  (o `any_class`) y horario permanente si es `permanent_only`.
+  `POST /packages/redeem` bloquea la compra con `FOR UPDATE` para que dos
+  reservas no gasten la misma última clase.
+- **Cobro:** mismo reparto que una clase (`splitCharge` en
+  `services/charges.js`, que usa también `/payments/charge`): el alumno paga el
+  precio (el de descuento si hay) + 3%. Mismas reglas demo que las reservas.
+- **Métricas:** el dinero de un paquete cuenta al comprarlo. Una reserva hecha
+  con paquete (`bookings.package_purchase_id`) **no** suma ingreso, o se
+  contaría dos veces. Todo pasa por `REVENUE_ROWS` (`services/revenue.js`).
 
 ## Cuentas demo (leer antes de tocar el catálogo o `/payments/charge`)
 

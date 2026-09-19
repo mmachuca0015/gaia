@@ -927,7 +927,7 @@ function Login() {
                       )
                     : firstChargePrice(selectedPlan, billingInterval),
                 )}{" "}
-                {selectedPlan.currency.toUpperCase()}
+                {selectedPlan.currency.toUpperCase()} + IVA
                 {billingInterval === "year" ? " por el año" : " el primer mes"}.
               </p>
             )}

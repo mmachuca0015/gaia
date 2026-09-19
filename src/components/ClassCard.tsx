@@ -2,8 +2,13 @@ import { Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { api, getCachedUser } from "../lib/api";
-import { fetchTransactionFee } from "../lib/fees";
+import { api, ApiError, getCachedUser } from "../lib/api";
+import { fetchServiceFeePercent, serviceFeeCents } from "../lib/fees";
+import {
+  fetchUsablePurchases,
+  redeemPackage,
+  type UsablePurchase,
+} from "../lib/packages";
 type ClassCardProps = {
   hour: string;
   name: string;
@@ -44,27 +49,58 @@ function ClassCard({
   const [showConfirmPopUp, setShowConfirmPopUp] = useState(false);
   const navigate = useNavigate();
 
-  // Cuota fija por transaccion. Se pide al backend para que lo que se muestra
-  // aqui sea lo mismo que se va a cobrar.
-  const [feeCents, setFeeCents] = useState<number | null>(null);
+  // Cargo por servicio. El porcentaje se pide al backend para que lo que se
+  // muestra aqui sea lo mismo que se va a cobrar.
+  const [feePercent, setFeePercent] = useState<number | null>(null);
   useEffect(() => {
-    fetchTransactionFee()
-      .then(setFeeCents)
-      .catch(() => setFeeCents(null));
+    fetchServiceFeePercent()
+      .then(setFeePercent)
+      .catch(() => setFeePercent(null));
   }, []);
 
+  const classCents = Math.round(Number(price) * 100);
+  const feeCents =
+    feePercent !== null ? serviceFeeCents(classCents, feePercent) : null;
   const fee = (feeCents ?? 0) / 100;
-  const total = Number(price) + fee;
+  const total = (classCents + (feeCents ?? 0)) / 100;
 
   // Las cuentas demo reservan sin tarjeta: el backend no les cobra.
   const isDemo = getCachedUser()?.is_demo === true;
 
-  const handleReservar = () => {
+  // Paquetes del alumno que cubren esta clase. Si hay, se ofrecen antes que
+  // la tarjeta; `payWith` es el id de la compra elegida o "card".
+  const [usable, setUsable] = useState<UsablePurchase[]>([]);
+  const [payWith, setPayWith] = useState<number | "card">("card");
+
+  const handleReservar = async () => {
+    const options = await fetchUsablePurchases(schedule_id, classDate).catch(
+      () => [] as UsablePurchase[],
+    );
+    setUsable(options);
+    setPayWith(options[0]?.id ?? "card");
+
+    // Con un paquete no hace falta tarjeta.
     const user = JSON.parse(localStorage.getItem("user") || "{}");
-    if (!isDemo && !user.stripe_customer_id) {
+    if (options.length === 0 && !isDemo && !user.stripe_customer_id) {
       setShowPopup(true);
     } else {
       setShowConfirmPopUp(true);
+    }
+  };
+
+  const handleConfirmar = async () => {
+    if (payWith === "card") return handlePagar();
+    try {
+      const res = await redeemPackage(payWith, schedule_id, classDate);
+      setShowConfirmPopUp(false);
+      alert(
+        `¡Reserva confirmada! Te ${
+          res.remaining === 1 ? "queda 1 clase" : `quedan ${res.remaining} clases`
+        } en el paquete.`,
+      );
+      onReservaExitosa();
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "No pudimos hacer la reserva");
     }
   };
 
@@ -173,8 +209,47 @@ function ClassCard({
           <div className="bg-white rounded-2xl p-8 max-w-sm w-full mx-4 flex flex-col gap-4 text-center">
             <p className="font-semibold text-slate-800">Confirmar reserva</p>
 
+            {/* Paquetes que cubren esta clase, o pagar con tarjeta */}
+            {usable.length > 0 && (
+              <div className="text-sm text-left border border-slate-200 rounded-xl divide-y divide-slate-100">
+                {usable.map((u) => (
+                  <label
+                    key={u.id}
+                    className="flex items-center gap-3 px-4 py-2.5 cursor-pointer"
+                  >
+                    <input
+                      type="radio"
+                      name={`pay-${schedule_id}`}
+                      checked={payWith === u.id}
+                      onChange={() => setPayWith(u.id)}
+                      className="accent-ink w-4 h-4"
+                    />
+                    <span className="text-slate-700">
+                      Usar «{u.name}»
+                      <span className="block text-xs text-slate-400">
+                        {u.remaining === 1
+                          ? "Te queda 1 clase"
+                          : `Te quedan ${u.remaining} clases`}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+                <label className="flex items-center gap-3 px-4 py-2.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    name={`pay-${schedule_id}`}
+                    checked={payWith === "card"}
+                    onChange={() => setPayWith("card")}
+                    className="accent-ink w-4 h-4"
+                  />
+                  <span className="text-slate-700">Pagar con tarjeta</span>
+                </label>
+              </div>
+            )}
+
             {/* Desglose completo: el cargo por transaccion no puede aparecer
                 por sorpresa hasta el estado de cuenta. */}
+            {payWith === "card" && (
             <div className="text-sm text-left border border-slate-200 rounded-xl divide-y divide-slate-100">
               <div className="flex justify-between px-4 py-2.5">
                 <span className="text-slate-600">Clase</span>
@@ -182,7 +257,9 @@ function ClassCard({
               </div>
               {feeCents !== null && (
                 <div className="flex justify-between px-4 py-2.5">
-                  <span className="text-slate-600">Cargo por transacción</span>
+                  <span className="text-slate-600">
+                    Cargo por servicio ({feePercent}%)
+                  </span>
                   <span className="text-slate-800">${fee.toFixed(2)}</span>
                 </div>
               )}
@@ -193,11 +270,14 @@ function ClassCard({
                 </span>
               </div>
             </div>
+            )}
 
             <p className="text-xs text-slate-400">
-              {isDemo
-                ? "Cuenta demo: la reserva se confirma sin ningún cobro."
-                : "Se cobrará a tu tarjeta guardada al confirmar."}
+              {payWith !== "card"
+                ? "Se descuenta 1 clase de tu paquete, sin ningún cobro."
+                : isDemo
+                  ? "Cuenta demo: la reserva se confirma sin ningún cobro."
+                  : "Se cobrará a tu tarjeta guardada al confirmar."}
             </p>
             <div className="flex gap-3 mt-2">
               <button
@@ -207,7 +287,7 @@ function ClassCard({
                 Cancelar
               </button>
               <button
-                onClick={handlePagar}
+                onClick={handleConfirmar}
                 className="flex-1 bg-[#1b2c44] text-white py-2.5 rounded-xl text-sm hover:bg-[#33506f] transition-colors cursor-pointer"
               >
                 Aceptar

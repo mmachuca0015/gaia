@@ -12,6 +12,7 @@ const {
 } = require("../middleware/auth");
 const { redeemCoupon } = require("./coupons");
 const { studioVisibleTo, viewerIsDemo } = require("../services/catalog");
+const { REVENUE_ROWS } = require("../services/revenue");
 
 // Los estudios demo solo existen para los usuarios demo. Para cualquier otro
 // visitante se responde igual que si el id no existiera.
@@ -376,7 +377,7 @@ router.get(
     try {
       const result = await pool.query(
         `
-      SELECT 
+      SELECT
         classes.*,
         COALESCE(instructors.name || ' ' || instructors.last_name, classes.instructor) AS instructor_name
       FROM classes
@@ -547,7 +548,7 @@ router.get(
       const { id } = req.params;
       const result = await pool.query(
         `
-      SELECT 
+      SELECT
         instructors.*,
         COUNT(DISTINCT schedules.id) FILTER (WHERE schedules.is_permanent = true) AS classes_per_week
       FROM instructors
@@ -684,31 +685,29 @@ router.get(
     const { id } = req.params;
     const { period } = req.query;
 
-    let dateFilter = "";
-    if (period === "hoy")
-      dateFilter = "AND bookings.created_at >= CURRENT_DATE";
-    else if (period === "semana")
-      dateFilter =
-        "AND bookings.created_at >= CURRENT_DATE - INTERVAL '7 days'";
-    else if (period === "mes")
-      dateFilter =
-        "AND bookings.created_at >= CURRENT_DATE - INTERVAL '1 month'";
+    let since = "";
+    if (period === "hoy") since = "CURRENT_DATE";
+    else if (period === "semana") since = "CURRENT_DATE - INTERVAL '7 days'";
+    else if (period === "mes") since = "CURRENT_DATE - INTERVAL '1 month'";
     else if (period === "semestral")
-      dateFilter =
-        "AND bookings.created_at >= CURRENT_DATE - INTERVAL '6 months'";
+      since = "CURRENT_DATE - INTERVAL '6 months'";
+    const after = (column) => (since ? `AND ${column} >= ${since}` : "");
 
     try {
+      // El dinero sale de los cobros (clases pagadas con tarjeta y paquetes
+      // vendidos); el conteo, de todas las reservas, incluidas las de paquete.
       const result = await pool.query(
         `
-      SELECT 
-        SUM(classes.price) AS total,
-        COUNT(bookings.id) AS reservas
-      FROM bookings
-      JOIN schedules ON bookings.schedule_id = schedules.id
-      JOIN classes ON schedules.class_id = classes.id
-      WHERE classes.studio_id = $1
-      AND bookings.status = 'activa'
-      ${dateFilter}
+      SELECT
+        (SELECT SUM(amount) FROM ${REVENUE_ROWS}
+         WHERE money.studio_id = $1 ${after("money.created_at")}) AS total,
+        (SELECT COUNT(bookings.id)
+         FROM bookings
+         JOIN schedules ON bookings.schedule_id = schedules.id
+         JOIN classes ON schedules.class_id = classes.id
+         WHERE classes.studio_id = $1
+         AND bookings.status = 'activa'
+         ${after("bookings.created_at")}) AS reservas
     `,
         [id],
       );
@@ -732,33 +731,29 @@ router.get(
     let dateFilter = "";
 
     if (period === "hoy") {
-      groupBy = "EXTRACT(HOUR FROM bookings.created_at)";
-      dateFilter = "AND bookings.created_at >= CURRENT_DATE";
+      groupBy = "EXTRACT(HOUR FROM money.created_at)";
+      dateFilter = "AND money.created_at >= CURRENT_DATE";
     } else if (period === "semana") {
-      groupBy = "DATE(bookings.created_at)";
-      dateFilter =
-        "AND bookings.created_at >= CURRENT_DATE - INTERVAL '7 days'";
+      groupBy = "DATE(money.created_at)";
+      dateFilter = "AND money.created_at >= CURRENT_DATE - INTERVAL '7 days'";
     } else if (period === "mes") {
-      groupBy = "DATE_TRUNC('week', bookings.created_at)";
-      dateFilter =
-        "AND bookings.created_at >= CURRENT_DATE - INTERVAL '1 month'";
+      groupBy = "DATE_TRUNC('week', money.created_at)";
+      dateFilter = "AND money.created_at >= CURRENT_DATE - INTERVAL '1 month'";
     } else if (period === "semestral") {
-      groupBy = "DATE_TRUNC('month', bookings.created_at)";
+      groupBy = "DATE_TRUNC('month', money.created_at)";
       dateFilter =
-        "AND bookings.created_at >= CURRENT_DATE - INTERVAL '6 months'";
+        "AND money.created_at >= CURRENT_DATE - INTERVAL '6 months'";
     }
 
     try {
+      // Cobros de clases y paquetes (services/revenue.js).
       const result = await pool.query(
         `
-      SELECT 
+      SELECT
         ${groupBy} AS periodo,
-        SUM(classes.price) AS total
-      FROM bookings
-      JOIN schedules ON bookings.schedule_id = schedules.id
-      JOIN classes ON schedules.class_id = classes.id
-      WHERE classes.studio_id = $1
-      AND bookings.status = 'activa'
+        SUM(amount) AS total
+      FROM ${REVENUE_ROWS}
+      WHERE money.studio_id = $1
       ${dateFilter}
       GROUP BY periodo
       ORDER BY periodo ASC
@@ -782,7 +777,7 @@ router.get(
     try {
       const reservas = await pool.query(
         `
-      SELECT 
+      SELECT
         users.name,
         users.last_name,
         classes.name AS class_name,
@@ -803,7 +798,7 @@ router.get(
 
       const favoritos = await pool.query(
         `
-      SELECT 
+      SELECT
         users.name,
         users.last_name,
         favorites.created_at,
@@ -843,7 +838,7 @@ router.get(
     try {
       const result = await pool.query(
         `
-      SELECT 
+      SELECT
         schedules.id AS schedule_id,
         classes.name AS class_name,
         COALESCE(instructors.name || ' ' || instructors.last_name, classes.instructor) AS instructor,
@@ -884,7 +879,7 @@ router.get(
     try {
       const result = await pool.query(
         `
-      SELECT 
+      SELECT
         users.name,
         users.last_name,
         users.email

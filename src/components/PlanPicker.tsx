@@ -127,7 +127,7 @@ function PlanPicker({
                   ${formatMoney(monthlyPrice(plan, annual))}
                 </span>
                 <span className="text-xs text-slate-400">
-                  {plan.currency.toUpperCase()} / mes
+                  {plan.currency.toUpperCase()} + IVA / mes
                 </span>
               </div>
 
@@ -138,12 +138,13 @@ function PlanPicker({
                   <span className="line-through text-slate-400">
                     ${formatMoney(toPesos(plan.price_cents) * 12)}
                   </span>{" "}
-                  ${formatMoney(annualTotal(plan))} al año · {plan.annual_discount}%
+                  ${formatMoney(annualTotal(plan))} + IVA al año ·{" "}
+                  {plan.annual_discount}%
                   menos
                 </p>
               ) : introEligible && plan.intro_discount > 0 ? (
                 <p className="text-xs text-[#1b2c44] bg-[#e8eef7] rounded-lg px-2 py-1 inline-block mb-3">
-                  Primer mes ${formatMoney(introPrice(plan))} ·{" "}
+                  Primer mes ${formatMoney(introPrice(plan))} + IVA ·{" "}
                   {plan.intro_discount}% menos
                 </p>
               ) : (

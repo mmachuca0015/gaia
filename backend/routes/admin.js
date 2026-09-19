@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { REVENUE_ROWS } = require("../services/revenue");
 const { requireAuth, requireRole } = require("../middleware/auth");
 
 // Todo el panel de administracion exige sesion con rol admin. Antes estas
@@ -10,13 +11,18 @@ router.use(requireAuth, requireRole("admin"));
 // Métricas generales
 router.get("/metrics", async (req, res) => {
   try {
-    // Las reservas de estudios demo no mueven dinero: no cuentan en metricas.
+    // Cobros de clases y de paquetes (services/revenue.js). Los estudios demo
+    // no mueven dinero: no cuentan en metricas.
     const transactions = await pool.query(
-      "SELECT COUNT(*) AS total, SUM(classes.price) AS total_amount FROM bookings JOIN schedules ON bookings.schedule_id = schedules.id JOIN classes ON schedules.class_id = classes.id JOIN studios ON studios.id = classes.studio_id WHERE bookings.status = 'activa' AND NOT studios.is_demo",
+      `SELECT COUNT(*) AS total, SUM(amount) AS total_amount
+       FROM ${REVENUE_ROWS} WHERE NOT is_demo`,
     );
 
+    // Ingreso de Wellco por cobro: 3% que paga el alumno + 1.5% del estudio,
+    // los dos sobre el precio (ver services/charges.js).
     const pilaCommission = await pool.query(
-      "SELECT SUM(classes.price * 0.036) AS commission FROM bookings JOIN schedules ON bookings.schedule_id = schedules.id JOIN classes ON schedules.class_id = classes.id JOIN studios ON studios.id = classes.studio_id WHERE bookings.status = 'activa' AND NOT studios.is_demo",
+      `SELECT SUM(amount * 0.045) AS commission
+       FROM ${REVENUE_ROWS} WHERE NOT is_demo`,
     );
 
     const newStudios = await pool.query(
@@ -64,16 +70,12 @@ router.get("/charts", async (req, res) => {
   const dateFilter = buildDateFilter(period);
 
   try {
-    const transactionsGroupBy = buildGroupBy("bookings.created_at", period);
+    const transactionsGroupBy = buildGroupBy("money.created_at", period);
     const transactions = await pool.query(`
-      SELECT ${transactionsGroupBy} AS periodo, COUNT(*) AS total, SUM(classes.price) AS amount
-      FROM bookings
-      JOIN schedules ON bookings.schedule_id = schedules.id
-      JOIN classes ON schedules.class_id = classes.id
-      JOIN studios ON studios.id = classes.studio_id
-      WHERE bookings.created_at >= NOW() - ${dateFilter}
-      AND bookings.status = 'activa'
-      AND NOT studios.is_demo
+      SELECT ${transactionsGroupBy} AS periodo, COUNT(*) AS total, SUM(amount) AS amount
+      FROM ${REVENUE_ROWS}
+      WHERE money.created_at >= NOW() - ${dateFilter}
+      AND NOT money.is_demo
       GROUP BY 1 ORDER BY 1 ASC
     `);
 

@@ -9,7 +9,6 @@ import { Lock } from "lucide-react";
 
 import { api } from "../lib/api";
 import { stripePromise } from "../lib/stripe";
-import { formatMoney } from "../lib/plans";
 
 type Props = {
   onSuccess: () => void;
@@ -79,7 +78,12 @@ function PaymentFields({
         {paying
           ? "Procesando..."
           : amount !== null
-            ? `${cta} · $${formatMoney(Math.round(amount / 100))} ${currency.toUpperCase()}`
+            ? // Monto de la factura de Stripe, ya con IVA. Con centavos:
+              // $578.84 redondeado diria un precio que no es el cobrado.
+              `${cta} · $${(amount / 100).toLocaleString("es-MX", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })} ${currency.toUpperCase()} IVA incluido`
             : cta}
       </button>
 

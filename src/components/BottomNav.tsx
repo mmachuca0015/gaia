@@ -1,10 +1,11 @@
-import { Compass, CalendarDays, User } from "lucide-react";
+import { Compass, CalendarDays, User, Package } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 function BottomNav() {
   const navItems = [
     { icon: Compass, label: "Explorar", path: "/explorar" },
     { icon: CalendarDays, label: "Clases", path: "/clases" },
+    { icon: Package, label: "Paquetes", path: "/mis-paquetes" },
     { icon: User, label: "Perfil", path: "/perfil" },
   ];
 

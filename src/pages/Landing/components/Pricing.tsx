@@ -132,10 +132,12 @@ function Pricing() {
                         </span>
                         <span
                           className={`text-sm ${
-                            plan.is_featured ? "text-slate-400" : "text-slate-500"
+                            plan.is_featured
+                              ? "text-slate-400"
+                              : "text-slate-500"
                           }`}
                         >
-                          {plan.currency.toUpperCase()} / mes
+                          {plan.currency.toUpperCase()} + IVA / mes
                         </span>
                       </div>
 
@@ -149,7 +151,8 @@ function Pricing() {
                             <span className="line-through">
                               ${formatMoney(toPesos(plan.price_cents) * 12)}
                             </span>{" "}
-                            · facturado ${formatMoney(annualTotal(plan))} al año
+                            · facturado ${formatMoney(annualTotal(plan))} + IVA
+                            al año
                           </>
                         ) : (
                           "Facturado mes a mes. Cancela cuando quieras."
@@ -164,8 +167,8 @@ function Pricing() {
                               : "bg-ink/5 text-ink"
                           }`}
                         >
-                          Tu primer mes: ${formatMoney(introPrice(plan))} ·{" "}
-                          {plan.intro_discount}% de descuento
+                          Tu primer mes: ${formatMoney(introPrice(plan))} + IVA
+                          · {plan.intro_discount}% de descuento
                         </p>
                       )}
                     </div>
@@ -210,10 +213,11 @@ function Pricing() {
         <div className="max-w-3xl mx-auto mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="border border-line rounded-2xl p-5">
             <p className="text-sm font-medium text-ink mb-1">
-              Gratis para quienes reservan
+              Comisión por reserva
             </p>
             <p className="text-sm text-slate-500 leading-relaxed">
-              Los atletas no pagan suscripción: solo el precio de su clase.
+              Todos los planes tienen una comisión de 1.5% más una comisión de
+              Stripe (3.6% + $3 MXN) por cada transacción.
             </p>
           </div>
           <div className="border border-line rounded-2xl p-5">

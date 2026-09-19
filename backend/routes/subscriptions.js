@@ -4,6 +4,7 @@ const { requireAuth, requireRole } = require("../middleware/auth");
 const { stripe, resourceMissing } = require("../services/stripe");
 const {
   ensureStripePrice,
+  ensureIvaTaxRate,
   ensureIntroCoupon,
   ensureCourtesyCoupon,
 } = require("../services/stripePlans");
@@ -131,6 +132,9 @@ async function setStripePlan(sub, plan) {
   return stripe.subscriptions.update(sub.stripe_subscription_id, {
     items: [{ id: item.id, price: priceId }],
     proration_behavior: "none",
+    // Una suscripcion contratada antes del IVA lo empieza a cobrar con el
+    // plan nuevo, igual que las que nacen hoy.
+    default_tax_rates: [await ensureIvaTaxRate()],
   });
 }
 
@@ -460,6 +464,9 @@ router.post(
         customer: customerId,
         items: [{ price: priceId }],
         discounts: couponId ? [{ coupon: couponId }] : undefined,
+        // IVA 16% encima del precio del plan, en esta factura y en cada
+        // renovacion.
+        default_tax_rates: [await ensureIvaTaxRate()],
         // Nace incompleta: no se cobra nada hasta que el navegador confirme.
         payment_behavior: "default_incomplete",
         payment_settings: {
