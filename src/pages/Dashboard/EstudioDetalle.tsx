@@ -142,6 +142,8 @@ function EstudioDetalle() {
     instructor: string;
     price: number;
     time: string;
+    /** Hora de fin. Null en los horarios creados antes de que existiera. */
+    end_time: string | null;
     schedule_id: number;
     /** Lugares libres en la fecha elegida. */
     available_spots: number;
@@ -329,6 +331,7 @@ function EstudioDetalle() {
               <ClassCard
                 key={classItem.id}
                 hour={classItem.time}
+                endHour={classItem.end_time}
                 name={classItem.name}
                 instructor={classItem.instructor}
                 availablePlaces={classItem.available_spots}

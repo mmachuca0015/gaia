@@ -257,6 +257,7 @@ router.get("/:id/clases", optionalAuth, async (req, res) => {
         classes.studio_id,
         schedules.day,
         schedules.time,
+        schedules.end_time,
         GREATEST(classes.capacity - ${bookedOnDate("$2")}, 0) AS available_spots,
         EXISTS (
           SELECT 1 FROM bookings b

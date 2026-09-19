@@ -11,6 +11,8 @@ import {
 } from "../lib/packages";
 type ClassCardProps = {
   hour: string;
+  /** Hora de fin. Los horarios viejos no la tienen: duraban una hora. */
+  endHour: string | null;
   name: string;
   instructor: string;
   availablePlaces: number;
@@ -23,6 +25,7 @@ type ClassCardProps = {
 
 function ClassCard({
   hour,
+  endHour,
   name,
   instructor,
   availablePlaces,
@@ -41,6 +44,22 @@ function ClassCard({
   };
 
   const { time: formattedTime, ampm } = formatTime(hour);
+
+  // "10 AM", "10:30 AM". En punto se omiten los minutos, que no dicen nada.
+  const shortTime = (time: string) => {
+    const { time: t, ampm: p } = formatTime(time);
+    return `${t.endsWith(":00") ? t.slice(0, -3) : t} ${p}`;
+  };
+
+  // Sin hora de fin (horarios de antes de que el dueño la pudiera elegir) se
+  // supone una hora, que es lo que duraban.
+  const endsAt =
+    endHour ??
+    (() => {
+      const [h, m] = hour.split(":").map(Number);
+      return `${String(((h ?? 0) + 1) % 24).padStart(2, "0")}:${String(m ?? 0).padStart(2, "0")}`;
+    })();
+  const range = `de ${shortTime(hour)} a ${shortTime(endsAt)}`;
 
   //Popup para verificar si tiene tarjeta agregada
   const [showPopup, setShowPopup] = useState(false);
@@ -146,7 +165,9 @@ function ClassCard({
         <div className="flex items-center gap-2 mb-1">
           <p className="font-semibold text-2xl text-slate-800">{name}</p>
         </div>
-        <p className="text-md text-slate-600 mb-1">con {instructor}</p>
+        <p className="text-md text-slate-600 mb-1">
+          con {instructor} · {range}
+        </p>
         <div className="flex items-center gap-3 text-md text-slate-600">
           <div className="flex items-center gap-1">
             {availablePlaces === 0 ? (
@@ -154,7 +175,7 @@ function ClassCard({
             ) : (
               <div className="flex items-center gap-1">
                 <Users size={14} />
-                <span>{availablePlaces} lugares</span>
+                <span>{availablePlaces} lugares restantes</span>
               </div>
             )}
           </div>

@@ -156,6 +156,11 @@ const TAB_HEIGHT = 18;
 // una sola tarjeta.
 const CARD_GAP = 3;
 
+// Lo minimo que mide una tarjeta: dos lineas de texto. Una clase de media hora
+// se sale un poco de su hueco antes que esconder al instructor, que es lo que
+// dice cual es cual cuando dos clases se llaman igual.
+const MIN_CARD_HEIGHT = 34;
+
 // Alto de una hora. Una clase dura una hora, asi que ese es tambien el alto de
 // su tarjeta: 56 es lo justo para el nombre y el instructor sin que la semana
 // entera pida media pantalla de scroll. Con dos encaramadas a la de delante le
@@ -221,6 +226,10 @@ function OwnerClases() {
   });
   const [editingClass, setEditingClass] = useState<Clase | null>(null);
 
+  // Lo que sale en rojo dentro del formulario. Se usa para la clase repetida:
+  // un alert se cierra y no deja ver que estaba mal.
+  const [formError, setFormError] = useState("");
+
   // 0 = esta semana. El calendario siempre pinta una semana completa; las
   // clases permanentes salen en todas y las unicas solo en su fecha.
   const [weekOffset, setWeekOffset] = useState(0);
@@ -282,6 +291,7 @@ function OwnerClases() {
 
   //Fucnión para agregar una clase nueva
   const handleAddClass = async () => {
+    setFormError("");
     if (
       !newClassForm.name ||
       !newClassForm.instructor_id ||
@@ -313,6 +323,13 @@ function OwnerClases() {
       newClassForm.selectedDays.length === 0
     ) {
       alert("Selecciona al menos un día");
+      return;
+    }
+
+    if (claseRepetida()) {
+      setFormError(
+        "Ya tienes una clase con estas mismas características: mismo instructor, capacidad, precio, horario y día.",
+      );
       return;
     }
     const res = await api(`/studios/${studio?.id}/add-class`, {
@@ -364,6 +381,15 @@ function OwnerClases() {
 
   const handleEditClass = async () => {
     if (!editingClass) return;
+
+    setFormError("");
+
+    if (claseRepetida()) {
+      setFormError(
+        "Ya tienes otra clase con estas mismas características: mismo instructor, capacidad, precio, horario y día.",
+      );
+      return;
+    }
 
     const res = await api(`/studios/${studio?.id}/classes/${editingClass.id}`, {
       method: "PUT",
@@ -459,6 +485,32 @@ function OwnerClases() {
     startMinutes + 30,
     Math.max(lastMinutes, startMinutes + 60),
   );
+
+  // Una clase igual a otra que ya existe: mismo instructor, capacidad, precio,
+  // tipo, horas y dia (o fecha, si es unica). El nombre no cuenta: dos clases
+  // con todo lo demas igual son la misma aunque se llamen distinto, y mientras
+  // no se podia crear una clase unica quedaron varias repetidas.
+  const claseRepetida = () => {
+    const inicio = convertTo24h(newClassForm.selectedTime);
+    const fin = convertTo24h(newClassForm.selectedEndTime);
+    const esPermanente = newClassForm.classType === "permanente";
+    const dias = newClassForm.selectedDays.map((d) => dayMap[d]);
+
+    return validSchedules.some((s) => {
+      if (editingClass && s.class_id === editingClass.id) return false;
+      const clase = classes.find((c) => c.id === s.class_id);
+      if (!clase) return false;
+      if (clase.instructor_id !== newClassForm.instructor_id) return false;
+      if (Number(clase.capacity) !== Number(newClassForm.capacity)) return false;
+      if (Number(clase.price) !== Number(newClassForm.price)) return false;
+      if (Boolean(s.is_permanent) !== esPermanente) return false;
+      if (s.time.slice(0, 5) !== inicio) return false;
+      if (endTimeOf(s).slice(0, 5) !== fin) return false;
+      return esPermanente
+        ? dias.includes(s.day ?? -1)
+        : s.date?.slice(0, 10) === newClassForm.selectedDate;
+    });
+  };
 
   // Cambiar la hora de inicio, o salir del horario especial, puede dejar la de
   // fin antes que la de inicio o fuera de la lista. Se empuja una hora adelante.
@@ -562,6 +614,7 @@ function OwnerClases() {
             onClick={() => {
               setPopupMode("add");
               setClassPopup(true);
+              setFormError("");
               // El select arranca en la primera hora del estudio, no en las
               // 6:00 AM: si esa hora no esta en la lista, lo que se guardaba
               // no era lo que se veia en pantalla.
@@ -653,6 +706,7 @@ function OwnerClases() {
                       setPopupMode("edit");
                       setEditingClass(clase);
                       setClassPopup(true);
+                      setFormError("");
                       setNewClassForm({
                         name: clase.name,
                         instructor_id: clase.instructor_id ?? 0,
@@ -812,7 +866,7 @@ function OwnerClases() {
                     );
                     const height = Math.max(
                       duracion * pxPerMinute - tabs * TAB_HEIGHT - CARD_GAP,
-                      TAB_HEIGHT,
+                      tabs > 0 ? TAB_HEIGHT : MIN_CARD_HEIGHT,
                     );
 
                     return ordered.map((s, k) => {
@@ -849,7 +903,10 @@ function OwnerClases() {
                             tabs > 0 ? "cursor-pointer shadow-sm" : ""
                           } ${isFront ? "" : "rounded-b-none"}`}
                         >
-                          <p className="text-xs font-medium text-[#1b2c44] leading-tight truncate">
+                          {/* Sin `truncate`: el nombre se acomoda en varias
+                              lineas antes que salir cortado, porque es lo que
+                              distingue dos clases del mismo instructor. */}
+                          <p className="text-xs font-medium text-[#1b2c44] leading-tight break-words">
                             {s.name}
                           </p>
                           <p className="text-xs text-[#33506f] leading-tight truncate">
@@ -1212,6 +1269,15 @@ function OwnerClases() {
                     </label>
                   </div>
                 </div>
+              )}
+
+              {formError && (
+                <p
+                  role="alert"
+                  className="text-md text-red-600 bg-red-50 rounded-xl px-4 py-3"
+                >
+                  {formError}
+                </p>
               )}
 
               <div className="flex gap-3 mt-2">
