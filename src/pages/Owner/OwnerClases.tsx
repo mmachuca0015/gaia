@@ -147,18 +147,20 @@ const TONES = [
   { bg: "#8fb0d9", edge: "#33506f" },
 ];
 
-// Lo que asoma de una clase que esta detras: su pestaña, con el nombre. Tiene
-// que dar para una linea de texto completa, o el nombre se corta a la mitad.
-const TAB_HEIGHT = 18;
+// Lo que asoma de una clase que esta detras: su pestaña, con el nombre. Con 18
+// el nombre entraba justo y quedaba pegado al borde de la de enfrente, que se
+// leia como si estuviera cortado.
+const TAB_HEIGHT = 22;
 
 // El hueco que se le quita a cada tarjeta por abajo. Sin el, una clase que
 // termina justo cuando empieza la siguiente se pega a ella y las dos parecen
 // una sola tarjeta.
 const CARD_GAP = 3;
 
-// Lo minimo que mide una tarjeta: dos lineas de texto. Una clase de media hora
-// se sale un poco de su hueco antes que esconder al instructor, que es lo que
-// dice cual es cual cuando dos clases se llaman igual.
+// Lo minimo que mide una tarjeta: dos lineas de texto. Es un minimo, no un
+// alto fijo: la tarjeta crece si el nombre necesita dos renglones. Se sale un
+// poco de su hueco antes que cortar el nombre o esconder al instructor, que es
+// lo que dice cual es cual cuando dos clases se llaman igual.
 const MIN_CARD_HEIGHT = 34;
 
 // Alto de una hora. Una clase dura una hora, asi que ese es tambien el alto de
@@ -848,7 +850,7 @@ function OwnerClases() {
                     </div>
                   ))}
 
-                  {byColumn[column]?.map(({ key, startMinutes, clases }) => {
+                  {byColumn[column]?.map(({ key, startMinutes, clases }, grupo) => {
                     // Las de atras asoman por arriba; la de delante ocupa el
                     // resto. Al hacer clic en una pestaña, esa pasa al frente y
                     // el monton rota (de ahi la animacion).
@@ -864,9 +866,9 @@ function OwnerClases() {
                     const duracion = Math.max(
                       ...clases.map((c) => minutesAt(endTimeOf(c)) - startMinutes),
                     );
-                    const height = Math.max(
+                    const minHeight = Math.max(
                       duracion * pxPerMinute - tabs * TAB_HEIGHT - CARD_GAP,
-                      tabs > 0 ? TAB_HEIGHT : MIN_CARD_HEIGHT,
+                      MIN_CARD_HEIGHT,
                     );
 
                     return ordered.map((s, k) => {
@@ -894,8 +896,10 @@ function OwnerClases() {
                           title={`${s.name}${s.instructor ? ` · ${s.instructor}` : ""}`}
                           style={{
                             top: top + k * TAB_HEIGHT,
-                            height,
-                            zIndex: k + 1,
+                            minHeight,
+                            // Por grupo, para que una clase que se estiro no
+                            // tape a la que empieza despues.
+                            zIndex: grupo * 10 + k + 1,
                             backgroundColor: tone.bg,
                             borderLeftColor: tone.edge,
                           }}
@@ -905,15 +909,21 @@ function OwnerClases() {
                         >
                           {/* Sin `truncate`: el nombre se acomoda en varias
                               lineas antes que salir cortado, porque es lo que
-                              distingue dos clases del mismo instructor. */}
-                          <p className="text-xs font-medium text-[#1b2c44] leading-tight break-words">
+                              distingue dos clases del mismo instructor. Parte
+                              por espacios, no a media palabra. */}
+                          <p className="text-xs font-medium text-[#1b2c44] leading-tight">
                             {s.name}
                           </p>
-                          <p className="text-xs text-[#33506f] leading-tight truncate">
-                            {s.is_permanent
-                              ? s.instructor
-                              : `Única · ${s.instructor ?? ""}`}
-                          </p>
+                          {/* En la pestaña de una clase de atras solo cabe el
+                              nombre: el instructor asomaria cortado por la
+                              mitad. Se ve completo al traerla al frente. */}
+                          {isFront && (
+                            <p className="text-xs text-[#33506f] leading-tight truncate">
+                              {s.is_permanent
+                                ? s.instructor
+                                : `Única · ${s.instructor ?? ""}`}
+                            </p>
+                          )}
                         </div>
                       );
                     });
