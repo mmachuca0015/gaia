@@ -43,4 +43,19 @@ async function viewerIsDemo(user) {
   return rows[0]?.is_demo === true;
 }
 
-module.exports = { STUDIO_PUBLISHED, studioVisibleTo, viewerIsDemo };
+// "Desde $X / clase" del catalogo: la clase mas barata que el estudio tiene
+// con horario, calculada cada vez. La columna studios.price_from era un
+// numero fijo que nadie actualizaba, y mostraba precios que ya no existian.
+// Null si el estudio aun no tiene clases.
+const STUDIO_PRICE_FROM = `(
+  SELECT MIN(c.price) FROM classes c
+  WHERE c.studio_id = studios.id
+    AND EXISTS (SELECT 1 FROM schedules s WHERE s.class_id = c.id)
+)`;
+
+module.exports = {
+  STUDIO_PUBLISHED,
+  STUDIO_PRICE_FROM,
+  studioVisibleTo,
+  viewerIsDemo,
+};

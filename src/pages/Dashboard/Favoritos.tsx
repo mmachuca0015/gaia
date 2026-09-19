@@ -10,7 +10,8 @@ function Favoritos() {
     cover_url: string;
     is_open: boolean;
     rating: number;
-    price_from: number;
+    /** Clase mas barata del estudio; null si aun no tiene clases. */
+    min_price: number | null;
     neighborhood: string;
   };
 
@@ -50,7 +51,7 @@ function Favoritos() {
               is_open={studio.is_open}
               name={studio.name}
               rating={studio.rating}
-              price_from={studio.price_from}
+              price_from={studio.min_price}
               neighborhood={studio.neighborhood}
             />
           </div>

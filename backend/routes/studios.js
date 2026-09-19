@@ -11,7 +11,11 @@ const {
   requireStudioOwner,
 } = require("../middleware/auth");
 const { redeemCoupon } = require("./coupons");
-const { studioVisibleTo, viewerIsDemo } = require("../services/catalog");
+const {
+  STUDIO_PRICE_FROM,
+  studioVisibleTo,
+  viewerIsDemo,
+} = require("../services/catalog");
 const { REVENUE_ROWS } = require("../services/revenue");
 
 // Los estudios demo solo existen para los usuarios demo. Para cualquier otro
@@ -29,7 +33,8 @@ const MIN_PASSWORD_LENGTH = 8;
 router.get("/", optionalAuth, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT * FROM studios WHERE ${studioVisibleTo("$1")}
+      `SELECT studios.*, ${STUDIO_PRICE_FROM} AS min_price
+       FROM studios WHERE ${studioVisibleTo("$1")}
        ORDER BY is_active DESC, created_at ASC`,
       [await viewerIsDemo(req.user)],
     );
@@ -266,7 +271,7 @@ router.get("/favorites/:userId", requireAuth, async (req, res) => {
       studios.cover_url,
       studios.neighborhood,
       studios.rating,
-      studios.price_from, studios.is_open
+      ${STUDIO_PRICE_FROM} AS min_price, studios.is_open
       FROM favorites
       JOIN studios ON studios.id = favorites.studio_id
       WHERE favorites.user_id = $1

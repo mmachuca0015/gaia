@@ -7,7 +7,8 @@ type StudioCardProps = {
   is_open: boolean;
   name: string;
   rating: number;
-  price_from: number;
+  /** Clase mas barata del estudio; null si aun no tiene clases. */
+  price_from: number | null;
   neighborhood: string;
   /** Distancia desde el alumno; null si no compartio su ubicacion. */
   distanceKm?: number | null;
@@ -49,7 +50,11 @@ function Studiocard({
         </div>
 
         <div className="flex flex-wrap items-center gap-x-2 text-sm text-slate-400 mb-4">
-          <span>Desde ${price_from} / clase</span>
+          <span>
+            {price_from != null
+              ? `Desde $${price_from} / clase`
+              : "Sin clases todavía"}
+          </span>
           <span>·</span>
           <span>{neighborhood}</span>
           {distanceKm != null && (

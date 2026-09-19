@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import StudioCard from "../../components/StudioCard";
-import { Search } from "lucide-react";
+import { ChevronDown, Search } from "lucide-react";
 
 import { api } from "../../lib/api";
 import { distanceKm, getUserLocation, type Coords } from "../../lib/location";
@@ -13,7 +13,8 @@ function Explorar() {
     cover_url: string;
     is_open: boolean;
     rating: number;
-    price_from: number;
+    /** Clase mas barata del estudio; null si aun no tiene clases. */
+    min_price: number | null;
     neighborhood: string;
     latitude: string | null;
     longitude: string | null;
@@ -25,8 +26,10 @@ function Explorar() {
       .then((data) => setStudios(data));
   }, []);
 
-  const filters = ["Más cerca", "Mejor rating", "Mayor precio", "Menor precio"];
-  const [activeFilter, setActiveFilter] = useState("Más cerca");
+  type Filter = "Más cerca" | "Menor precio" | "Mayor precio";
+  const [activeFilter, setActiveFilter] = useState<Filter>("Más cerca");
+  const [priceMenuOpen, setPriceMenuOpen] = useState(false);
+  const priceActive = activeFilter !== "Más cerca";
   const [search, setSearch] = useState("");
 
   // Ubicacion del alumno, solo para "Más cerca". Se pide al elegir el filtro
@@ -58,9 +61,16 @@ function Explorar() {
     })
     .sort((a, b) => {
       if (a.is_open !== b.is_open) return a.is_open ? -1 : 1;
-      if (activeFilter === "Mejor rating") return b.rating - a.rating;
-      if (activeFilter === "Menor precio") return a.price_from - b.price_from;
-      if (activeFilter === "Mayor precio") return b.price_from - a.price_from;
+      // Por precio: los que aun no tienen clases van al final en los dos
+      // sentidos.
+      if (priceActive) {
+        if (a.min_price == null || b.min_price == null) {
+          return a.min_price == null ? (b.min_price == null ? 0 : 1) : -1;
+        }
+        return activeFilter === "Menor precio"
+          ? a.min_price - b.min_price
+          : b.min_price - a.min_price;
+      }
       // Más cerca: el mas cercano primero; los que no tienen ubicacion, al
       // final.
       const da = distanceTo(a) ?? Infinity;
@@ -108,23 +118,66 @@ function Explorar() {
 
       {/* Filtros */}
       <div className="flex flex-wrap gap-2 mb-6">
-        {filters.map((filter) => (
+        <button
+          onClick={() => {
+            setActiveFilter("Más cerca");
+            setPriceMenuOpen(false);
+            // Volver a elegir "Más cerca" reintenta si antes no hubo permiso.
+            setLocationAttempt((n) => n + 1);
+          }}
+          className={`px-5 py-2 rounded-full text-sm transition-colors cursor-pointer ${
+            !priceActive
+              ? "bg-[#1b2c44] text-white"
+              : "bg-white text-slate-600 border border-slate-200 hover:border-slate-400"
+          }`}
+        >
+          Más cerca
+        </button>
+
+        {/* Precio: un boton que abre "Menor precio" / "Mayor precio" */}
+        <div className="relative">
           <button
-            key={filter}
-            onClick={() => {
-              setActiveFilter(filter);
-              // Volver a elegir "Más cerca" reintenta si antes no hubo permiso.
-              if (filter === "Más cerca") setLocationAttempt((n) => n + 1);
-            }}
-            className={`px-5 py-2 rounded-full text-sm transition-colors ${
-              activeFilter === filter
+            onClick={() => setPriceMenuOpen((open) => !open)}
+            className={`flex items-center gap-1.5 px-5 py-2 rounded-full text-sm transition-colors cursor-pointer ${
+              priceActive
                 ? "bg-[#1b2c44] text-white"
-                : "bg-white text-slate-600 border border-slate-200 hover:border-slate-400 cursor-pointer"
+                : "bg-white text-slate-600 border border-slate-200 hover:border-slate-400"
             }`}
           >
-            {filter}
+            {priceActive ? activeFilter : "Precio"}
+            <ChevronDown
+              size={15}
+              className={`transition-transform ${priceMenuOpen ? "rotate-180" : ""}`}
+            />
           </button>
-        ))}
+          {priceMenuOpen && (
+            <>
+              {/* Clic fuera del menu lo cierra */}
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setPriceMenuOpen(false)}
+              />
+              <div className="absolute left-0 mt-2 z-20 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden min-w-[160px]">
+                {(["Menor precio", "Mayor precio"] as const).map((option) => (
+                  <button
+                    key={option}
+                    onClick={() => {
+                      setActiveFilter(option);
+                      setPriceMenuOpen(false);
+                    }}
+                    className={`block w-full text-left px-4 py-2.5 text-sm transition-colors cursor-pointer ${
+                      activeFilter === option
+                        ? "bg-[#e8eef7] text-[#1b2c44] font-medium"
+                        : "text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {activeFilter === "Más cerca" && locationDenied && (
@@ -144,7 +197,7 @@ function Explorar() {
               is_open={studio.is_open}
               name={studio.name}
               rating={studio.rating}
-              price_from={studio.price_from}
+              price_from={studio.min_price}
               neighborhood={studio.neighborhood}
               distanceKm={distanceTo(studio)}
             />

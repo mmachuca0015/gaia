@@ -162,6 +162,10 @@ así que el neto de Wellco es aproximado, no exacto al centavo.
   `STUDIO_PUBLISHED`): `activa` sí; `pendiente` y `vencida` solo hasta
   `paid_until`; `cancelada` no; sin fila (heredados) sí. Si no se publica, no
   sale en `GET /studios` y `/payments/charge` rechaza la reserva.
+- **"Desde $X / clase"** del catálogo y favoritos es `min_price`
+  (`STUDIO_PRICE_FROM` en `services/catalog.js`): la clase más barata con
+  horario, calculada en cada consulta. La columna `studios.price_from` es un
+  número fijo que nadie actualiza; no la uses para mostrar precios.
 - **`paid_until` ≠ `current_period_end`.** `paid_until` es el último día
   cubierto por un cobro exitoso y lo escribe `invoice.paid` con el fin del
   periodo de las líneas de la factura (no `invoice.period_end`, que en una
