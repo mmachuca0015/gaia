@@ -1,6 +1,8 @@
 // Las sucursales del dueño. Cada una es un estudio: su direccion, su horario,
 // sus clases y sus imagenes. Lo que las agrupa es la cuenta del dueño, y
 // cuantas puede tener lo dice su plan (Basic 1, Pro 3).
+import { useCallback, useEffect, useState } from "react";
+
 import { apiJson } from "./api";
 import type { StudioHour } from "./hours";
 
@@ -78,4 +80,73 @@ export function deleteBranch(id: number) {
 /** Lo que dice la pestaña. Sin nombre capturado, se numeran. */
 export function branchLabel(branch: Branch, index: number) {
   return branch.branch_name?.trim() || `Sucursal ${index + 1}`;
+}
+
+// La sucursal abierta se recuerda entre pantallas: si el dueño esta viendo
+// Providencia y se va a Reservas, sigue en Providencia. Vive en localStorage
+// porque es estado de presentacion, como el nombre y el rol; el backend nunca
+// lo mira, y toda ruta comprueba que la sucursal sea suya.
+const STORAGE_KEY = "wellco_branch";
+
+function storedBranch(): number | null {
+  try {
+    const raw = Number(localStorage.getItem(STORAGE_KEY));
+    return Number.isInteger(raw) && raw > 0 ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Las sucursales del dueño y cual esta abierta. Lo usan las seis pantallas
+ * del panel, para que las pestañas digan lo mismo en todas.
+ */
+export function useBranches() {
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [maxStudios, setMaxStudios] = useState(1);
+  const [activeId, setActiveIdState] = useState<number | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  const setActiveId = useCallback((id: number) => {
+    setActiveIdState(id);
+    try {
+      localStorage.setItem(STORAGE_KEY, String(id));
+    } catch {
+      // Modo privado o almacenamiento bloqueado: se pierde al cambiar de
+      // pantalla, pero la pagina sigue funcionando.
+    }
+  }, []);
+
+  const apply = useCallback((data: BranchesResponse) => {
+    setBranches(data.branches);
+    setMaxStudios(data.max_studios);
+    // La guardada puede ya no existir (se borro, o es de otra cuenta que uso
+    // este navegador): en ese caso se cae a la primera.
+    setActiveIdState((current) => {
+      const elegida = current ?? storedBranch();
+      return elegida && data.branches.some((b) => b.id === elegida)
+        ? elegida
+        : (data.branches[0]?.id ?? null);
+    });
+    setLoaded(true);
+  }, []);
+
+  /** Para volver a pedirlas despues de crear o borrar una. */
+  const reload = useCallback(() => fetchBranches().then(apply), [apply]);
+
+  useEffect(() => {
+    // `cancelled` evita pintar la respuesta de una pantalla que el dueño ya
+    // dejo atras.
+    let cancelled = false;
+    fetchBranches().then((data) => {
+      if (!cancelled) apply(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [apply]);
+
+  const studio = branches.find((b) => b.id === activeId) ?? null;
+
+  return { branches, studio, activeId, setActiveId, maxStudios, loaded, reload };
 }

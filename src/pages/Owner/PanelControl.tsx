@@ -13,6 +13,8 @@ import {
 
 import { api } from "../../lib/api";
 import ShareStudioButton from "../../components/ShareStudioButton";
+import BranchTabs from "../../components/BranchTabs";
+import { useBranches } from "../../lib/branches";
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -112,19 +114,9 @@ function activityText(item: Actividad) {
 }
 
 function PanelControl() {
-  const owner = JSON.parse(localStorage.getItem("user") || "{}");
-
-  type Studio = {
-    id: number;
-    name: string;
-  };
-
-  const [studio, setStudio] = useState<Studio | null>(null);
-  useEffect(() => {
-    api(`/studios/owner/${owner.id}`)
-      .then((res) => res.json())
-      .then((data) => setStudio(data));
-  }, [owner.id]);
+  // Las metricas son de una sucursal: al cambiar de pestaña se piden las de
+  // la otra.
+  const { branches, studio, activeId, setActiveId } = useBranches();
   const studioId = studio?.id;
 
   const [activeFilter, setActiveFilter] = useState<Period>("hoy");
@@ -139,6 +131,11 @@ function PanelControl() {
   const [activityHasMore, setActivityHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
+  // De que sucursal es lo que hay en la lista. Al cambiar de pestaña hay que
+  // reemplazarla: el refresco solo agrega arriba, y sin esto se mezclaba la
+  // actividad de las dos sucursales.
+  const activityStudio = useRef<number | undefined>(undefined);
+
   // Primera pagina de la actividad. Al refrescar no se reemplaza la lista
   // (el dueño pudo haber bajado y cargado mas): solo se agregan arriba los
   // elementos nuevos.
@@ -147,8 +144,10 @@ function PanelControl() {
     api(`/studios/${studioId}/actividad-reciente`)
       .then((res) => res.json())
       .then((page: ActivityPage) => {
+        const otraSucursal = activityStudio.current !== studioId;
+        activityStudio.current = studioId;
         setActividad((current) => {
-          if (current.length === 0) {
+          if (otraSucursal || current.length === 0) {
             setActivityHasMore(page.has_more);
             return page.items;
           }
@@ -272,6 +271,14 @@ function PanelControl() {
               label="Copiar link del estudio"
             />
           )}
+        </div>
+
+        <div className="mb-6">
+          <BranchTabs
+            branches={branches}
+            activeId={activeId}
+            onSelect={setActiveId}
+          />
         </div>
 
         {/* Layout de dos columnas */}

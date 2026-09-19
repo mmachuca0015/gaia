@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { CalendarCheck } from "lucide-react";
 
 import { api } from "../../lib/api";
+import BranchTabs from "../../components/BranchTabs";
+import { useBranches } from "../../lib/branches";
 // Forma de GET /studios/:id/reservas. `reservas_count` y `available_spots`
 // vienen de un COUNT, asi que Postgres los manda como texto, no como number.
 type Reserva = {
@@ -23,12 +25,10 @@ type ReservaUser = {
 };
 
 function OwnerReservas() {
-  type Studio = {
-    id: number;
-  };
-  const owner = JSON.parse(localStorage.getItem("user") || "{}");
+  // Las reservas son de una sucursal: al cambiar de pestaña se piden las de
+  // la otra.
+  const { branches, studio, activeId, setActiveId } = useBranches();
 
-  const [studio, setStudio] = useState<Studio | null>(null);
   const [reservations, setReservations] = useState<Reserva[]>([]);
   const [activeTab, setActiveTab] = useState<"proximas" | "pasadas">(
     "proximas",
@@ -36,14 +36,6 @@ function OwnerReservas() {
   const [showDetails, setShowDetails] = useState(false);
   const [selectedReserva, setSelectedReserva] = useState<Reserva | null>(null);
   const [reservaUsers, setReservaUsers] = useState<ReservaUser[]>([]);
-
-  useEffect(() => {
-    api(`/studios/owner/${owner.id}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setStudio(data);
-      });
-  }, [owner.id]);
 
   useEffect(() => {
     if (!studio?.id) return;
@@ -80,8 +72,14 @@ function OwnerReservas() {
         </h1>
       </div>
 
+      <BranchTabs
+        branches={branches}
+        activeId={activeId}
+        onSelect={setActiveId}
+      />
+
       {/* Tabs */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-6 mt-6">
         {(["proximas", "pasadas"] as const).map((tab) => (
           <button
             key={tab}

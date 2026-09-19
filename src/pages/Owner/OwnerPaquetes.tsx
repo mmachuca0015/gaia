@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Package, Pencil, Plus } from "lucide-react";
 
-import { ApiError, apiJson, getCachedUser } from "../../lib/api";
+import { ApiError, apiJson } from "../../lib/api";
+import BranchTabs from "../../components/BranchTabs";
+import { useBranches } from "../../lib/branches";
 import {
   VALIDITY_OPTIONS,
   classesText,
@@ -89,18 +91,13 @@ function saleWindowText(p: StudioPackage) {
 }
 
 function OwnerPaquetes() {
-  const ownerId = getCachedUser()?.id;
-  const [studioId, setStudioId] = useState<number | null>(null);
+  // Los paquetes son de una sucursal: al cambiar de pestaña se piden los de
+  // la otra.
+  const { branches, studio, activeId, setActiveId } = useBranches();
+  const studioId = studio?.id ?? null;
   const [packages, setPackages] = useState<OwnerPackage[]>([]);
   const [classes, setClasses] = useState<PackageClass[]>([]);
   const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    if (!ownerId) return;
-    apiJson<{ id: number }>(`/studios/owner/${ownerId}`).then((s) =>
-      setStudioId(s.id),
-    );
-  }, [ownerId]);
 
   const load = useCallback(() => {
     if (!studioId) return;
@@ -250,6 +247,14 @@ function OwnerPaquetes() {
           <Plus size={20} />
           Agregar paquete
         </button>
+      </div>
+
+      <div className="mb-6">
+        <BranchTabs
+          branches={branches}
+          activeId={activeId}
+          onSelect={setActiveId}
+        />
       </div>
 
       {loaded && packages.length === 0 && (

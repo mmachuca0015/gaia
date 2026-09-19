@@ -1,17 +1,13 @@
-import { useState, useEffect, useCallback } from "react";
-import { ArrowLeft, MoreVertical, Plus } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 
 import { api, apiJson, ApiError } from "../../lib/api";
 import StudioHoursEditor from "../../components/StudioHoursEditor";
 import BranchForm from "../../components/BranchForm";
-import {
-  branchLabel,
-  deleteBranch,
-  fetchBranches,
-  type Branch,
-} from "../../lib/branches";
+import BranchTabs from "../../components/BranchTabs";
+import { branchLabel, deleteBranch, useBranches } from "../../lib/branches";
 import {
   DAY_NAMES,
   WEEK_ORDER,
@@ -20,7 +16,6 @@ import {
   validateWeek,
   weekFrom,
   type DayHours,
-  type StudioHour,
 } from "../../lib/hours";
 // Respuesta de api.zippopotam.us: las claves llevan espacio, tal cual las
 // manda ese servicio.
@@ -50,34 +45,19 @@ function DraggableMarker({
 function OwnerEstudioGeneral() {
   const navigate = useNavigate();
 
-  // Todas las sucursales del dueño; la pestaña activa decide cual se edita.
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [maxStudios, setMaxStudios] = useState(1);
-  const [activeId, setActiveId] = useState<number | null>(null);
-  const [loaded, setLoaded] = useState(false);
-
-  const reloadStudio = useCallback(async () => {
-    const data = await fetchBranches();
-    setBranches(data.branches);
-    setMaxStudios(data.max_studios);
-    // Si la sucursal abierta ya no existe (se borro), se cae a la primera.
-    setActiveId((current) =>
-      current && data.branches.some((b) => b.id === current)
-        ? current
-        : (data.branches[0]?.id ?? null),
-    );
-    setLoaded(true);
-  }, []);
-
-  useEffect(() => {
-    reloadStudio();
-  }, [reloadStudio]);
-
-  const studio = branches.find((b) => b.id === activeId) ?? null;
+  // La pestaña activa decide que sucursal se edita, y se recuerda al cambiar
+  // de pantalla.
+  const {
+    branches,
+    studio,
+    activeId,
+    setActiveId,
+    maxStudios,
+    loaded,
+    reload: reloadStudio,
+  } = useBranches();
   const studioIndex = branches.findIndex((b) => b.id === activeId);
 
-  // Menu de los tres puntos y borrado, por sucursal.
-  const [menuOpen, setMenuOpen] = useState(false);
   const [showBranchForm, setShowBranchForm] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -275,97 +255,27 @@ function OwnerEstudioGeneral() {
         {/* Sucursales. Cada una es un estudio con su direccion, su horario y
             sus clases; el plan dice cuantas caben. */}
         <div className="max-w-2xl mx-auto mb-4">
-          <div className="flex items-end gap-1 flex-wrap border-b border-slate-200">
-            {branches.map((branch, i) => {
-              const activa = branch.id === activeId;
-              return (
-                <div key={branch.id} className="relative">
-                  <div
-                    className={`flex items-center gap-1 rounded-t-xl border-b-2 transition-colors ${
-                      activa
-                        ? "bg-white border-[#1b2c44]"
-                        : "border-transparent"
-                    }`}
-                  >
-                    <button
-                      onClick={() => {
-                        setActiveId(branch.id);
-                        setMenuOpen(false);
-                      }}
-                      className={`flex items-center gap-2 pl-4 py-2.5 text-md cursor-pointer ${
-                        activa
-                          ? "text-slate-800 font-medium pr-1"
-                          : "text-slate-500 hover:text-slate-700 pr-4"
-                      }`}
-                    >
-                      {branchLabel(branch, i)}
-                      {!branch.complete && (
-                        <span
-                          title="Le falta información"
-                          className="w-1.5 h-1.5 rounded-full bg-amber-500"
-                        />
-                      )}
-                    </button>
-                    {activa && (
-                      <button
-                        onClick={() => setMenuOpen((open) => !open)}
-                        aria-label="Opciones de la sucursal"
-                        className="pr-2 py-2.5 text-slate-400 hover:text-slate-700 cursor-pointer"
-                      >
-                        <MoreVertical size={16} />
-                      </button>
-                    )}
-                  </div>
-
-                  {activa && menuOpen && (
-                    <>
-                      {/* Capa para cerrar el menu al hacer clic fuera. */}
-                      <div
-                        className="fixed inset-0 z-10"
-                        onClick={() => setMenuOpen(false)}
-                      />
-                      <div className="absolute left-0 top-full mt-1 z-20 w-56 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden">
-                        <button
-                          onClick={() => {
-                            setMenuOpen(false);
-                            setModalError("");
-                            setEditForm({
-                              ...editForm,
-                              branch_name: branch.branch_name || "",
-                            });
-                            setEditMode("branchName");
-                          }}
-                          className="w-full text-left px-4 py-3 text-md text-slate-700 hover:bg-slate-50 cursor-pointer"
-                        >
-                          Cambiar nombre
-                        </button>
-                        <button
-                          onClick={() => {
-                            setMenuOpen(false);
-                            setModalError("");
-                            setEditMode("deleteBranch");
-                          }}
-                          className="w-full text-left px-4 py-3 text-md text-red-500 hover:bg-red-50 border-t border-slate-100 cursor-pointer"
-                        >
-                          Borrar sucursal
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              );
-            })}
-
-            {branches.length < maxStudios && (
-              <button
-                onClick={() => setShowBranchForm(true)}
-                className="flex items-center gap-1.5 px-4 py-2.5 text-md text-[#1b2c44] font-medium hover:text-[#33506f] transition-colors cursor-pointer"
-              >
-                <Plus size={16} />
-                Agregar sucursal
-              </button>
-            )}
-          </div>
+          <BranchTabs
+            branches={branches}
+            activeId={activeId}
+            onSelect={setActiveId}
+            actions={{
+              canAdd: branches.length < maxStudios,
+              onAdd: () => setShowBranchForm(true),
+              onRename: (branch) => {
+                setModalError("");
+                setEditForm({
+                  ...editForm,
+                  branch_name: branch.branch_name || "",
+                });
+                setEditMode("branchName");
+              },
+              onDelete: () => {
+                setModalError("");
+                setEditMode("deleteBranch");
+              },
+            }}
+          />
         </div>
 
         {!studio.complete && (

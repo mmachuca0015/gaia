@@ -3,6 +3,8 @@ import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
 
 import { api } from "../../lib/api";
+import BranchTabs from "../../components/BranchTabs";
+import { useBranches } from "../../lib/branches";
 // GET /studios/:id/instructors. `classes_per_week` sale de un COUNT, asi que
 // Postgres lo manda como texto.
 type Instructor = {
@@ -15,18 +17,9 @@ type Instructor = {
 };
 
 function OwnerInstructors() {
-  //Obtener datos del estudio
-  type Studio = {
-    id: number;
-    name: string;
-  };
-  const owner = JSON.parse(localStorage.getItem("user") || "{}");
-  const [studio, setStudio] = useState<Studio | null>(null);
-  useEffect(() => {
-    api(`/studios/owner/${owner.id}`)
-      .then((res) => res.json())
-      .then((data) => setStudio(data));
-  }, [owner.id]);
+  // Los instructores son de una sucursal: al cambiar de pestaña se piden los
+  // de la otra.
+  const { branches, studio, activeId, setActiveId } = useBranches();
   const studioId = studio?.id;
   //Obtener instructores del estudio
   const [instructors, setInstructors] = useState<Instructor[]>([]);
@@ -126,7 +119,13 @@ function OwnerInstructors() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <BranchTabs
+          branches={branches}
+          activeId={activeId}
+          onSelect={setActiveId}
+        />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
           {instructors.map((instructor) => (
             <InstructorCard
               key={instructor.id}

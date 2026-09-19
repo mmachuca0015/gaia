@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import ClassManagementCard from "../../components/ClassManagementCard";
 import { WEEK_ORDER, type StudioHour } from "../../lib/hours";
+import BranchTabs from "../../components/BranchTabs";
+import { useBranches } from "../../lib/branches";
 
 import { api } from "../../lib/api";
 // GET /studios/:id/classes (classes.* mas el nombre del instructor ya unido).
@@ -198,15 +200,10 @@ function useColumns() {
 }
 
 function OwnerClases() {
-  type Studio = {
-    id: number;
-    name: string;
-    // GET /studios/owner/:id ya trae el horario de atencion (studio_hours).
-    hours: StudioHour[];
-  };
-  const owner = JSON.parse(localStorage.getItem("user") || "{}");
+  // Las clases y el horario son de una sucursal: al cambiar de pestaña, el
+  // calendario y las tarjetas se rehacen con los de la otra.
+  const { branches, studio, activeId, setActiveId } = useBranches();
 
-  const [studio, setStudio] = useState<Studio | null>(null);
   const [classes, setClasses] = useState<Clase[]>([]);
   const [schedules, setSchedules] = useState<Horario[]>([]);
   const [classPopup, setClassPopup] = useState(false);
@@ -245,14 +242,6 @@ function OwnerClases() {
   const [page, setPage] = useState(1);
   const perPage = useColumns() * 2;
   const totalPages = Math.max(1, Math.ceil(classes.length / perPage));
-
-  useEffect(() => {
-    api(`/studios/owner/${owner.id}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setStudio(data);
-      });
-  }, [owner.id]);
 
   useEffect(() => {
     if (!studio?.id) return;
@@ -632,6 +621,14 @@ function OwnerClases() {
             <Plus size={20} />
             Agregar clase
           </button>
+        </div>
+
+        <div className="mb-6">
+          <BranchTabs
+            branches={branches}
+            activeId={activeId}
+            onSelect={setActiveId}
+          />
         </div>
         {totalPages > 1 && (
           <div className="flex items-center justify-end gap-3 mb-3">
