@@ -1,6 +1,34 @@
 // Que estudios estan publicados para los clientes.
 const pool = require("../db");
 
+// Los campos que tiene que tener una sucursal para salir en el catalogo. El
+// registro solo pide nombre, estado, telefono y horario, asi que un estudio
+// recien creado esta incompleto a proposito: el panel le dice al dueño que le
+// falta y no lo publica hasta que lo llene. `int_number` no cuenta, no todos
+// los locales tienen.
+//
+// Es un fragmento de WHERE que espera la tabla `studios` en la consulta.
+const STUDIO_COMPLETE = `(
+  btrim(COALESCE(studios.name, '')) <> ''
+  AND btrim(COALESCE(studios.description, '')) <> ''
+  AND btrim(COALESCE(studios.street, '')) <> ''
+  AND btrim(COALESCE(studios.ext_number, '')) <> ''
+  AND btrim(COALESCE(studios.neighborhood, '')) <> ''
+  AND btrim(COALESCE(studios.zip_code, '')) <> ''
+  AND btrim(COALESCE(studios.city, '')) <> ''
+  AND btrim(COALESCE(studios.state, '')) <> ''
+  AND btrim(COALESCE(studios.country, '')) <> ''
+  AND studios.latitude IS NOT NULL AND studios.longitude IS NOT NULL
+  AND btrim(COALESCE(studios.phone, '')) <> ''
+  AND btrim(COALESCE(studios.logo_url, '')) <> ''
+  AND btrim(COALESCE(studios.cover_url, '')) <> ''
+  AND EXISTS (SELECT 1 FROM studio_hours h WHERE h.studio_id = studios.id)
+)`;
+
+// Una sucursal borrada sale del catalogo, pero no de la base: las reservas y
+// los ingresos cuelgan de ella.
+const STUDIO_LIVE = `studios.deleted_at IS NULL`;
+
 // Un estudio real se publica mientras su suscripcion este al corriente:
 //   - 'activa': si. Incluye la que el dueño cancelo, porque sigue activa hasta
 //     que termina el periodo que ya pago.
@@ -12,8 +40,10 @@ const pool = require("../db");
 //
 // Si no se publica, no sale en el catalogo y no acepta reservas.
 //
+// Ademas tiene que estar completo y no borrado.
+//
 // Es un fragmento de WHERE que espera la tabla `studios` en la consulta.
-const STUDIO_PUBLISHED = `NOT EXISTS (
+const STUDIO_PUBLISHED = `${STUDIO_LIVE} AND ${STUDIO_COMPLETE} AND NOT EXISTS (
   SELECT 1 FROM subscriptions sub
   WHERE sub.owner_id = studios.owner_id
     AND NOT (
@@ -29,7 +59,9 @@ const STUDIO_PUBLISHED = `NOT EXISTS (
 // usuarios demo, sin importar su suscripcion; nunca se publican para nadie
 // mas. `param` es el placeholder ($n) con el resultado de viewerIsDemo.
 function studioVisibleTo(param) {
-  return `(CASE WHEN studios.is_demo THEN ${param}::boolean
+  // El estudio demo se salta la suscripcion y lo de estar completo, que es
+  // justo lo que se esta probando, pero borrado es borrado para todos.
+  return `(${STUDIO_LIVE} AND CASE WHEN studios.is_demo THEN ${param}::boolean
                ELSE ${STUDIO_PUBLISHED} END)`;
 }
 
@@ -85,6 +117,8 @@ const STUDIO_HOURS_JSON = `COALESCE(
 
 module.exports = {
   STUDIO_PUBLISHED,
+  STUDIO_COMPLETE,
+  STUDIO_LIVE,
   STUDIO_PRICE_FROM,
   STUDIO_OPEN_NOW,
   STUDIO_HOURS_JSON,

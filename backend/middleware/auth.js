@@ -58,8 +58,10 @@ function requireStudioOwner(paramName = "id") {
       }
 
       const studioId = req.params[paramName];
+      // `deleted_at IS NULL`: una sucursal borrada ya no se toca, ni para
+      // editarla ni para colgarle clases.
       const { rows } = await pool.query(
-        "SELECT 1 FROM studios WHERE id = $1 AND owner_id = $2",
+        "SELECT 1 FROM studios WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL",
         [studioId, req.user.id],
       );
       if (rows.length === 0) {

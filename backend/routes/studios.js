@@ -19,6 +19,7 @@ const {
   viewerIsDemo,
 } = require("../services/catalog");
 const { parseHours, replaceHours } = require("../services/hours");
+const { listBranches, branchLimit } = require("../services/branches");
 const { scheduleOnDate, bookedOnDate } = require("../services/spots");
 const {
   REVENUE_ROWS,
@@ -209,6 +210,164 @@ router.post("/register-studio", async (req, res) => {
 });
 
 //Ver estudio por ID
+// Las sucursales del dueño de la sesion, con lo que le falta a cada una y
+// cuantas mas puede crear. Va antes de "/:id": Express toma la primera ruta
+// que casa, y "mine" pasaria por un id.
+router.get("/mine", requireAuth, requireRole("owner"), async (req, res) => {
+  try {
+    const [branches, maxStudios] = await Promise.all([
+      listBranches(req.user.id),
+      branchLimit(req.user.id),
+    ]);
+    res.json({ branches, max_studios: maxStudios });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al obtener tus sucursales" });
+  }
+});
+
+// Crear una sucursal. Es el mismo formulario del registro, sin la cuenta: el
+// dueño y la suscripcion ya existen.
+router.post("/mine", requireAuth, requireRole("owner"), async (req, res) => {
+  const {
+    name,
+    branch_name,
+    description,
+    street,
+    ext_number,
+    int_number,
+    neighborhood,
+    city,
+    state,
+    country,
+    zip_code,
+    latitude,
+    longitude,
+    phone,
+    logo_url,
+    cover_url,
+    hours,
+  } = req.body;
+
+  if (!name || !String(name).trim()) {
+    return res.status(400).json({ error: "Escribe el nombre de la sucursal" });
+  }
+
+  // El horario es opcional al crearla: si no viene, la sucursal nace
+  // incompleta y el panel le dice al dueño que le falta. Si viene, tiene que
+  // ser valido.
+  let parsedHours = { hours: [] };
+  if (Array.isArray(hours) && hours.length > 0) {
+    parsedHours = parseHours(hours);
+    if (parsedHours.error) {
+      return res.status(400).json({ error: parsedHours.error });
+    }
+  }
+
+  let cleanPhone = null;
+  if (phone != null && String(phone).trim() !== "") {
+    cleanPhone = parsePhone(phone);
+    if (!cleanPhone) {
+      return res
+        .status(400)
+        .json({ error: "Escribe un teléfono válido de 10 dígitos" });
+    }
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // El limite se comprueba con la fila bloqueada: sin esto, dos pestañas
+    // abiertas podian crear la cuarta sucursal de un plan de tres.
+    const { rows: actuales } = await client.query(
+      "SELECT id FROM studios WHERE owner_id = $1 AND deleted_at IS NULL FOR UPDATE",
+      [req.user.id],
+    );
+    const maxStudios = await branchLimit(req.user.id, client);
+    if (actuales.length >= maxStudios) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({
+        error:
+          maxStudios === 1
+            ? "Tu plan incluye una sola sucursal. Cambia al plan Pro para abrir más."
+            : `Tu plan incluye ${maxStudios} sucursales y ya las tienes todas.`,
+      });
+    }
+
+    const { rows } = await client.query(
+      `INSERT INTO studios
+         (name, branch_name, description, street, ext_number, int_number,
+          neighborhood, city, state, country, zip_code, latitude, longitude,
+          phone, logo_url, cover_url, owner_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+       RETURNING id`,
+      [
+        String(name).trim(),
+        branch_name?.trim() || null,
+        description || null,
+        street || null,
+        ext_number || null,
+        int_number || null,
+        neighborhood || null,
+        city || null,
+        state || null,
+        country || "México",
+        zip_code || null,
+        latitude || null,
+        longitude || null,
+        cleanPhone,
+        logo_url || null,
+        cover_url || null,
+        req.user.id,
+      ],
+    );
+    if (parsedHours.hours.length > 0) {
+      await replaceHours(client, rows[0].id, parsedHours.hours);
+    }
+
+    await client.query("COMMIT");
+    res.status(201).json({ id: rows[0].id });
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error(err);
+    res.status(500).json({ error: "Error al crear la sucursal" });
+  } finally {
+    client.release();
+  }
+});
+
+// Borrar una sucursal: se marca, no se elimina. Las reservas, los paquetes y
+// los ingresos cuelgan de ella y desaparecerian del historial. Marcada sale
+// del catalogo y libera el lugar para crear otra.
+router.delete(
+  "/mine/:id",
+  requireAuth,
+  requireRole("owner"),
+  requireStudioOwner(),
+  async (req, res) => {
+    try {
+      const { rows } = await pool.query(
+        "SELECT id FROM studios WHERE owner_id = $1 AND deleted_at IS NULL",
+        [req.user.id],
+      );
+      if (rows.length <= 1) {
+        return res.status(400).json({
+          error: "No puedes borrar tu única sucursal.",
+        });
+      }
+      await pool.query(
+        "UPDATE studios SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL",
+        [req.params.id],
+      );
+      res.json({ success: true });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Error al borrar la sucursal" });
+    }
+  },
+);
+
 router.get("/:id", optionalAuth, async (req, res) => {
   const { id } = req.params;
   try {
@@ -780,6 +939,7 @@ router.put("/:id", requireAuth, requireStudioOwner(), async (req, res) => {
     latitude,
     longitude,
     phone,
+    branch_name,
   } = req.body;
 
   // El telefono es opcional en esta ruta (cada pantalla manda solo lo que
@@ -810,7 +970,8 @@ router.put("/:id", requireAuth, requireStudioOwner(), async (req, res) => {
         logo_url = CASE WHEN $12 != '' THEN $12 ELSE logo_url END,
         latitude = CASE WHEN $13::float IS NOT NULL AND $13::float != 0 THEN $13::float ELSE latitude END,
 longitude = CASE WHEN $14::float IS NOT NULL AND $14::float != 0 THEN $14::float ELSE longitude END,
-        phone = CASE WHEN $16 != '' THEN $16 ELSE phone END
+        phone = CASE WHEN $16 != '' THEN $16 ELSE phone END,
+        branch_name = CASE WHEN $17 != '' THEN $17 ELSE branch_name END
       WHERE id = $15`,
       [
         name ?? "",
@@ -829,6 +990,7 @@ longitude = CASE WHEN $14::float IS NOT NULL AND $14::float != 0 THEN $14::float
         longitude ?? 0,
         id,
         cleanPhone,
+        branch_name ?? "",
       ],
     );
     res.json({ success: true });

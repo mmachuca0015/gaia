@@ -1,10 +1,17 @@
-import { useState, useEffect } from "react";
-import { ArrowLeft } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { ArrowLeft, MoreVertical, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 
 import { api, apiJson, ApiError } from "../../lib/api";
 import StudioHoursEditor from "../../components/StudioHoursEditor";
+import BranchForm from "../../components/BranchForm";
+import {
+  branchLabel,
+  deleteBranch,
+  fetchBranches,
+  type Branch,
+} from "../../lib/branches";
 import {
   DAY_NAMES,
   WEEK_ORDER,
@@ -42,31 +49,37 @@ function DraggableMarker({
 
 function OwnerEstudioGeneral() {
   const navigate = useNavigate();
-  type Studio = {
-    id: number;
-    name: string;
-    description: string;
-    street: string;
-    ext_number: string;
-    int_number: string;
-    neighborhood: string;
-    city: string;
-    state: string;
-    country: string;
-    zip_code: string;
-    cover_url: string;
-    logo_url: string;
-    phone: string | null;
-    /** Horario de atencion; vacio si el estudio aun no lo captura. */
-    hours: StudioHour[];
-  };
-  const owner = JSON.parse(localStorage.getItem("user") || "{}");
-  const [studio, setStudio] = useState<Studio | null>(null);
+
+  // Todas las sucursales del dueño; la pestaña activa decide cual se edita.
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [maxStudios, setMaxStudios] = useState(1);
+  const [activeId, setActiveId] = useState<number | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  const reloadStudio = useCallback(async () => {
+    const data = await fetchBranches();
+    setBranches(data.branches);
+    setMaxStudios(data.max_studios);
+    // Si la sucursal abierta ya no existe (se borro), se cae a la primera.
+    setActiveId((current) =>
+      current && data.branches.some((b) => b.id === current)
+        ? current
+        : (data.branches[0]?.id ?? null),
+    );
+    setLoaded(true);
+  }, []);
+
   useEffect(() => {
-    api(`/studios/owner/${owner.id}`)
-      .then((res) => res.json())
-      .then((data) => setStudio(data));
-  }, [owner.id]);
+    reloadStudio();
+  }, [reloadStudio]);
+
+  const studio = branches.find((b) => b.id === activeId) ?? null;
+  const studioIndex = branches.findIndex((b) => b.id === activeId);
+
+  // Menu de los tres puntos y borrado, por sucursal.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showBranchForm, setShowBranchForm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   //Paso para saber que boton hizo clic
   type EditMode =
@@ -78,6 +91,8 @@ function OwnerEstudioGeneral() {
     | "logo"
     | "phone"
     | "hours"
+    | "branchName"
+    | "deleteBranch"
     | null;
   const [editMode, setEditMode] = useState<EditMode>(null);
 
@@ -98,16 +113,12 @@ function OwnerEstudioGeneral() {
     latitude: 0,
     longitude: 0,
     phone: "",
+    branch_name: "",
   });
 
   // Horario en edicion y error de cualquiera de los pop ups.
   const [hoursDraft, setHoursDraft] = useState<DayHours[]>([]);
   const [modalError, setModalError] = useState("");
-
-  const reloadStudio = () =>
-    api(`/studios/owner/${owner.id}`)
-      .then((res) => res.json())
-      .then((data) => setStudio(data));
 
   const handleSavePhone = async () => {
     setModalError("");
@@ -177,9 +188,7 @@ function OwnerEstudioGeneral() {
     });
     if (res.ok) {
       setEditMode(null);
-      api(`/studios/owner/${owner.id}`)
-        .then((res) => res.json())
-        .then((data) => setStudio(data));
+      reloadStudio();
     }
   };
 
@@ -204,6 +213,40 @@ function OwnerEstudioGeneral() {
     20.6737, -103.348,
   ]);
 
+  const handleSaveBranchName = async () => {
+    setModalError("");
+    try {
+      await apiJson(`/studios/${studio?.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ branch_name: editForm.branch_name }),
+      });
+      setEditMode(null);
+      reloadStudio();
+    } catch (err) {
+      setModalError(
+        err instanceof ApiError ? err.message : "No pudimos guardar el nombre",
+      );
+    }
+  };
+
+  const handleDeleteBranch = async () => {
+    if (!studio) return;
+    setModalError("");
+    setDeleting(true);
+    try {
+      await deleteBranch(studio.id);
+      setEditMode(null);
+      reloadStudio();
+    } catch (err) {
+      setModalError(
+        err instanceof ApiError ? err.message : "No pudimos borrar la sucursal",
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  if (!loaded) return null;
   if (!studio) return null;
   return (
     <div>
@@ -228,6 +271,114 @@ function OwnerEstudioGeneral() {
             </span>
           </h1>
         </div>
+
+        {/* Sucursales. Cada una es un estudio con su direccion, su horario y
+            sus clases; el plan dice cuantas caben. */}
+        <div className="max-w-2xl mx-auto mb-4">
+          <div className="flex items-end gap-1 flex-wrap border-b border-slate-200">
+            {branches.map((branch, i) => {
+              const activa = branch.id === activeId;
+              return (
+                <div key={branch.id} className="relative">
+                  <div
+                    className={`flex items-center gap-1 rounded-t-xl border-b-2 transition-colors ${
+                      activa
+                        ? "bg-white border-[#1b2c44]"
+                        : "border-transparent"
+                    }`}
+                  >
+                    <button
+                      onClick={() => {
+                        setActiveId(branch.id);
+                        setMenuOpen(false);
+                      }}
+                      className={`flex items-center gap-2 pl-4 py-2.5 text-md cursor-pointer ${
+                        activa
+                          ? "text-slate-800 font-medium pr-1"
+                          : "text-slate-500 hover:text-slate-700 pr-4"
+                      }`}
+                    >
+                      {branchLabel(branch, i)}
+                      {!branch.complete && (
+                        <span
+                          title="Le falta información"
+                          className="w-1.5 h-1.5 rounded-full bg-amber-500"
+                        />
+                      )}
+                    </button>
+                    {activa && (
+                      <button
+                        onClick={() => setMenuOpen((open) => !open)}
+                        aria-label="Opciones de la sucursal"
+                        className="pr-2 py-2.5 text-slate-400 hover:text-slate-700 cursor-pointer"
+                      >
+                        <MoreVertical size={16} />
+                      </button>
+                    )}
+                  </div>
+
+                  {activa && menuOpen && (
+                    <>
+                      {/* Capa para cerrar el menu al hacer clic fuera. */}
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setMenuOpen(false)}
+                      />
+                      <div className="absolute left-0 top-full mt-1 z-20 w-56 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden">
+                        <button
+                          onClick={() => {
+                            setMenuOpen(false);
+                            setModalError("");
+                            setEditForm({
+                              ...editForm,
+                              branch_name: branch.branch_name || "",
+                            });
+                            setEditMode("branchName");
+                          }}
+                          className="w-full text-left px-4 py-3 text-md text-slate-700 hover:bg-slate-50 cursor-pointer"
+                        >
+                          Cambiar nombre
+                        </button>
+                        <button
+                          onClick={() => {
+                            setMenuOpen(false);
+                            setModalError("");
+                            setEditMode("deleteBranch");
+                          }}
+                          className="w-full text-left px-4 py-3 text-md text-red-500 hover:bg-red-50 border-t border-slate-100 cursor-pointer"
+                        >
+                          Borrar sucursal
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+
+            {branches.length < maxStudios && (
+              <button
+                onClick={() => setShowBranchForm(true)}
+                className="flex items-center gap-1.5 px-4 py-2.5 text-md text-[#1b2c44] font-medium hover:text-[#33506f] transition-colors cursor-pointer"
+              >
+                <Plus size={16} />
+                Agregar sucursal
+              </button>
+            )}
+          </div>
+        </div>
+
+        {!studio.complete && (
+          <div className="max-w-2xl mx-auto mb-6 bg-amber-50 rounded-2xl px-5 py-4">
+            <p className="font-medium text-amber-800">
+              Esta sucursal todavía no se publica
+            </p>
+            <p className="text-md text-amber-700">
+              Tus alumnos no la ven en el catálogo hasta que completes:{" "}
+              {studio.missing.join(", ")}.
+            </p>
+          </div>
+        )}
 
         <div className="max-w-2xl mx-auto flex flex-col gap-6">
           {/* Información General */}
@@ -497,7 +648,7 @@ function OwnerEstudioGeneral() {
                 </label>
                 <textarea
                   value={editForm.description}
-                  placeholder={studio?.description}
+                  placeholder={studio?.description ?? ""}
                   onChange={(e) =>
                     setEditForm({ ...editForm, description: e.target.value })
                   }
@@ -832,6 +983,107 @@ function OwnerEstudioGeneral() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Cambiar el nombre corto de la sucursal. No es el nombre del
+            estudio: ese es el que ve el alumno y se edita arriba. */}
+        {editMode === "branchName" && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-8 w-full max-w-sm mx-4 flex flex-col gap-4">
+              <div>
+                <p className="font-semibold text-slate-800 text-lg text-center">
+                  Nombre de la sucursal
+                </p>
+                <p className="text-md text-slate-500 text-center">
+                  Solo lo ves tú, para distinguirla en tu panel.
+                </p>
+              </div>
+              <input
+                type="text"
+                value={editForm.branch_name}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, branch_name: e.target.value })
+                }
+                placeholder={branchLabel(studio, studioIndex)}
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-md outline-none focus:border-slate-400 transition-colors"
+              />
+              {modalError && (
+                <p
+                  role="alert"
+                  className="text-md text-red-600 bg-red-50 rounded-xl px-4 py-3"
+                >
+                  {modalError}
+                </p>
+              )}
+              <div className="flex gap-3 mt-2">
+                <button
+                  onClick={() => setEditMode(null)}
+                  className="flex-1 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-md hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSaveBranchName}
+                  className="flex-1 bg-[#1b2c44] text-white py-2.5 rounded-xl text-md hover:bg-[#33506f] transition-colors cursor-pointer"
+                >
+                  Guardar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Borrar la sucursal. Pide confirmacion: sale del catalogo y deja de
+            aceptar reservas. */}
+        {editMode === "deleteBranch" && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-8 w-full max-w-sm mx-4 flex flex-col gap-4">
+              <p className="font-semibold text-slate-800 text-lg text-center">
+                ¿Borrar {branchLabel(studio, studioIndex)}?
+              </p>
+              <p className="text-md text-slate-600 text-center">
+                {studio.name} deja de aparecer en el catálogo y de aceptar
+                reservas. Las reservas que ya tiene se conservan en tu
+                historial.
+              </p>
+              {modalError && (
+                <p
+                  role="alert"
+                  className="text-md text-red-600 bg-red-50 rounded-xl px-4 py-3"
+                >
+                  {modalError}
+                </p>
+              )}
+              <div className="flex gap-3 mt-2">
+                <button
+                  onClick={() => setEditMode(null)}
+                  className="flex-1 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-md hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleDeleteBranch}
+                  disabled={deleting}
+                  className="flex-1 bg-red-500 text-white py-2.5 rounded-xl text-md hover:bg-red-600 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {deleting ? "Borrando…" : "Borrar sucursal"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showBranchForm && (
+          <BranchForm
+            onClose={() => setShowBranchForm(false)}
+            onCreated={(id) => {
+              setShowBranchForm(false);
+              // Se abre la sucursal nueva, que es donde el dueño va a
+              // terminar de llenar lo que falte.
+              setActiveId(id);
+              reloadStudio();
+            }}
+          />
         )}
 
         {editMode === "logo" && (
