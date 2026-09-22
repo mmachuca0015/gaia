@@ -1,11 +1,21 @@
-import { Compass, CalendarDays, User, Package } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { Compass, CalendarDays, User, Package, Bell } from "lucide-react";
+import { NavLink, useLocation } from "react-router-dom";
+
+import { useUnreadNotices } from "../lib/notices";
 
 function BottomNav() {
+  // El mismo punto que el sidebar: en el telefono esta barra es el unico
+  // camino a Notificaciones.
+  const { pathname } = useLocation();
+  const unread = useUnreadNotices(pathname);
+
   const navItems = [
     { icon: Compass, label: "Explorar", path: "/explorar" },
     { icon: CalendarDays, label: "Clases", path: "/clases" },
     { icon: Package, label: "Paquetes", path: "/mis-paquetes" },
+    // "Avisos" y no "Notificaciones": la palabra completa no cabe en una
+    // barra de cinco a lo ancho de un telefono.
+    { icon: Bell, label: "Avisos", path: "/notificaciones" },
     { icon: User, label: "Perfil", path: "/perfil" },
   ];
 
@@ -21,7 +31,12 @@ function BottomNav() {
             }`
           }
         >
-          <Icon size={18} />
+          <span className="relative">
+            <Icon size={18} />
+            {path === "/notificaciones" && unread > 0 && (
+              <span className="absolute -top-1 -right-1.5 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-white" />
+            )}
+          </span>
           {label}
         </NavLink>
       ))}

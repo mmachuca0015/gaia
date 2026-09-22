@@ -1,5 +1,6 @@
 const pool = require("../db");
 const { COOKIE_NAME, readSession } = require("../auth/sessions");
+const { STUDIO_WITHIN_PLAN } = require("../services/catalog");
 
 // Exige sesion valida. Deja { id, role } en req.user.
 // A partir de aqui NINGUNA ruta debe leer el id del usuario del body o del
@@ -49,7 +50,16 @@ function requireRole(...roles) {
 
 // Para rutas /studios/:id... : verifica que el estudio pertenezca al dueño
 // de la sesion. Un admin pasa siempre.
-function requireStudioOwner(paramName = "id") {
+//
+// Tambien rechaza las sucursales DORMIDAS: las que ya no caben en el plan
+// (un Basic que estuvo en Pro). El panel no las ofrece, pero el candado va
+// aqui y no en la pantalla, porque son 20 y pico de rutas y basta con una que
+// se olvide para poder seguir dando de alta clases en una sucursal que el
+// alumno ya no ve. Se comprueba en el MISMO SELECT, sin un viaje extra.
+//
+// `allowSleeping` lo usa borrar una sucursal: esa si tiene que funcionar
+// dormida, es como el dueño elige cual de las suyas se queda.
+function requireStudioOwner(paramName = "id", { allowSleeping = false } = {}) {
   return async (req, res, next) => {
     try {
       if (req.user.role === "admin") return next();
@@ -61,11 +71,20 @@ function requireStudioOwner(paramName = "id") {
       // `deleted_at IS NULL`: una sucursal borrada ya no se toca, ni para
       // editarla ni para colgarle clases.
       const { rows } = await pool.query(
-        "SELECT 1 FROM studios WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL",
+        `SELECT ${STUDIO_WITHIN_PLAN} AS within_plan
+           FROM studios
+          WHERE studios.id = $1 AND studios.owner_id = $2
+            AND studios.deleted_at IS NULL`,
         [studioId, req.user.id],
       );
       if (rows.length === 0) {
         return res.status(403).json({ error: "No autorizado" });
+      }
+      if (!allowSleeping && rows[0].within_plan !== true) {
+        return res.status(403).json({
+          error:
+            "Esta sucursal no cabe en tu plan. Cambia al plan Pro para volver a administrarla.",
+        });
       }
       next();
     } catch (err) {

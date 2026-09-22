@@ -1,5 +1,6 @@
 import { Check } from "lucide-react";
 import {
+  planFeatureLines,
   toPesos,
   formatMoney,
   introPrice,
@@ -56,7 +57,9 @@ function PlanPicker({
             type="button"
             onClick={() => onIntervalChange("month")}
             className={`px-5 py-2 rounded-full text-sm transition-colors cursor-pointer ${
-              annual ? "text-slate-500 hover:text-slate-800" : "bg-[#1b2c44] text-white"
+              annual
+                ? "text-slate-500 hover:text-slate-800"
+                : "bg-[#1b2c44] text-white"
             }`}
           >
             Mensual
@@ -65,13 +68,17 @@ function PlanPicker({
             type="button"
             onClick={() => onIntervalChange("year")}
             className={`flex items-center gap-2 px-5 py-2 rounded-full text-sm transition-colors cursor-pointer ${
-              annual ? "bg-[#1b2c44] text-white" : "text-slate-500 hover:text-slate-800"
+              annual
+                ? "bg-[#1b2c44] text-white"
+                : "text-slate-500 hover:text-slate-800"
             }`}
           >
             Anual
             <span
               className={`text-[10px] px-2 py-0.5 rounded-full ${
-                annual ? "bg-white/15 text-white" : "bg-[#e8eef7] text-[#1b2c44]"
+                annual
+                  ? "bg-white/15 text-white"
+                  : "bg-[#e8eef7] text-[#1b2c44]"
               }`}
             >
               -{annualOff}%
@@ -139,8 +146,7 @@ function PlanPicker({
                     ${formatMoney(toPesos(plan.price_cents) * 12)}
                   </span>{" "}
                   ${formatMoney(annualTotal(plan))} + IVA al año ·{" "}
-                  {plan.annual_discount}%
-                  menos
+                  {plan.annual_discount}% menos
                 </p>
               ) : introEligible && plan.intro_discount > 0 ? (
                 <p className="text-xs text-[#1b2c44] bg-[#e8eef7] rounded-lg px-2 py-1 inline-block mb-3">
@@ -154,9 +160,14 @@ function PlanPicker({
               )}
 
               <ul className="flex flex-col gap-2 mt-2">
-                {plan.features.map((f) => (
+                {/* Sucursales y avisos salen de las columnas del plan, los
+                    mismos valores que aplica el backend. */}
+                {planFeatureLines(plan).map((f) => (
                   <li key={f.id} className="flex gap-2 items-start">
-                    <Check size={13} className="text-[#1b2c44] mt-0.5 shrink-0" />
+                    <Check
+                      size={13}
+                      className="text-[#1b2c44] mt-0.5 shrink-0"
+                    />
                     <span className="text-xs text-slate-600 leading-relaxed">
                       {f.label}
                     </span>

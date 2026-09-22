@@ -23,15 +23,22 @@ const REVENUE_ROWS = `(
   JOIN schedules ON bookings.schedule_id = schedules.id
   JOIN classes   ON schedules.class_id = classes.id
   JOIN studios   ON studios.id = classes.studio_id
-  WHERE bookings.status IN ('activa', 'pasada')
+  -- 'reubicada' cuenta: es una clase que no se dio porque cerro la sucursal,
+  -- pero el alumno recibio otra gratis a cambio y el estudio se quedo con el
+  -- dinero. 'reembolsada' NO cuenta: ese dinero se devolvio.
+  WHERE bookings.status IN ('activa', 'pasada', 'reubicada')
     AND bookings.package_purchase_id IS NULL
 
   UNION ALL
 
+  -- package_id NO NULO: las clases a favor por el cierre de una sucursal son
+  -- una compra de precio cero, no una venta. Sumarian $0, pero tampoco tienen
+  -- por que aparecer como movimiento.
   SELECT pp.created_at, pp.price_cents / 100.0 AS amount,
          pp.studio_id, studios.is_demo
   FROM package_purchases pp
   JOIN studios ON studios.id = pp.studio_id
+  WHERE pp.package_id IS NOT NULL
 ) AS money`;
 
 // Hora local de Mexico (timestamp sin zona). La base de Render corre en UTC:

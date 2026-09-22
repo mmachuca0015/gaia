@@ -9,6 +9,10 @@ const {
   ownerRouter: studioPackagesRouter,
   userRouter: packagesRouter,
 } = require("./routes/packages");
+const {
+  ownerRouter: studioNoticesRouter,
+  userRouter: noticesRouter,
+} = require("./routes/notices");
 const bookingsRouter = require("./routes/bookings");
 const userRouter = require("./routes/users");
 const paymentsRouter = require("./routes/payments");
@@ -66,7 +70,9 @@ app.get("/health", (req, res) => res.json({ ok: true }));
 
 app.use("/studios", studiosRouter);
 app.use("/studios", studioPackagesRouter);
+app.use("/studios", studioNoticesRouter);
 app.use("/packages", packagesRouter);
+app.use("/notificaciones", noticesRouter);
 app.use("/bookings", bookingsRouter);
 app.use("/users", userRouter);
 app.use("/payments", paymentsRouter);

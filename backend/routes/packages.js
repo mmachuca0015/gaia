@@ -337,6 +337,10 @@ userRouter.get("/mine", requireAuth, requireRole("user"), async (req, res) => {
               pp.price_cents, pp.list_price_cents, pp.validity_value,
               pp.validity_unit,
               pp.created_at, pp.expires_at < NOW() AS expired,
+              -- Un abono por el cierre de una sucursal: no lo compro, se lo
+              -- dieron. Vale lo que pago por la clase que se quedo sin sede.
+              pp.package_id IS NULL AS is_credit,
+              origen.name AS origin_studio_name,
               studios.id AS studio_id, studios.name AS studio_name,
               COALESCE(
                 (SELECT json_agg(json_build_object(
@@ -351,6 +355,7 @@ userRouter.get("/mine", requireAuth, requireRole("user"), async (req, res) => {
               ) AS classes
        FROM package_purchases pp
        JOIN studios ON studios.id = pp.studio_id
+       LEFT JOIN studios origen ON origen.id = pp.origin_studio_id
        WHERE pp.user_id = $1
          -- Uno que ya no sirve (vencido o sin clases) se sigue mostrando,
          -- opaco, solo 3 meses despues de que termino: al vencer, o al
@@ -534,7 +539,12 @@ userRouter.get("/usable", requireAuth, requireRole("user"), async (req, res) => 
   }
 });
 
-// Reservar una clase con un paquete: descuenta una clase, sin cobro.
+// Reservar una clase con un paquete o con un abono por cierre.
+//
+// Un paquete descuenta una clase y no cobra nada. Un abono vale lo que el
+// alumno pago por la clase que se quedo sin sede, asi que si la que elige
+// ahora cuesta mas, se le cobra NADA MAS la diferencia, con el mismo reparto
+// que cualquier otro cobro.
 userRouter.post("/redeem", requireAuth, requireRole("user"), async (req, res) => {
   const userId = req.user.id;
   const purchaseId = Number(req.body.purchaseId);
@@ -573,18 +583,61 @@ userRouter.post("/redeem", requireAuth, requireRole("user"), async (req, res) =>
     // Un estudio que dejo de publicarse no recibe reservas, tampoco con
     // paquete. Los demo se saltan la regla: solo los compra un usuario demo.
     const studio = await client.query(
-      `SELECT studios.is_demo, ${STUDIO_PUBLISHED} AS published
+      `SELECT studios.id AS studio_id, studios.is_demo,
+              studios.stripe_account_id,
+              ${STUDIO_PUBLISHED} AS published
        FROM schedules
        JOIN classes ON classes.id = schedules.class_id
        JOIN studios ON studios.id = classes.studio_id
        WHERE schedules.id = $1`,
       [scheduleId],
     );
-    if (!studio.rows[0].is_demo && !studio.rows[0].published) {
+    const sede = studio.rows[0];
+    if (!sede.is_demo && !sede.published) {
       await client.query("ROLLBACK");
       return res
         .status(400)
         .json({ error: "Este estudio ya no esta recibiendo reservas" });
+    }
+
+    // La diferencia la calcula usablePurchases con el precio de la clase que
+    // esta en la base, nunca con lo que mande el cliente.
+    //
+    // Una diferencia tan chica que al estudio no le quedaria nada despues de
+    // la comision de Stripe no se cobra: se le regala. Cobrar $1 cuesta mas
+    // que $1, y rechazar la reserva por eso seria absurdo para el alumno.
+    const difference = Number(chosen.difference_cents) || 0;
+    const split = difference > 0 ? splitCharge(difference) : null;
+    const cobrable = Boolean(split && split.studioAmount > 0);
+
+    const userIsDemo = await viewerIsDemo(req.user);
+    if (userIsDemo && !sede.is_demo) {
+      await client.query("ROLLBACK");
+      return res
+        .status(400)
+        .json({ error: "Las cuentas demo solo pueden reservar en estudios demo" });
+    }
+    const simulated = sede.is_demo && userIsDemo;
+
+    let card = null;
+    if (cobrable && !simulated) {
+      if (
+        !sede.stripe_account_id ||
+        !(await studioCanReceive(sede.studio_id, sede.stripe_account_id))
+      ) {
+        await client.query("ROLLBACK");
+        return res
+          .status(400)
+          .json({ error: "El estudio aún no puede recibir pagos" });
+      }
+      card = await savedCard(userId);
+      if (!card) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          error:
+            "Esta clase cuesta más que tu clase a favor. Guarda una tarjeta para pagar la diferencia.",
+        });
+      }
     }
 
     // Lugar en ESA fecha (services/spots.js): bloquea el horario y cuenta
@@ -604,10 +657,41 @@ userRouter.post("/redeem", requireAuth, requireRole("user"), async (req, res) =>
       return res.status(400).json({ error: "Ya tienes una reserva para esta clase" });
     }
 
+    // El cobro de la diferencia va DENTRO de la transaccion, como la compra de
+    // un paquete: si la tarjeta se rechaza, no queda una reserva regalada ni
+    // una clase descontada.
+    let paymentIntent = null;
+    if (cobrable && !simulated) {
+      paymentIntent = await stripe.paymentIntents.create({
+        amount: split.amountCents,
+        currency: "mxn",
+        customer: card.customerId,
+        payment_method: card.paymentMethodId,
+        confirm: true,
+        off_session: true,
+        transfer_data: {
+          destination: sede.stripe_account_id,
+          amount: split.studioAmount,
+        },
+        metadata: {
+          tipo: "diferencia_de_abono",
+          compra_id: String(purchaseId),
+          ...splitMetadata(difference, split),
+        },
+      });
+    }
+
     const booking = await client.query(
-      `INSERT INTO bookings (user_id, schedule_id, status, class_date, package_purchase_id)
-       VALUES ($1, $2, 'activa', $3, $4) RETURNING id`,
-      [userId, scheduleId, classDate, purchaseId],
+      `INSERT INTO bookings
+         (user_id, schedule_id, status, class_date, package_purchase_id,
+          stripe_payment_intent_id, price_cents, service_fee_cents)
+       VALUES ($1, $2, 'activa', $3, $4, $5, $6, $7) RETURNING id`,
+      [
+        userId, scheduleId, classDate, purchaseId,
+        paymentIntent?.id ?? null,
+        cobrable ? difference : 0,
+        cobrable ? split.serviceFee : 0,
+      ],
     );
     await client.query(
       "UPDATE package_purchases SET classes_used = classes_used + 1 WHERE id = $1",
@@ -616,14 +700,20 @@ userRouter.post("/redeem", requireAuth, requireRole("user"), async (req, res) =>
     await client.query("COMMIT");
 
     const remaining = chosen.remaining - 1;
-    await sendBookingConfirmation(
-      booking.rows[0].id,
-      `Paquete «${chosen.name}» (te ${
-        remaining === 1 ? "queda 1 clase" : `quedan ${remaining} clases`
-      })`,
-    );
+    const linea = chosen.is_credit
+      ? cobrable
+        ? `Clase a favor «${chosen.name}» + $${(split.amountCents / 100).toFixed(2)} MXN de diferencia`
+        : `Clase a favor «${chosen.name}», sin ningún cobro`
+      : `Paquete «${chosen.name}» (te ${
+          remaining === 1 ? "queda 1 clase" : `quedan ${remaining} clases`
+        })`;
+    await sendBookingConfirmation(booking.rows[0].id, linea);
 
-    res.json({ success: true, remaining });
+    res.json({
+      success: true,
+      remaining,
+      charged_cents: cobrable && !simulated ? split.amountCents : 0,
+    });
   } catch (err) {
     await client.query("ROLLBACK").catch(() => {});
     console.error(err);

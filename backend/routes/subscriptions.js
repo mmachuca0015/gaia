@@ -2,6 +2,9 @@ const express = require("express");
 const pool = require("../db");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const { stripe, resourceMissing } = require("../services/stripe");
+const { sleepingImpact } = require("../services/planImpact");
+const { ownerNotices } = require("../services/catalog");
+const { relocateStudents, refundStudents } = require("../services/closure");
 const {
   ensureStripePrice,
   ensureIvaTaxRate,
@@ -49,6 +52,14 @@ function periodEnd(stripeSub) {
 router.get("/me", requireAuth, requireRole("owner"), async (req, res) => {
   try {
     const sub = await loadOwnerSubscription(req.user.id);
+    // Que incluye su plan, con la MISMA regla que aplican las rutas de avisos.
+    // Va en todas las respuestas, tambien en las de heredada y demo: el menu
+    // del panel decide con esto si enseña la pestaña de Avisos.
+    const { rows: incluye } = await pool.query(
+      `SELECT ${ownerNotices("$1")} AS notices`,
+      [req.user.id],
+    );
+    const notices = incluye[0].notices === true;
     // Los dueños que se registraron antes de que existieran los planes no
     // tienen fila. No se les bloquea el panel: se reportan como heredados.
     // Un estudio demo no paga ni ve avisos de pago, tenga fila o no.
@@ -57,9 +68,12 @@ router.get("/me", requireAuth, requireRole("owner"), async (req, res) => {
         "SELECT 1 FROM studios WHERE owner_id = $1 AND is_demo",
         [req.user.id],
       );
-      return res.json({ status: rows.length > 0 ? "demo" : "heredada" });
+      return res.json({
+        status: rows.length > 0 ? "demo" : "heredada",
+        notices,
+      });
     }
-    if (sub.is_demo) return res.json({ status: "demo" });
+    if (sub.is_demo) return res.json({ status: "demo", notices });
 
     // La fecha del siguiente cobro solo llega por webhook. Si ese evento se
     // perdio, se le pregunta a Stripe una vez y se guarda: sin ella la
@@ -94,6 +108,7 @@ router.get("/me", requireAuth, requireRole("owner"), async (req, res) => {
     } = sub;
     res.json({
       ...rest,
+      notices,
       pending_plan: pending_plan_id
         ? {
             id: pending_plan_id,
@@ -140,8 +155,89 @@ async function setStripePlan(sub, plan) {
 
 const PLAN_FOR_STRIPE = `
   SELECT id, slug, name, tagline, price_cents, currency, annual_discount,
+         max_studios,
          stripe_product_id, stripe_price_id, stripe_price_id_year
   FROM plans WHERE id = $1`;
+
+// Cuantas sucursales vivas tiene el dueño. Con el plan nuevo caben las
+// primeras `max_studios`; las demas se duermen al renovar (ver
+// STUDIO_WITHIN_PLAN en services/catalog.js).
+async function liveBranchCount(ownerId) {
+  const { rows } = await pool.query(
+    `SELECT COUNT(*)::int AS total FROM studios
+      WHERE owner_id = $1 AND deleted_at IS NULL`,
+    [ownerId],
+  );
+  return rows[0].total;
+}
+
+// Guarda por que el dueño se fue a un plan mas barato.
+//
+// El texto es opcional y no detiene nada: si viene vacio se guarda el renglon
+// igual, con `reason` en NULL, porque saber CUANTOS bajaron sin contestar es
+// parte de la informacion. Se recorta a 500 caracteres en vez de rechazarse
+// para que un copy-paste largo no tire un cambio de plan ya cobrado.
+async function recordDowngrade(ownerId, from, to, reason) {
+  const texto = String(reason ?? "").trim().slice(0, 500);
+  await pool.query(
+    `INSERT INTO plan_downgrade_reasons
+       (owner_id, from_plan_id, to_plan_id, from_plan_name, to_plan_name,
+        from_price_cents, to_price_cents, reason)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [
+      ownerId,
+      from.id,
+      to.id,
+      from.name,
+      to.name,
+      from.price_cents,
+      to.price_cents,
+      texto || null,
+    ],
+  );
+}
+
+// Reubicar no debe tumbar el webhook. Si falla, Stripe reintentaria el evento
+// y volveria a correr el UPDATE de la suscripcion; el abono se puede repetir a
+// mano, pero dejar la suscripcion sin actualizar rompe cosas mas visibles.
+async function reubicarConCuidado(ownerId) {
+  try {
+    await relocateStudents(ownerId);
+  } catch (err) {
+    console.error("Fallo la reubicacion de alumnos:", err);
+  }
+}
+
+// Que se lleva por delante un cambio de plan, ANTES de confirmarlo: que
+// sucursales se duermen y cuanta gente cuelga de cada una. La pantalla lo pide
+// al abrir la confirmacion.
+//
+// `plan_id` ausente = cancelar: no sobrevive ninguna sucursal, asi que se
+// piden todas (limite 0).
+router.get("/impact", requireAuth, requireRole("owner"), async (req, res) => {
+  try {
+    const sub = await loadOwnerSubscription(req.user.id);
+    if (!sub || sub.is_demo) return res.json({ branches: [], max_studios: 0 });
+
+    let maxStudios = 0;
+    if (req.query.plan_id) {
+      const { rows } = await pool.query(
+        "SELECT max_studios FROM plans WHERE id = $1",
+        [Number(req.query.plan_id)],
+      );
+      if (rows.length === 0) {
+        return res.status(400).json({ error: "El plan seleccionado no existe" });
+      }
+      maxStudios = rows[0].max_studios;
+    }
+
+    const branches = await sleepingImpact(req.user.id, maxStudios);
+    res.json({ branches, max_studios: maxStudios });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "No pudimos calcular el cambio" });
+  }
+});
 
 // Deja de renovar al terminar el periodo pagado. Hasta ese dia el estudio
 // sigue publicado; despues Stripe borra la suscripcion y el webhook la marca
@@ -151,6 +247,26 @@ router.post("/cancel", requireAuth, requireRole("owner"), async (req, res) => {
     const sub = await loadOwnerSubscription(req.user.id);
     const error = notManageable(sub);
     if (error) return res.status(409).json({ error });
+
+    // Cancelar no deja ninguna sucursal en pie: al terminar el periodo el
+    // estudio entero sale del catalogo y no hay a donde mover a los alumnos
+    // que ya pagaron. Ahi si hay que devolverles su dinero, y lo pone el
+    // estudio, que es quien decidio irse. No se cancela sin que lo reconozca.
+    const pendientes = await sleepingImpact(req.user.id, 0);
+    const reservaciones = pendientes.reduce((n, b) => n + b.bookings, 0);
+    const clasesPaquete = pendientes.reduce((n, b) => n + b.package_classes, 0);
+    if (
+      (reservaciones > 0 || clasesPaquete > 0) &&
+      req.body.confirm_refunds !== true
+    ) {
+      return res.status(409).json({
+        error:
+          "Al cancelar hay que devolverle su dinero a los alumnos que ya pagaron. Confirma que lo aceptas.",
+        code: "reembolsos_pendientes",
+        bookings: reservaciones,
+        package_classes: clasesPaquete,
+      });
+    }
 
     // Un cambio de plan programado se deshace: si el dueño reanuda despues,
     // debe volver al plan que tiene, no a uno que eligio antes de cancelar.
@@ -231,12 +347,68 @@ router.post("/change-plan", requireAuth, requireRole("owner"), async (req, res) 
       return res.status(400).json({ error: "Ya tienes este plan" });
     }
 
+    // Si el plan nuevo incluye menos sucursales de las que tiene, al renovar
+    // se le duermen las que sobren: dejan de salir en el catalogo aunque no se
+    // borren. El dueño tiene que reconocerlo por escrito antes de seguir, y el
+    // candado va aqui y no solo en la pantalla: un cambio de plan que le tira
+    // sucursales no puede depender de un checkbox del navegador.
+    const sleeping = backToCurrent
+      ? 0
+      : Math.max((await liveBranchCount(req.user.id)) - target.max_studios, 0);
+
+    // El check obligatorio sale en dos casos:
+    //
+    //   - Quedarse con UNA sucursal. Es el caso grave; bajar de cinco a tres
+    //     solo enseña los numeros y pregunta, porque ahi el dueño conserva
+    //     varias a donde mover a su gente.
+    //   - Que haya clases sueltas ya pagadas en lo que se cierra. Esas se le
+    //     abonan GRATIS al alumno en la sucursal que sobrevive, o sea que el
+    //     dueño va a dar clases que ya cobro: tiene que estar de acuerdo.
+    const afectadas = sleeping > 0 ? await sleepingImpact(req.user.id, target.max_studios) : [];
+    const porAbonar = afectadas.reduce((n, b) => n + b.credit_classes, 0);
+    if (
+      sleeping > 0 &&
+      (target.max_studios === 1 || porAbonar > 0) &&
+      req.body.confirm_branches !== true
+    ) {
+      return res.status(409).json({
+        error:
+          porAbonar > 0
+            ? `Hay ${porAbonar} ${porAbonar === 1 ? "clase ya pagada" : "clases ya pagadas"} en las sucursales que cierras. Se le ${porAbonar === 1 ? "abonará" : "abonarán"} a tus alumnos sin costo en la que conservas: confirma que estás de acuerdo.`
+            : sleeping === 1
+              ? "Con este plan una de tus sucursales deja de aparecer en el catálogo. Confirma que lo sabes."
+              : `Con este plan ${sleeping} de tus sucursales dejan de aparecer en el catálogo. Confirma que lo sabes.`,
+        code: "sucursales_dormidas",
+        sleeping,
+        credit_classes: porAbonar,
+        max_studios: target.max_studios,
+      });
+    }
+
     await setStripePlan(sub, target);
     await pool.query(
       `UPDATE subscriptions SET pending_plan_id = $1, updated_at = NOW()
        WHERE id = $2`,
       [backToCurrent ? null : target.id, sub.subscription_id],
     );
+
+    // Solo al BAJAR, y solo si es una eleccion nueva: repetir el mismo cambio
+    // ya programado no es otra baja y duplicaria el renglon.
+    const baja =
+      !backToCurrent &&
+      target.id !== sub.pending_plan_id &&
+      target.price_cents < sub.price_cents;
+    if (baja) {
+      // El plan YA cambio en Stripe y en la base. Si la encuesta falla se
+      // anota y se sigue: perder un motivo es molesto, responder 500 sobre un
+      // cambio que si se aplico haria que el dueño lo intentara otra vez.
+      await recordDowngrade(
+        req.user.id,
+        { id: sub.plan_id, name: sub.plan_name, price_cents: sub.price_cents },
+        target,
+        req.body.reason,
+      ).catch((err) => console.error("No se guardo el motivo de la baja:", err));
+    }
     res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -568,6 +740,18 @@ async function webhookHandler(req, res) {
            WHERE stripe_subscription_id = $1`,
           [typeof subId === "string" ? subId : subId.id, renewal, coveredUntil],
         );
+
+        // Aqui es donde un cambio de plan de veras entra. Si dejo sucursales
+        // fuera, se resuelve a sus alumnos: las clases que ya pagaron se les
+        // abonan gratis en la que sobrevive. Hasta hoy la clase se daba
+        // normal, por eso no se hizo nada al confirmar el cambio.
+        if (renewal) {
+          const { rows: dueño } = await pool.query(
+            "SELECT owner_id FROM subscriptions WHERE stripe_subscription_id = $1",
+            [typeof subId === "string" ? subId : subId.id],
+          );
+          if (dueño[0]) await reubicarConCuidado(dueño[0].owner_id);
+        }
         break;
       }
 
@@ -601,13 +785,24 @@ async function webhookHandler(req, res) {
       // Termino el periodo de una suscripcion cancelada (o se borro a mano).
       // 'cancelada' es lo que saca al estudio del catalogo.
       case "customer.subscription.deleted": {
-        await pool.query(
+        const { rows } = await pool.query(
           `UPDATE subscriptions
            SET status = 'cancelada', cancel_at_period_end = FALSE,
                pending_plan_id = NULL, updated_at = NOW()
-           WHERE stripe_subscription_id = $1`,
+           WHERE stripe_subscription_id = $1
+           RETURNING owner_id`,
           [event.data.object.id],
         );
+
+        // El estudio quedo fuera del catalogo entero: no hay otra sucursal a
+        // donde mover a nadie, asi que se le devuelve su dinero a quien tenga
+        // clases pagadas sin tomar. La bitacora `refunds` es lo que evita
+        // pagar dos veces si Stripe reintenta este mismo evento.
+        if (rows[0]) {
+          await refundStudents(rows[0].owner_id).catch((err) =>
+            console.error("Fallo el reembolso por cancelacion:", err),
+          );
+        }
         break;
       }
 

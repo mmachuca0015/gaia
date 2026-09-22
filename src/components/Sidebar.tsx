@@ -5,21 +5,27 @@ import {
   LogOut,
   Heart,
   Package,
+  Bell,
 } from "lucide-react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 
 import { logout } from "../lib/api";
+import { useUnreadNotices } from "../lib/notices";
 const navItems = [
   { icon: Compass, label: "Explorar", path: "/explorar" },
   { icon: CalendarDays, label: "Mis Clases", path: "/clases" },
   { icon: Package, label: "Mis paquetes", path: "/mis-paquetes" },
   { icon: Heart, label: "Favoritos", path: "/favoritos" },
+  { icon: Bell, label: "Notificaciones", path: "/notificaciones" },
   { icon: User, label: "Perfil", path: "/perfil" },
-  // { icon: Bell, label: "Notificaciones", path: "/notificaciones" },
 ];
 
 function Sidebar() {
   const navigate = useNavigate();
+  // El punto de los avisos sin leer. Se vuelve a contar al cambiar de
+  // pantalla, que es cuando el alumno puede haber abierto Notificaciones.
+  const { pathname } = useLocation();
+  const unread = useUnreadNotices(pathname);
   return (
     <aside className="w-64 h-screen bg-[#ffffff] flex flex-col px-4 py-8">
       {/* Logo */}
@@ -48,6 +54,12 @@ function Sidebar() {
           >
             <Icon size={18} />
             {label}
+            {path === "/notificaciones" && unread > 0 && (
+              <span
+                title={`Tienes ${unread} aviso${unread === 1 ? "" : "s"} sin ver`}
+                className="ml-auto w-2.5 h-2.5 rounded-full bg-red-500"
+              />
+            )}
           </NavLink>
         ))}
       </nav>

@@ -10,6 +10,13 @@ const PLANS_QUERY = `
   SELECT
     p.id, p.slug, p.name, p.tagline, p.price_cents, p.currency,
     p.intro_discount, p.annual_discount, p.is_featured, p.is_active, p.sort_order,
+    -- Cuantas sucursales incluye el plan. Va aqui y no como una linea escrita
+    -- a mano en plan_features porque es el MISMO numero que aplica el
+    -- backend: asi la landing no puede prometer tres y el panel dar una.
+    p.max_studios,
+    -- Si el plan incluye mandar avisos a los alumnos. Misma razon que
+    -- max_studios: es lo que aplica el backend, no una linea escrita a mano.
+    p.notices,
     -- El total anual se calcula aqui y no en el cliente: es el mismo numero
     -- que se le manda a Stripe, asi que no puede diferir del que se cobra.
     ROUND(p.price_cents * 12 * (100 - p.annual_discount) / 100.0)::int
@@ -63,8 +70,28 @@ function toCents(pesos) {
   return Math.round(n * 100);
 }
 
+// Cuantas sucursales incluye un plan. Entero de 1 en adelante: un plan de
+// cero sucursales no le serviria a nadie. El tope evita un dedazo (un 30 en
+// vez de un 3) que publicaria sucursales que el dueño no contrato.
+const MAX_STUDIOS_TOPE = 20;
+
+function toBranchLimit(value) {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1 || n > MAX_STUDIOS_TOPE) return null;
+  return n;
+}
+
 router.post("/", async (req, res) => {
-  const { slug, name, tagline, price, intro_discount, is_featured } = req.body;
+  const {
+    slug,
+    name,
+    tagline,
+    price,
+    intro_discount,
+    is_featured,
+    max_studios,
+    notices,
+  } = req.body;
   const priceCents = toCents(price);
 
   if (!slug || !name || priceCents === null) {
@@ -73,10 +100,20 @@ router.post("/", async (req, res) => {
       .json({ error: "Faltan el identificador, el nombre o el precio" });
   }
 
+  let branchLimit = 1;
+  if (max_studios !== undefined) {
+    branchLimit = toBranchLimit(max_studios);
+    if (branchLimit === null) {
+      return res.status(400).json({
+        error: `Las sucursales incluidas van de 1 a ${MAX_STUDIOS_TOPE}`,
+      });
+    }
+  }
+
   try {
     const { rows } = await pool.query(
-      `INSERT INTO plans (slug, name, tagline, price_cents, intro_discount, is_featured, sort_order)
-       VALUES ($1, $2, $3, $4, COALESCE($5, 50), COALESCE($6, FALSE),
+      `INSERT INTO plans (slug, name, tagline, price_cents, intro_discount, is_featured, max_studios, notices, sort_order)
+       VALUES ($1, $2, $3, $4, COALESCE($5, 50), COALESCE($6, FALSE), $7, COALESCE($8, FALSE),
                COALESCE((SELECT MAX(sort_order) + 1 FROM plans), 1))
        RETURNING id`,
       [
@@ -86,6 +123,8 @@ router.post("/", async (req, res) => {
         priceCents,
         intro_discount,
         is_featured,
+        branchLimit,
+        notices === undefined ? null : Boolean(notices),
       ],
     );
     res.status(201).json({ id: rows[0].id });
@@ -107,6 +146,8 @@ router.patch("/:id", async (req, res) => {
     annual_discount,
     is_featured,
     is_active,
+    max_studios,
+    notices,
   } = req.body;
 
   // Solo se tocan los campos que vienen en el cuerpo: el formulario del admin
@@ -122,6 +163,9 @@ router.patch("/:id", async (req, res) => {
   if (tagline !== undefined) push("tagline", tagline || null);
   if (is_featured !== undefined) push("is_featured", Boolean(is_featured));
   if (is_active !== undefined) push("is_active", Boolean(is_active));
+  // Apagar los avisos no borra los que ya se mandaron: el alumno los sigue
+  // viendo hasta que caduquen, y el dueño deja de tener la pestaña.
+  if (notices !== undefined) push("notices", Boolean(notices));
 
   if (price !== undefined) {
     const priceCents = toCents(price);
@@ -141,6 +185,20 @@ router.patch("/:id", async (req, res) => {
       return res.status(400).json({ error: "El descuento debe ir de 0 a 100" });
     }
     push(field, n);
+  }
+
+  // Bajar las sucursales de un plan no borra nada: las sucursales que dejan de
+  // caber se duermen (salen del catalogo, el dueño ya no las administra) y
+  // vuelven solas si el numero sube otra vez. El catalogo lo calcula en cada
+  // consulta, asi que el cambio surte efecto al guardarlo.
+  if (max_studios !== undefined) {
+    const branchLimit = toBranchLimit(max_studios);
+    if (branchLimit === null) {
+      return res.status(400).json({
+        error: `Las sucursales incluidas van de 1 a ${MAX_STUDIOS_TOPE}`,
+      });
+    }
+    push("max_studios", branchLimit);
   }
 
   if (sets.length === 0) {

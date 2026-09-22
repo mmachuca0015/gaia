@@ -27,7 +27,59 @@ export interface Plan {
   is_featured: boolean;
   is_active: boolean;
   sort_order: number;
+  /**
+   * Sucursales incluidas. Es el mismo numero que aplica el backend para
+   * publicar y para dejar crear, no una promesa escrita aparte.
+   */
+  max_studios: number;
+  /**
+   * Si el plan incluye mandar avisos a los alumnos que tienen el estudio en
+   * favoritos. Es el mismo permiso que aplica el backend, no una promesa
+   * escrita aparte.
+   */
+  notices: boolean;
   features: PlanFeature[];
+}
+
+/**
+ * La linea de sucursales que se muestra junto a las caracteristicas.
+ *
+ * Se arma con `max_studios` en vez de guardarse como una fila de
+ * `plan_features`: el texto escrito a mano se quedaba viejo en cuanto el admin
+ * movia el limite, y la landing prometia sucursales que el panel no daba.
+ */
+export function branchesFeature(plan: Plan) {
+  return plan.max_studios === 1
+    ? "1 sucursal"
+    : `Hasta ${plan.max_studios} sucursales`;
+}
+
+/**
+ * La linea de avisos, cuando el plan los incluye. Se arma con `plan.notices`
+ * por lo mismo que la de sucursales: la fila escrita a mano en
+ * `plan_features` seguia prometiendolos aunque el admin apagara la funcion.
+ * Devuelve null cuando el plan no los trae, para no listar lo que no hay.
+ */
+export function noticesFeature(plan: Plan) {
+  return plan.notices ? "Avisos a tus alumnos" : null;
+}
+
+/**
+ * Las lineas que se enseñan de un plan, en orden: lo que sale de sus columnas
+ * (sucursales y avisos) y luego lo que el admin escribio en `plan_features`.
+ *
+ * Vive aqui y no en cada pantalla porque son cuatro las que la pintan (la
+ * landing, el registro, el cambio de plan del dueño y el admin) y antes cada
+ * una armaba la lista por su cuenta: agregar una caracteristica obligaba a
+ * acordarse de las cuatro.
+ */
+export function planFeatureLines(plan: Plan) {
+  const avisos = noticesFeature(plan);
+  return [
+    { id: "sucursales", label: branchesFeature(plan) },
+    ...(avisos ? [{ id: "avisos", label: avisos }] : []),
+    ...plan.features.map((f) => ({ id: String(f.id), label: f.label })),
+  ];
 }
 
 export function fetchPlans() {

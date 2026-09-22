@@ -61,6 +61,14 @@ export interface PurchasedPackage {
   expires_at: string;
   created_at: string;
   expired: boolean;
+  /**
+   * Clase a favor por el cierre de una sucursal: no la compró, se la dieron a
+   * cambio de una que ya había pagado. Vale `price_cents`, y si canjea una más
+   * cara paga la diferencia.
+   */
+  is_credit: boolean;
+  /** La sucursal que cerró, de donde salió el abono. Null si no es abono. */
+  origin_studio_name: string | null;
   studio_id: number;
   studio_name: string;
   classes: PackageClass[];
@@ -72,6 +80,17 @@ export interface UsablePurchase {
   name: string;
   remaining: number;
   expires_at: string;
+  /** Clase a favor por un cierre, no un paquete comprado. */
+  is_credit: boolean;
+  /** Lo que vale una clase de esta compra, en centavos. */
+  value_cents: number;
+  /**
+   * Lo que falta para cubrir ESTA clase, en centavos. Siempre 0 en un paquete
+   * comprado: cubre sus clases enteras. En un abono es lo que hay que cobrar
+   * si la clase elegida cuesta más. Lo calcula el backend con el precio de la
+   * base, nunca el cliente.
+   */
+  difference_cents: number;
 }
 
 /** Duraciones que ofrece el formulario. El backend acepta exactamente estas. */
@@ -161,7 +180,12 @@ export function redeemPackage(
   scheduleId: number,
   classDate: string,
 ) {
-  return apiJson<{ success: boolean; remaining: number }>("/packages/redeem", {
+  return apiJson<{
+    success: boolean;
+    remaining: number;
+    /** Lo cobrado por la diferencia, con el 3%. 0 si no hubo cobro. */
+    charged_cents: number;
+  }>("/packages/redeem", {
     method: "POST",
     body: JSON.stringify({ purchaseId, scheduleId, classDate }),
   });

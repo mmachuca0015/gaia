@@ -165,10 +165,120 @@ así que el neto de Wellco es aproximado, no exacto al centavo.
     `invoice.paid` con `billing_reason = subscription_cycle`. No muevas
     `plan_id` antes: el dueño ya pagó el periodo del plan anterior.
   - Cancelar deshace un cambio de plan programado.
+  - **Bajar de plan pregunta por qué** (tabla `plan_downgrade_reasons`,
+    migración 014). Solo al bajar (el plan nuevo cuesta menos), texto libre de
+    máximo 500 caracteres y **opcional**: se guarda el renglón aunque venga
+    vacío, para saber cuántos bajaron sin contestar, y si el INSERT falla se
+    anota en el log sin tirar un cambio de plan que Stripe ya aplicó. Nadie lo
+    lee todavía; se consulta a mano.
+  - **Antes de confirmar se le enseña a quién le pega.**
+    `GET /subscriptions/impact?plan_id=` (`services/planImpact.js`) devuelve
+    las sucursales que se dormirían con ese plan, cada una con sus
+    reservaciones futuras y sus clases de paquete sin canjear. Sin `plan_id`
+    es el impacto de **cancelar**, donde no sobrevive ninguna. Los números
+    los cuenta el backend: estimarlos en el cliente sería enseñar cifras que
+    no son.
+  - **La casilla obligatoria es solo para quedarse con UNA sucursal.**
+    `/subscriptions/change-plan` responde 409 (`code: "sucursales_dormidas"`)
+    sin `confirm_branches: true` cuando el plan destino tiene
+    `max_studios = 1`. Bajar de cinco a tres enseña los mismos números y
+    pregunta "¿quieres seguir adelante?", pero no pone tranca: ahí el dueño
+    conserva sucursal a donde mover a su gente.
+  - **Cancelar sí exige aceptar los reembolsos** (`confirm_refunds`, 409
+    `code: "reembolsos_pendientes"`), porque no queda ninguna sucursal en pie
+    y no hay a dónde mover a los alumnos que ya pagaron. El reembolso lo pone
+    el estudio, no Wellco: la baja es su decisión.
+- **Un paquete de una sucursal dormida se canjea en las que sí caben en el
+  plan** (`PURCHASE_COVERS_STUDIO` en `services/packages.js`). El alumno pagó
+  por unas clases y el estudio sigue existiendo; dejarlas muertas sería
+  quedarse con su dinero. Solo se abre mientras la sucursal de la compra esté
+  dormida: despierta, el paquete vale únicamente donde se compró, que es lo
+  que se vendió.
+
+## Cuando una sucursal deja de operar (`services/closure.js`)
+
+Todo corre **desde el webhook**, cuando el cambio de veras entra, no cuando el
+dueño lo confirma: hasta el último día pagado las clases se dan normal. Dos
+caminos, y la diferencia es si le queda alguna sucursal.
+
+- **Bajar de plan** (sobrevive al menos una) → `relocateStudents`, desde
+  `invoice.paid` con `billing_reason = subscription_cycle`. Nadie pierde
+  dinero, se mueve:
+  - Las clases sueltas pagadas con tarjeta se le **abonan gratis** al alumno en
+    la sucursal que sobrevive (la primera, la que nació con la cuenta).
+  - Las que salieron de un paquete se le **regresan al paquete**
+    (`classes_used - 1`), que de todos modos ya se canjea allí. No se abonan
+    aparte: sería pagarle dos veces la misma clase.
+  - La reserva queda en **`reubicada`**, no cancelada: el estudio conserva el
+    dinero porque dio otra clase a cambio, así que sigue contando en
+    `REVENUE_ROWS`.
+- **Cancelar** (no sobrevive ninguna) → `refundStudents`, desde
+  `customer.subscription.deleted`. No hay a dónde mover a nadie:
+  - Se devuelve el **precio** de la clase, no el total: el alumno **pierde el
+    3%** de cargo por servicio, que cobró Wellco y no tuvo que ver con la baja.
+  - De un paquete se devuelve lo proporcional a las clases sin usar
+    (`unusedPackageCents`): 0 de 4 usadas devuelve todo, 2 de 4 la mitad.
+  - `reverse_transfer: true` le saca el dinero a la cuenta del estudio, no al
+    bolsillo de Wellco. **No lo quites**: es la misma razón que la resta de
+    `transfer_data.amount`.
+  - La reserva queda en **`reembolsada`**, que sí sale de `REVENUE_ROWS`.
+
+Otras reglas de esta parte:
+
+- **Un abono es una compra de paquete con `package_id` NULL** (migración 015).
+  Reusa el canje, el vencimiento y "Mis paquetes" en vez de una tabla nueva con
+  su mecánica a medias. Dura 6 meses (`CREDIT_MONTHS`). No cuenta como venta:
+  `REVENUE_ROWS` exige `package_id IS NOT NULL`.
+- **Un abono es de UNA clase y vale lo que el alumno pagó** (`price_cents`).
+  Uno por clase y no una bolsa de N, porque con clases de precios distintos el
+  valor sería un promedio y a alguien le saldría mal la cuenta.
+- **Si canjea una clase más cara, paga solo la diferencia**
+  (`PURCHASE_DIFFERENCE` en `services/packages.js`, cobrada en
+  `/packages/redeem` con el mismo `splitCharge` que todo lo demás). Un paquete
+  comprado **nunca** cobra diferencia: cubre sus clases enteras, que es lo que
+  se vendió. Si la clase cuesta menos, no se devuelve nada. Una diferencia tan
+  chica que al estudio no le quedaría nada tras la comisión de Stripe no se
+  cobra: cobrar $1 cuesta más que $1.
+- **La comisión de Stripe de un reembolso la absorbe Wellco**, porque de la
+  cuenta del estudio solo se puede recuperar lo que recibió, que ya venía sin
+  ella. Se guarda en `refunds.stripe_fee_cents` y sale como columna en el Excel
+  del admin, para poder medirla y para que cambiar la regla sea mover un
+  cálculo y no reconstruir el historial:
+  `SELECT SUM(stripe_fee_cents)/100.0 FROM refunds WHERE status = 'hecho';`
+- **`bookings` guarda con qué cargo se pagó** (`stripe_payment_intent_id`,
+  `price_cents`, `service_fee_cents`). Sin eso una clase suelta no se puede
+  reembolsar. Las reservas **anteriores** a la migración 015 lo tienen en NULL
+  y van al Excel del admin.
+- **La tabla `refunds` existe para no devolver dos veces.** Stripe reintenta
+  los webhooks; sin el UNIQUE por reserva y por compra, el segundo intento
+  devolvería el dinero otra vez a costa del estudio.
+- **Lo que no se puede devolver solo** (cuenta Connect sin saldo, cargo viejo
+  sin referencia) se junta y se le manda al admin por correo con un Excel
+  adjunto, un renglón por movimiento con el correo del alumno
+  (`sendNoFundsReport`). Asunto: `"<estudio>" cancelación de suscripción. Sin
+  fondos para reembolsar alumnos.`
+- **Las fechas de los correos salen de SQL con `to_char`** en hora de México.
+  Un `DATE` que pg convierte a `Date` se corre un día con el servidor en UTC y
+  el alumno leería la fecha equivocada.
 - **Qué estudios se publican** (`backend/services/catalog.js`,
   `STUDIO_PUBLISHED`): `activa` sí; `pendiente` y `vencida` solo hasta
   `paid_until`; `cancelada` no; sin fila (heredados) sí. Si no se publica, no
   sale en `GET /studios` y `/payments/charge` rechaza la reserva.
+- **Sucursales por plan** (`plans.max_studios`, Basic 1 y Pro 3 de arranque):
+  el número lo edita el admin en `/admin/suscripciones`, no el código, y es el
+  mismo que muestran la landing y el registro (`branchesFeature` en
+  `src/lib/plans.ts`). **No escribas "3 sucursales" como fila de
+  `plan_features`**: el texto a mano se queda viejo en cuanto se mueve el
+  límite. La migración 013 borró las que había.
+- **Las sucursales que no caben en el plan se duermen, no se borran.** Caben
+  las primeras `max_studios` **por antigüedad**, así que la que sobrevive a una
+  baja de Pro a Basic es la que nació con la cuenta. Es un cálculo
+  (`STUDIO_WITHIN_PLAN`), no una columna ni un interruptor: volver a Pro las
+  despierta solas y no hay estado que se desincronice del plan. Una dormida
+  conserva clases, reservas, paquetes e ingresos, pero sale del catálogo y
+  `requireStudioOwner` rechaza sus rutas (403). La única excepción es `DELETE
+  /studios/mine/:id` (`allowSleeping`): borrar la despierta es como el dueño se
+  queda con otra que no sea la primera.
 - **Horario y "Abierto/Cerrado"**: tabla `studio_hours` (un rango por día,
   `day` 0 = domingo, sin cruzar medianoche; migración 010). Se pide al
   registrar el estudio y se edita en Estudio > General (`PUT
@@ -222,6 +332,51 @@ así que el neto de Wellco es aproximado, no exacto al centavo.
 - **Métricas:** el dinero de un paquete cuenta al comprarlo. Una reserva hecha
   con paquete (`bookings.package_purchase_id`) **no** suma ingreso, o se
   contaría dos veces. Todo pasa por `REVENUE_ROWS` (`services/revenue.js`).
+
+## Avisos a los alumnos (migración 017)
+
+- **Dueño:** `/owner/avisos` (`OwnerAvisos.tsx`). **Alumno:** `/notificaciones`
+  (`pages/Dashboard/Notificaciones.tsx`). Rutas en `backend/routes/notices.js`:
+  `ownerRouter` bajo `/studios` (`GET`/`POST /studios/:id/avisos`) y
+  `userRouter` en `/notificaciones`. Reglas en `services/notices.js`.
+- **Es una caracteristica del plan** (`plans.notices`, migración 018: hoy solo
+  Pro). El permiso vive en la base y lo prende el admin en
+  `/admin/suscripciones`, no el código, igual que `max_studios`. El backend lo
+  resuelve con `ownerNotices` (`services/catalog.js`) y las dos rutas del dueño
+  responden 403 `code: "plan_sin_avisos"` sin él; el panel esconde la pestaña
+  leyendo `notices` de `GET /subscriptions/me`. **El candado va en la ruta, no
+  solo en el menú**: esconder la pestaña evita el clic, no la URL.
+  - Un dueño **heredado** (sin fila en `subscriptions`) los conserva, como en
+    todo lo demás: el COALESCE cae al plan activo más generoso.
+  - La línea "Avisos a tus alumnos" de la landing y del registro la arma
+    `planFeatureLines` (`src/lib/plans.ts`) con la columna. **No la escribas
+    como fila de `plan_features`**: es el mismo error que "3 sucursales" de la
+    migración 013, y la 018 borró la que había.
+- **Quien los recibe son los favoritos de ESA sucursal**, no de la cuenta: los
+  favoritos son por estudio y un aviso de Providencia no le sirve a quien va a
+  Chapalita. La pantalla usa `BranchTabs` como el resto del panel.
+- **No son correo.** Se guardan y el alumno los ve dentro de la app. Asi no
+  hay que darle de baja de nada ni arriesgar que marquen a Wellco como spam.
+- Solo se ve lo mandado **despues** de que agrego el estudio a favoritos
+  (`n.created_at >= f.created_at`) y de los **ultimos 30 días**: quien marca un
+  estudio hoy no tiene por que enterarse del cambio de horario de la semana
+  pasada.
+- **Maximo 500 caracteres**, en el CHECK de la tabla y en la ruta; el contador
+  del frontend lee `NOTICE_MAX` de `src/lib/notices.ts`.
+- **Tope de 5 avisos por sucursal cada 24 horas** (`DAILY_LIMIT`, 429). No es
+  regla de negocio, es freno: el alumno no se puede dar de baja de los avisos
+  sin quitar el estudio de favoritos, y el estudio que manda veinte se queda
+  sin seguidores.
+- `studio_notices.recipients` se cuenta **al mandarlo**, no al leerlo: los
+  favoritos cambian y contarlos hoy diria a cuantos les llegaria ahora.
+- Lo sin leer es una sola fecha, `users.notices_seen_at`, no una fila por aviso
+  leido: lo unico que se necesita es el **punto rojo** del menu (sidebar y
+  `BottomNav`), que sale de `GET /notificaciones/unread`.
+- **El punto se pregunta cada minuto** (`POLL_MS` en `src/lib/notices.ts`),
+  al entrar a cada pantalla y al volver a la pestaña del navegador; con la
+  pestaña escondida no se pregunta nada. Al abrir Notificaciones se apaga al
+  momento por el evento `wellco:avisos` (`noticesChanged`), sin esperar al
+  siguiente sondeo: el proyecto no usa librerias de estado global.
 
 ## Panel de control del dueño (`PanelControl.tsx`)
 

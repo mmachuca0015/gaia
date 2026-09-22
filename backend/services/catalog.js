@@ -29,6 +29,58 @@ const STUDIO_COMPLETE = `(
 // los ingresos cuelgan de ella.
 const STUDIO_LIVE = `studios.deleted_at IS NULL`;
 
+// Cuantas sucursales permite el plan de un dueño. `ownerRef` es el SQL que
+// apunta a su id: la tabla en una consulta correlacionada ($1 en una suelta).
+//
+// Sin fila en `subscriptions` es un dueño heredado (se registro antes de que
+// existieran los planes) y a esos no se les bloquea nada, asi que se les da el
+// limite mas alto que haya. Un plan sin limite capturado vale por una.
+const ownerBranchLimit = (ownerRef) => `COALESCE(
+  (SELECT p.max_studios FROM subscriptions sub
+     JOIN plans p ON p.id = sub.plan_id
+    WHERE sub.owner_id = ${ownerRef}),
+  (SELECT MAX(p.max_studios) FROM plans p WHERE p.is_active),
+  1
+)`;
+
+// ¿El plan de este dueño incluye mandar avisos a sus alumnos? Mismo COALESCE
+// que el limite de sucursales, y por las mismas razones: el permiso vive en la
+// base (`plans.notices`, que edita el admin) y no en el codigo, y al dueño
+// heredado no se le quita nada que ya tuviera.
+const ownerNotices = (ownerRef) => `COALESCE(
+  (SELECT p.notices FROM subscriptions sub
+     JOIN plans p ON p.id = sub.plan_id
+    WHERE sub.owner_id = ${ownerRef}),
+  (SELECT BOOL_OR(p.notices) FROM plans p WHERE p.is_active),
+  FALSE
+)`;
+
+// ¿Cabe esta sucursal en el plan de su dueño?
+//
+// No se apaga ninguna sucursal a mano ni se guarda un interruptor: se cuentan
+// las que se crearon antes que ella y caben las primeras `max_studios`. Asi
+// bajar de Pro a Basic deja viva la que nacio con la cuenta y duerme las
+// otras, y volver a Pro las despierta solas, sin tocar la base. No hay estado
+// que se pueda desincronizar del plan.
+//
+// Dormida no es borrada: sus clases, reservas, paquetes e ingresos siguen
+// enteros, solo que el catalogo deja de publicarla.
+//
+// `alias` es como se llama la tabla `studios` en la consulta: casi siempre
+// `studios`, pero los paquetes la necesitan sobre dos sucursales a la vez (la
+// de la compra y la que sobrevive) y ahi cada una lleva su alias.
+//
+// Es un fragmento de WHERE.
+const studioWithinPlan = (alias = "studios") => `(
+  (SELECT COUNT(*) FROM studios older
+    WHERE older.owner_id = ${alias}.owner_id
+      AND older.deleted_at IS NULL
+      AND (older.created_at, older.id) < (${alias}.created_at, ${alias}.id)
+  ) < ${ownerBranchLimit(`${alias}.owner_id`)}
+)`;
+
+const STUDIO_WITHIN_PLAN = studioWithinPlan();
+
 // Un estudio real se publica mientras su suscripcion este al corriente:
 //   - 'activa': si. Incluye la que el dueño cancelo, porque sigue activa hasta
 //     que termina el periodo que ya pago.
@@ -38,12 +90,13 @@ const STUDIO_LIVE = `studios.deleted_at IS NULL`;
 //   - 'cancelada': no.
 // Los dueños sin fila en `subscriptions` (heredados) siguen visibles.
 //
+// Ademas tiene que estar completo, no borrado y caber en el plan: un Basic
+// con tres sucursales de cuando era Pro publica solo la primera.
+//
 // Si no se publica, no sale en el catalogo y no acepta reservas.
 //
-// Ademas tiene que estar completo y no borrado.
-//
 // Es un fragmento de WHERE que espera la tabla `studios` en la consulta.
-const STUDIO_PUBLISHED = `${STUDIO_LIVE} AND ${STUDIO_COMPLETE} AND NOT EXISTS (
+const STUDIO_PUBLISHED = `${STUDIO_LIVE} AND ${STUDIO_WITHIN_PLAN} AND ${STUDIO_COMPLETE} AND NOT EXISTS (
   SELECT 1 FROM subscriptions sub
   WHERE sub.owner_id = studios.owner_id
     AND NOT (
@@ -60,8 +113,10 @@ const STUDIO_PUBLISHED = `${STUDIO_LIVE} AND ${STUDIO_COMPLETE} AND NOT EXISTS (
 // mas. `param` es el placeholder ($n) con el resultado de viewerIsDemo.
 function studioVisibleTo(param) {
   // El estudio demo se salta la suscripcion y lo de estar completo, que es
-  // justo lo que se esta probando, pero borrado es borrado para todos.
-  return `(${STUDIO_LIVE} AND CASE WHEN studios.is_demo THEN ${param}::boolean
+  // justo lo que se esta probando, pero borrado es borrado para todos, y el
+  // limite de sucursales es del plan, no del pago: aplica igual.
+  return `(${STUDIO_LIVE} AND ${STUDIO_WITHIN_PLAN}
+           AND CASE WHEN studios.is_demo THEN ${param}::boolean
                ELSE ${STUDIO_PUBLISHED} END)`;
 }
 
@@ -119,6 +174,10 @@ module.exports = {
   STUDIO_PUBLISHED,
   STUDIO_COMPLETE,
   STUDIO_LIVE,
+  STUDIO_WITHIN_PLAN,
+  studioWithinPlan,
+  ownerBranchLimit,
+  ownerNotices,
   STUDIO_PRICE_FROM,
   STUDIO_OPEN_NOW,
   STUDIO_HOURS_JSON,

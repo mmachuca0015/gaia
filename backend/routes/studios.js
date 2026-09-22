@@ -340,11 +340,16 @@ router.post("/mine", requireAuth, requireRole("owner"), async (req, res) => {
 // Borrar una sucursal: se marca, no se elimina. Las reservas, los paquetes y
 // los ingresos cuelgan de ella y desaparecerian del historial. Marcada sale
 // del catalogo y libera el lugar para crear otra.
+//
+// `allowSleeping`: es la unica ruta que acepta una sucursal dormida. Ademas
+// de poder borrar la que ya no cabe, deja al dueño de Basic quedarse con otra
+// que no sea la primera: al borrar la que esta despierta, despierta la
+// siguiente.
 router.delete(
   "/mine/:id",
   requireAuth,
   requireRole("owner"),
-  requireStudioOwner(),
+  requireStudioOwner("id", { allowSleeping: true }),
   async (req, res) => {
     try {
       const { rows } = await pool.query(

@@ -1,6 +1,7 @@
 // Las sucursales del dueño. Cada una es un estudio: su direccion, su horario,
 // sus clases y sus imagenes. Lo que las agrupa es la cuenta del dueño, y
-// cuantas puede tener lo dice su plan (Basic 1, Pro 3).
+// cuantas puede tener lo dice su plan (`plans.max_studios`, que el admin edita
+// en /admin/suscripciones).
 import { useCallback, useEffect, useState } from "react";
 
 import { apiJson } from "./api";
@@ -31,6 +32,13 @@ export interface Branch {
   complete: boolean;
   /** Que le falta para publicarse, en palabras. */
   missing: string[];
+  /**
+   * Si cabe en el plan del dueño. Las que no caben estan DORMIDAS: se
+   * conservan enteras (clases, reservas, ingresos) pero salen del catalogo y
+   * el dueño no las administra hasta que vuelva a un plan que las incluya.
+   * Lo decide el backend; aqui solo se pinta.
+   */
+  within_plan: boolean;
 }
 
 export interface BranchesResponse {
@@ -82,6 +90,29 @@ export function branchLabel(branch: Branch, index: number) {
   return branch.branch_name?.trim() || `Sucursal ${index + 1}`;
 }
 
+/**
+ * Las que el dueño puede administrar hoy. El backend las manda en el orden en
+ * que se crearon y duerme las que sobran del limite, asi que la primera de la
+ * lista es siempre la que nacio con la cuenta.
+ */
+export function awakeBranches(branches: Branch[]) {
+  return branches.filter((b) => b.within_plan);
+}
+
+/**
+ * Cuales se dormirian con un plan de `maxStudios` sucursales. Sirve para
+ * avisarle al dueño ANTES de que confirme el cambio, con nombre y apellido en
+ * vez de un numero.
+ *
+ * Se apoya en que la lista viene ordenada por antigüedad desde el backend, que
+ * es la misma regla con la que el catalogo decide (STUDIO_WITHIN_PLAN): caben
+ * las primeras, se duerme la cola. El backend vuelve a comprobarlo al guardar;
+ * esto es solo lo que se pinta.
+ */
+export function branchesLeftOut(branches: Branch[], maxStudios: number) {
+  return branches.slice(Math.max(maxStudios, 0));
+}
+
 // La sucursal abierta se recuerda entre pantallas: si el dueño esta viendo
 // Providencia y se va a Reservas, sigue en Providencia. Vive en localStorage
 // porque es estado de presentacion, como el nombre y el rol; el backend nunca
@@ -121,12 +152,14 @@ export function useBranches() {
     setBranches(data.branches);
     setMaxStudios(data.max_studios);
     // La guardada puede ya no existir (se borro, o es de otra cuenta que uso
-    // este navegador): en ese caso se cae a la primera.
+    // este navegador) o haberse dormido al bajar de plan: en esos casos se cae
+    // a la primera que el plan si incluye.
+    const despiertas = awakeBranches(data.branches);
     setActiveIdState((current) => {
       const elegida = current ?? storedBranch();
-      return elegida && data.branches.some((b) => b.id === elegida)
+      return elegida && despiertas.some((b) => b.id === elegida)
         ? elegida
-        : (data.branches[0]?.id ?? null);
+        : (despiertas[0]?.id ?? null);
     });
     setLoaded(true);
   }, []);
@@ -146,7 +179,23 @@ export function useBranches() {
     };
   }, [apply]);
 
-  const studio = branches.find((b) => b.id === activeId) ?? null;
+  // `studio` es siempre una sucursal que el plan incluye: las dormidas se
+  // pintan en las pestañas pero no se abren, y ninguna pantalla del panel debe
+  // acabar pidiendole datos al backend (que las rechaza con 403).
+  const studio =
+    branches.find((b) => b.id === activeId && b.within_plan) ?? null;
 
-  return { branches, studio, activeId, setActiveId, maxStudios, loaded, reload };
+  /** Las que el plan dejo fuera. Vacio mientras el plan alcance para todas. */
+  const sleeping = branches.filter((b) => !b.within_plan);
+
+  return {
+    branches,
+    studio,
+    sleeping,
+    activeId,
+    setActiveId,
+    maxStudios,
+    loaded,
+    reload,
+  };
 }

@@ -12,6 +12,7 @@ import AgregarTarjeta from "./pages/Dashboard/AgregarTarjeta";
 import Favoritos from "./pages/Dashboard/Favoritos";
 import MisPaquetes from "./pages/Dashboard/MisPaquetes";
 import Privacidad from "./pages/Dashboard/Privacidad";
+import Notificaciones from "./pages/Dashboard/Notificaciones";
 import OwnerLayout from "./layouts/OwnerLayout";
 import PanelControl from "./pages/Owner/PanelControl";
 import OwnerClases from "./pages/Owner/OwnerClases";
@@ -23,6 +24,7 @@ import OwnerEstudioSeguridad from "./pages/Owner/OwnerEstudioSeguridad";
 import OwnerEstudioSuscripcion from "./pages/Owner/OwnerEstudioSuscripcion";
 import OwnerReservas from "./pages/Owner/OwnerReservas";
 import OwnerPaquetes from "./pages/Owner/OwnerPaquetes";
+import OwnerAvisos from "./pages/Owner/OwnerAvisos";
 import AdminLayout from "./layouts/AdminLayout";
 import AdminDashboard from "./pages/Admin/AdminDashboard";
 import AdminUsuarios from "./pages/Admin/AdminUsuarios";
@@ -77,6 +79,7 @@ function App() {
               element={<OwnerEstudioSeguridad />}
             />
             <Route path="/owner/reservas" element={<OwnerReservas />} />
+            <Route path="/owner/avisos" element={<OwnerAvisos />} />
           </Route>
         </Route>
 
@@ -89,7 +92,7 @@ function App() {
             <Route path="/mis-paquetes" element={<MisPaquetes />} />
             <Route path="/studios/:id" element={<EstudioDetalle />} />
             <Route path="/agregar-tarjeta" element={<AgregarTarjeta />} />
-            <Route path="/notificaciones" element={<div>Notificaciones</div>} />
+            <Route path="/notificaciones" element={<Notificaciones />} />
             <Route path="/privacidad" element={<Privacidad />} />
           </Route>
         </Route>

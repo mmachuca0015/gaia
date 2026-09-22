@@ -3,8 +3,12 @@
 //
 // En Estudio > General llevan ademas los tres puntos y el boton de agregar
 // (`actions`); en las demas pantallas solo cambian de sucursal.
+//
+// Las sucursales DORMIDAS (las que ya no caben en el plan) si se pintan, con
+// candado y sin poder abrirse: el dueño tiene que ver que siguen ahi, o
+// pensaria que bajar de plan se las borro.
 import { useState } from "react";
-import { MoreVertical, Plus } from "lucide-react";
+import { Lock, MoreVertical, Plus } from "lucide-react";
 
 import { branchLabel, type Branch } from "../lib/branches";
 
@@ -28,7 +32,8 @@ function BranchTabs({ branches, activeId, onSelect, actions }: Props) {
   return (
     <div className="flex items-end gap-1 flex-wrap border-b border-slate-200">
       {branches.map((branch, i) => {
-        const activa = branch.id === activeId;
+        const dormida = !branch.within_plan;
+        const activa = branch.id === activeId && !dormida;
         return (
           <div key={branch.id} className="relative">
             <div
@@ -38,17 +43,27 @@ function BranchTabs({ branches, activeId, onSelect, actions }: Props) {
             >
               <button
                 onClick={() => {
+                  if (dormida) return;
                   onSelect(branch.id);
                   setMenuOpen(false);
                 }}
-                className={`flex items-center gap-2 pl-4 py-2.5 text-md cursor-pointer ${
-                  activa
-                    ? `text-slate-800 font-medium ${actions ? "pr-1" : "pr-4"}`
-                    : "text-slate-500 hover:text-slate-700 pr-4"
+                disabled={dormida}
+                title={
+                  dormida
+                    ? "Tu plan ya no incluye esta sucursal. Sigue guardada: cambia de plan para volver a abrirla."
+                    : undefined
+                }
+                className={`flex items-center gap-2 pl-4 py-2.5 text-md ${
+                  dormida
+                    ? "text-slate-300 cursor-not-allowed pr-4"
+                    : activa
+                      ? `text-slate-800 font-medium cursor-pointer ${actions ? "pr-1" : "pr-4"}`
+                      : "text-slate-500 hover:text-slate-700 cursor-pointer pr-4"
                 }`}
               >
+                {dormida && <Lock size={13} className="shrink-0" />}
                 {branchLabel(branch, i)}
-                {!branch.complete && (
+                {!branch.complete && !dormida && (
                   <span
                     title="Le falta información"
                     className="w-1.5 h-1.5 rounded-full bg-amber-500"

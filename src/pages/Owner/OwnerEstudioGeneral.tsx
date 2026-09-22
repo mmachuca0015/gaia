@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 
@@ -50,6 +50,7 @@ function OwnerEstudioGeneral() {
   const {
     branches,
     studio,
+    sleeping,
     activeId,
     setActiveId,
     maxStudios,
@@ -277,6 +278,28 @@ function OwnerEstudioGeneral() {
             }}
           />
         </div>
+
+        {/* Las que el plan dejo fuera. No se borro nada: dejan de publicarse
+            y de administrarse hasta que el dueño vuelva a un plan que las
+            incluya. Se avisa aqui, que es donde se administran las
+            sucursales. */}
+        {sleeping.length > 0 && (
+          <div className="max-w-2xl mx-auto mb-6 bg-slate-50 border border-line rounded-2xl px-5 py-4">
+            <p className="flex items-center gap-2 font-medium text-slate-700">
+              <Lock size={15} className="shrink-0" />
+              {sleeping.length === 1
+                ? "Tu plan ya no incluye una de tus sucursales"
+                : `Tu plan ya no incluye ${sleeping.length} de tus sucursales`}
+            </p>
+            <p className="text-md text-slate-500">
+              {sleeping.map((b) => branchLabel(b, branches.indexOf(b))).join(", ")}{" "}
+              {sleeping.length === 1 ? "salió" : "salieron"} del catálogo, pero
+              no se {sleeping.length === 1 ? "borró" : "borraron"}: sus clases,
+              reservaciones e ingresos siguen guardados. Cambia al plan Pro para
+              volver a abrir{sleeping.length === 1 ? "la" : "las"}.
+            </p>
+          </div>
+        )}
 
         {!studio.complete && (
           <div className="max-w-2xl mx-auto mb-6 bg-amber-50 rounded-2xl px-5 py-4">

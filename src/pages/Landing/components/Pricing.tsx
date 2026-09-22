@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import {
+  planFeatureLines,
   fetchPlans,
   monthlyPrice,
   annualTotal,
@@ -174,7 +175,10 @@ function Pricing() {
                     </div>
 
                     <ul className="flex flex-col gap-3 mb-8">
-                      {plan.features.map((f) => (
+                      {/* Sucursales y avisos se arman con las columnas del
+                          plan, no con caracteristicas escritas a mano: son los
+                          mismos valores que aplica el backend. */}
+                      {planFeatureLines(plan).map((f) => (
                         <li key={f.id} className="flex gap-3 items-start">
                           <Check
                             size={15}

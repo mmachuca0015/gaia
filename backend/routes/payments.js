@@ -268,9 +268,23 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
           metadata: { tipo: "clase", ...splitMetadata(classCents, split) },
         });
 
+    // Se guarda con que cargo se pago y cuanto. Sin el PaymentIntent no hay
+    // forma de devolverle el dinero al alumno si el estudio cierra, y el
+    // desglose se copia porque `classes.price` cambia: hay que devolver lo
+    // que se cobro, no lo que la clase cueste ese dia.
     const bookingResult = await client.query(
-      "INSERT INTO bookings (user_id, schedule_id, status, class_date) VALUES ($1, $2, 'activa', $3) RETURNING id",
-      [userId, scheduleId, classDate],
+      `INSERT INTO bookings
+         (user_id, schedule_id, status, class_date,
+          stripe_payment_intent_id, price_cents, service_fee_cents)
+       VALUES ($1, $2, 'activa', $3, $4, $5, $6) RETURNING id`,
+      [
+        userId,
+        scheduleId,
+        classDate,
+        paymentIntent?.id ?? null,
+        classCents,
+        split.serviceFee,
+      ],
     );
 
 

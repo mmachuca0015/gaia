@@ -6,6 +6,7 @@ import { api, ApiError, getCachedUser } from "../lib/api";
 import { fetchServiceFeePercent, serviceFeeCents } from "../lib/fees";
 import {
   fetchUsablePurchases,
+  money,
   redeemPackage,
   type UsablePurchase,
 } from "../lib/packages";
@@ -98,9 +99,14 @@ function ClassCard({
     setUsable(options);
     setPayWith(options[0]?.id ?? "card");
 
-    // Con un paquete no hace falta tarjeta.
+    // Con un paquete no hace falta tarjeta. Con una clase a favor sí, si la
+    // clase elegida cuesta más que la que se quedó sin sede: esa diferencia se
+    // cobra.
     const user = JSON.parse(localStorage.getItem("user") || "{}");
+    const todasCubren = options.some((o) => o.difference_cents === 0);
     if (options.length === 0 && !isDemo && !user.stripe_customer_id) {
+      setShowPopup(true);
+    } else if (options.length > 0 && !todasCubren && !isDemo && !user.stripe_customer_id) {
       setShowPopup(true);
     } else {
       setShowConfirmPopUp(true);
@@ -112,10 +118,15 @@ function ClassCard({
     try {
       const res = await redeemPackage(payWith, schedule_id, classDate);
       setShowConfirmPopUp(false);
+      const elegida = usable.find((u) => u.id === payWith);
       alert(
-        `¡Reserva confirmada! Te ${
-          res.remaining === 1 ? "queda 1 clase" : `quedan ${res.remaining} clases`
-        } en el paquete.`,
+        elegida?.is_credit
+          ? res.charged_cents > 0
+            ? `¡Reserva confirmada! Usamos tu clase a favor y cobramos $${money(res.charged_cents)} MXN de diferencia.`
+            : "¡Reserva confirmada! Usamos tu clase a favor, sin ningún cobro."
+          : `¡Reserva confirmada! Te ${
+              res.remaining === 1 ? "queda 1 clase" : `quedan ${res.remaining} clases`
+            } en el paquete.`,
       );
       onReservaExitosa();
     } catch (err) {
@@ -246,11 +257,23 @@ function ClassCard({
                       className="accent-ink w-4 h-4"
                     />
                     <span className="text-slate-700">
-                      Usar «{u.name}»
+                      {u.is_credit ? "Usar tu clase a favor" : `Usar «${u.name}»`}
                       <span className="block text-xs text-slate-400">
-                        {u.remaining === 1
-                          ? "Te queda 1 clase"
-                          : `Te quedan ${u.remaining} clases`}
+                        {u.is_credit ? (
+                          <>
+                            «{u.name}», pagaste ${money(u.value_cents)}
+                            {u.difference_cents > 0 && (
+                              <span className="block text-ink font-medium">
+                                Esta clase cuesta más: pagas $
+                                {money(u.difference_cents)} de diferencia
+                              </span>
+                            )}
+                          </>
+                        ) : u.remaining === 1 ? (
+                          "Te queda 1 clase"
+                        ) : (
+                          `Te quedan ${u.remaining} clases`
+                        )}
                       </span>
                     </span>
                   </label>
@@ -293,13 +316,28 @@ function ClassCard({
             </div>
             )}
 
-            <p className="text-xs text-slate-400">
-              {payWith !== "card"
-                ? "Se descuenta 1 clase de tu paquete, sin ningún cobro."
-                : isDemo
-                  ? "Cuenta demo: la reserva se confirma sin ningún cobro."
-                  : "Se cobrará a tu tarjeta guardada al confirmar."}
-            </p>
+            {/* Una clase a favor con diferencia SÍ cobra. Decir "sin ningún
+                cobro" ahí sería mentirle al alumno justo antes del cargo. */}
+            {(() => {
+              const elegida =
+                payWith === "card" ? null : usable.find((u) => u.id === payWith);
+              const diferencia = elegida?.difference_cents ?? 0;
+              return (
+                <p className="text-xs text-slate-400">
+                  {payWith !== "card"
+                    ? diferencia > 0
+                      ? isDemo
+                        ? "Cuenta demo: la reserva se confirma sin ningún cobro."
+                        : `Se cobrará a tu tarjeta la diferencia de $${money(diferencia)} MXN más el cargo por servicio.`
+                      : elegida?.is_credit
+                        ? "Se usa tu clase a favor, sin ningún cobro."
+                        : "Se descuenta 1 clase de tu paquete, sin ningún cobro."
+                    : isDemo
+                      ? "Cuenta demo: la reserva se confirma sin ningún cobro."
+                      : "Se cobrará a tu tarjeta guardada al confirmar."}
+                </p>
+              );
+            })()}
             <div className="flex gap-3 mt-2">
               <button
                 onClick={() => setShowConfirmPopUp(false)}

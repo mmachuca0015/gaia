@@ -6,12 +6,29 @@ import {
   Users,
   Check,
   Package,
+  Megaphone,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 
 import { logout } from "../lib/api";
+import { fetchOwnerSubscription } from "../lib/subscription";
 function OwnerSidebar() {
   const navigate = useNavigate();
+
+  // Los avisos son una caracteristica del plan (Pro hoy). El backend lo
+  // resuelve en /subscriptions/me con la misma regla con la que rechaza las
+  // rutas, para que el menu no ofrezca una pestaña que va a dar 403.
+  //
+  // Arranca en false: mas vale que la pestaña aparezca un instante despues a
+  // que parpadee y desaparezca en la cara de quien no la tiene.
+  const [notices, setNotices] = useState(false);
+
+  useEffect(() => {
+    fetchOwnerSubscription()
+      .then((sub) => setNotices(sub.notices === true))
+      .catch(() => setNotices(false));
+  }, []);
 
   const navItems = [
     {
@@ -23,6 +40,9 @@ function OwnerSidebar() {
     { icon: Package, label: "Paquetes", path: "/owner/paquetes" },
     { icon: Users, label: "Instructores", path: "/owner/instructores" },
     { icon: Check, label: "Reservas", path: "/owner/reservas" },
+    ...(notices
+      ? [{ icon: Megaphone, label: "Avisos", path: "/owner/avisos" }]
+      : []),
     { icon: Store, label: "Estudio", path: "/owner/estudio" },
   ];
 

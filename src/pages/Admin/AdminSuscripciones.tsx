@@ -1,5 +1,13 @@
 import { useEffect, useState } from "react";
-import { Plus, X, Star, Check, CreditCard } from "lucide-react";
+import {
+  Plus,
+  X,
+  Star,
+  Check,
+  CreditCard,
+  Store,
+  Megaphone,
+} from "lucide-react";
 
 import { api, apiJson } from "../../lib/api";
 import {
@@ -7,6 +15,7 @@ import {
   formatMoney,
   introPrice,
   annualTotal,
+  branchesFeature,
   type Plan,
 } from "../../lib/plans";
 
@@ -143,7 +152,9 @@ function AdminSuscripciones() {
             <div
               key={plan.id}
               className={`bg-white rounded-2xl p-6 border ${
-                plan.is_active ? "border-slate-200" : "border-slate-200 opacity-60"
+                plan.is_active
+                  ? "border-slate-200"
+                  : "border-slate-200 opacity-60"
               }`}
             >
               {/* Encabezado */}
@@ -266,6 +277,60 @@ function AdminSuscripciones() {
                     ${formatMoney(annualTotal(plan))} al año
                   </p>
                 </div>
+              </div>
+
+              {/* Lo que incluye el plan: sucursales y avisos. Lo que se guarde
+                  aqui es lo que el backend aplica de verdad, no un texto
+                  suelto, y es lo que ven la landing y el registro. */}
+              <div className="mb-5">
+                <label className="text-xs text-slate-400 block mb-1.5">
+                  Sucursales incluidas
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    defaultValue={plan.max_studios}
+                    onBlur={(e) => {
+                      const n = Number(e.target.value);
+                      if (n !== plan.max_studios) {
+                        patchPlan(plan.id, { max_studios: n });
+                      }
+                    }}
+                    className="w-24 px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
+                  />
+                  <span className="flex items-center gap-2 text-sm text-slate-500">
+                    <Store size={14} className="text-[#1b2c44] shrink-0" />
+                    {branchesFeature(plan)}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-2">
+                  Si lo bajas, las sucursales que ya no caben dejan de
+                  publicarse, pero no se borran: vuelven si el número sube.
+                </p>
+              </div>
+
+              <div className="mb-5">
+                <label className="text-xs text-slate-400 block mb-1.5">
+                  Avisos a los alumnos
+                </label>
+                <button
+                  onClick={() => patchPlan(plan.id, { notices: !plan.notices })}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm transition-colors cursor-pointer ${
+                    plan.notices
+                      ? "border-[#1b2c44] bg-[#1b2c44]/5 text-[#1b2c44]"
+                      : "border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300"
+                  }`}
+                >
+                  <Megaphone size={14} className="shrink-0" />
+                  {plan.notices ? "Incluidos" : "No incluidos"}
+                </button>
+                <p className="text-xs text-slate-400 mt-2">
+                  Deja al dueño mandarles mensajes a los alumnos que tienen su
+                  estudio en favoritos. Si lo apagas pierde la pestaña, pero los
+                  avisos que ya mandó se siguen viendo hasta que caduquen.
+                </p>
               </div>
 
               {/* Caracteristicas */}

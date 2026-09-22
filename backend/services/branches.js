@@ -1,15 +1,25 @@
 // Las sucursales de un dueño. Cada una es una fila de `studios`; lo que las
 // agrupa es `owner_id`.
 const pool = require("../db");
-const { STUDIO_COMPLETE, STUDIO_HOURS_JSON } = require("./catalog");
+const {
+  STUDIO_COMPLETE,
+  STUDIO_HOURS_JSON,
+  STUDIO_WITHIN_PLAN,
+  ownerBranchLimit,
+} = require("./catalog");
 
-// Las sucursales vivas de un dueño, en el orden en que las creo. `complete`
-// sale del MISMO SQL con el que el catalogo decide si se publica, para que el
-// panel no pueda decir una cosa y el catalogo otra.
+// Las sucursales vivas de un dueño, en el orden en que las creo. `complete` y
+// `within_plan` salen del MISMO SQL con el que el catalogo decide si se
+// publica, para que el panel no pueda decir una cosa y el catalogo otra.
+//
+// El orden importa y es el mismo que usa STUDIO_WITHIN_PLAN: la primera de
+// la lista es la que nacio con la cuenta, y es la que sobrevive si el dueño
+// baja de Pro a Basic.
 const BRANCHES_QUERY = `
   SELECT studios.*,
-         ${STUDIO_HOURS_JSON} AS hours,
-         ${STUDIO_COMPLETE}   AS complete
+         ${STUDIO_HOURS_JSON}   AS hours,
+         ${STUDIO_COMPLETE}     AS complete,
+         ${STUDIO_WITHIN_PLAN}  AS within_plan
   FROM studios
   WHERE studios.owner_id = $1 AND studios.deleted_at IS NULL
   ORDER BY studios.created_at, studios.id`;
@@ -46,19 +56,13 @@ function missingFields(studio) {
 /**
  * Cuantas sucursales puede tener este dueño: las que permite su plan.
  *
- * Sin fila en `subscriptions` es un dueño heredado (se registro antes de que
- * existieran los planes) y a esos no se les bloquea nada, asi que se le da el
- * limite mas alto que haya. Un plan sin limite capturado vale por una.
+ * Es el mismo COALESCE que usa el catalogo para decidir cuales publica
+ * (`ownerBranchLimit`), no una segunda copia: si se escribieran aparte, el
+ * panel podria ofrecer un lugar que el catalogo no reconoce.
  */
 async function branchLimit(ownerId, client = pool) {
   const { rows } = await client.query(
-    `SELECT COALESCE(
-       (SELECT p.max_studios FROM subscriptions s
-          JOIN plans p ON p.id = s.plan_id
-         WHERE s.owner_id = $1),
-       (SELECT MAX(max_studios) FROM plans WHERE is_active),
-       1
-     ) AS max_studios`,
+    `SELECT ${ownerBranchLimit("$1")} AS max_studios`,
     [ownerId],
   );
   return Number(rows[0]?.max_studios) || 1;
@@ -70,4 +74,23 @@ async function listBranches(ownerId, client = pool) {
   return rows.map((studio) => ({ ...studio, missing: missingFields(studio) }));
 }
 
-module.exports = { listBranches, branchLimit, missingFields };
+/**
+ * ¿Cabe esta sucursal en el plan de su dueño? Una que no cabe esta dormida:
+ * el dueño la ve en el panel pero no la puede administrar, y el catalogo no
+ * la publica. Se comprueba en la base con el mismo fragmento que el catalogo.
+ */
+async function branchWithinPlan(studioId, client = pool) {
+  const { rows } = await client.query(
+    `SELECT ${STUDIO_WITHIN_PLAN} AS within_plan
+       FROM studios WHERE studios.id = $1`,
+    [studioId],
+  );
+  return rows[0]?.within_plan === true;
+}
+
+module.exports = {
+  listBranches,
+  branchLimit,
+  branchWithinPlan,
+  missingFields,
+};

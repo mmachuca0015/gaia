@@ -1,13 +1,15 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertCircle, ArrowLeft, Check, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, Lock, X } from "lucide-react";
 
 import PlanPicker from "../../components/PlanPicker";
 import SubscriptionPayment from "../../components/SubscriptionPayment";
 import {
+  branchesFeature,
   fetchPlans,
   firstChargePrice,
   formatMoney,
+  planFeatureLines,
   type BillingInterval,
   type Plan,
 } from "../../lib/plans";
@@ -15,6 +17,8 @@ import {
   cancelSubscription,
   changePlan,
   fetchOwnerSubscription,
+  fetchPlanImpact,
+  type BranchImpact,
   formatLongDate,
   nextChargeDate,
   renewalPrice,
@@ -78,15 +82,27 @@ function OwnerEstudioSuscripcion() {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   // Elegir suscripcion despues de que la anterior termino.
-  const [chooseStep, setChooseStep] = useState<"pick" | "confirm" | "pay" | null>(
-    null,
-  );
-  const [chooseInterval, setChooseInterval] = useState<BillingInterval>("month");
+  const [chooseStep, setChooseStep] = useState<
+    "pick" | "confirm" | "pay" | null
+  >(null);
+  const [chooseInterval, setChooseInterval] =
+    useState<BillingInterval>("month");
   const [choosePlanId, setChoosePlanId] = useState<number | null>(null);
   const [activating, setActivating] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState("");
+
+  // Encuesta de salida y reconocimiento de las sucursales que se duermen. Se
+  // limpian al abrir el selector: no deben arrastrarse de un intento previo.
+  const [reason, setReason] = useState("");
+  const [branchesAcknowledged, setBranchesAcknowledged] = useState(false);
+  const [refundsAcknowledged, setRefundsAcknowledged] = useState(false);
+
+  // Lo que se lleva por delante lo que esta a punto de confirmar: sucursales
+  // que se duermen, con sus reservaciones y sus clases de paquete sin canjear.
+  // Lo cuenta el backend; estimarlo aqui seria enseñarle numeros que no son.
+  const [impact, setImpact] = useState<BranchImpact[] | null>(null);
 
   const load = () =>
     fetchOwnerSubscription()
@@ -113,7 +129,9 @@ function OwnerEstudioSuscripcion() {
       setConfirmOpen(false);
     } catch (err) {
       setActionError(
-        err instanceof Error ? err.message : "Algo salió mal. Intenta de nuevo.",
+        err instanceof Error
+          ? err.message
+          : "Algo salió mal. Intenta de nuevo.",
       );
     } finally {
       setBusy(false);
@@ -121,7 +139,10 @@ function OwnerEstudioSuscripcion() {
   };
 
   const loadPlans = () => {
-    if (plans.length === 0) fetchPlans().then(setPlans).catch(() => {});
+    if (plans.length === 0)
+      fetchPlans()
+        .then(setPlans)
+        .catch(() => {});
   };
 
   const openChooser = () => {
@@ -146,7 +167,9 @@ function OwnerEstudioSuscripcion() {
       setChooseStep("pay");
     } catch (err) {
       setActionError(
-        err instanceof Error ? err.message : "Algo salió mal. Intenta de nuevo.",
+        err instanceof Error
+          ? err.message
+          : "Algo salió mal. Intenta de nuevo.",
       );
     } finally {
       setBusy(false);
@@ -167,10 +190,32 @@ function OwnerEstudioSuscripcion() {
     setActivating(false);
   };
 
+  /**
+   * Abre una ventana de confirmacion despues de preguntarle al backend a
+   * quien le pega. `planId` ausente = cancelar, donde no sobrevive ninguna
+   * sucursal.
+   *
+   * Si la consulta falla, la ventana se abre igual y sin numeros: el backend
+   * vuelve a comprobarlo al guardar, asi que perder el aviso no deja pasar
+   * nada indebido.
+   */
+  const openWithImpact = (open: () => void, planId?: number) => {
+    setActionError("");
+    setImpact(null);
+    setBranchesAcknowledged(false);
+    setRefundsAcknowledged(false);
+    open();
+    fetchPlanImpact(planId)
+      .then((data) => setImpact(data.branches))
+      .catch(() => setImpact([]));
+  };
+
   const openPicker = () => {
     if (!sub) return;
     setActionError("");
     setSelectedPlanId(sub.pending_plan?.id ?? sub.plan_id ?? null);
+    setReason("");
+    setBranchesAcknowledged(false);
     setPickerOpen(true);
     loadPlans();
   };
@@ -196,7 +241,9 @@ function OwnerEstudioSuscripcion() {
       <div className="p-4 md:p-8">
         {header}
         {loadError && (
-          <p className="max-w-2xl mx-auto text-sm text-slate-500">{loadError}</p>
+          <p className="max-w-2xl mx-auto text-sm text-slate-500">
+            {loadError}
+          </p>
         )}
       </div>
     );
@@ -224,8 +271,8 @@ function OwnerEstudioSuscripcion() {
         <div className="max-w-2xl mx-auto bg-white rounded-2xl p-6">
           <p className="font-medium text-slate-800 mb-1">Sin plan contratado</p>
           <p className="text-md text-slate-600">
-            Tu estudio se registró antes de que existieran los planes. Escríbenos
-            si quieres contratar uno.
+            Tu estudio se registró antes de que existieran los planes.
+            Escríbenos si quieres contratar uno.
           </p>
         </div>
       </div>
@@ -239,14 +286,19 @@ function OwnerEstudioSuscripcion() {
   const periodEnd = sub.current_period_end
     ? formatLongDate(sub.current_period_end)
     : null;
-  const endPhrase = periodEnd ? `el ${periodEnd}` : "al terminar tu periodo actual";
+  const endPhrase = periodEnd
+    ? `el ${periodEnd}`
+    : "al terminar tu periodo actual";
   const manageable = sub.status === "activa";
   const cancelling = manageable && sub.cancel_at_period_end;
 
   const currentPrice =
     sub.price_cents != null && sub.annual_price_cents != null
       ? renewalPrice(
-          { price_cents: sub.price_cents, annual_price_cents: sub.annual_price_cents },
+          {
+            price_cents: sub.price_cents,
+            annual_price_cents: sub.annual_price_cents,
+          },
           interval,
         )
       : null;
@@ -257,6 +309,46 @@ function OwnerEstudioSuscripcion() {
   const revertingChange =
     selectedPlanId === sub.plan_id && Boolean(sub.pending_plan);
 
+  // Las que dejarian de publicarse con el plan elegido, ya contadas por el
+  // backend. Volver al plan actual no duerme nada.
+  const sleepingSoon = revertingChange ? [] : (impact ?? []);
+  const sleepingPackages = sleepingSoon.reduce(
+    (n, b) => n + b.package_classes,
+    0,
+  );
+
+  // Bajar de plan es pagar menos que hoy. Solo entonces se pregunta el motivo:
+  // subir de plan no necesita explicacion.
+  const isDowngrade = Boolean(
+    selectedPlan &&
+    !revertingChange &&
+    sub.price_cents != null &&
+    selectedPlan.price_cents < sub.price_cents,
+  );
+
+  // Clases sueltas ya pagadas en lo que se cierra: se le abonan gratis al
+  // alumno en la sucursal que queda, o sea que el dueño las va a dar sin
+  // cobrar otra vez. Es lo que tiene que aceptar.
+  const creditClasses = sleepingSoon.reduce((n, b) => n + b.credit_classes, 0);
+
+  // El check obligatorio sale en dos casos: quedarse con UNA sucursal, o
+  // tener clases por abonar. Bajar de cinco a tres sin nada pagado solo
+  // enseña los numeros. Misma regla que el backend, que es quien manda.
+  const needsBranchCheck =
+    sleepingSoon.length > 0 &&
+    (selectedPlan?.max_studios === 1 || creditClasses > 0);
+  const confirmBlocked = needsBranchCheck && !branchesAcknowledged;
+
+  // Al cancelar no sobrevive ninguna sucursal: no hay a donde mover a nadie y
+  // hay que devolver el dinero.
+  const cancelBookings = (impact ?? []).reduce((n, b) => n + b.bookings, 0);
+  const cancelPackages = (impact ?? []).reduce(
+    (n, b) => n + b.package_classes,
+    0,
+  );
+  const cancelNeedsCheck = cancelBookings > 0 || cancelPackages > 0;
+  const cancelBlocked = cancelNeedsCheck && !refundsAcknowledged;
+
   // Lo que se cobra al elegir suscripcion de nuevo. La bienvenida solo aplica
   // a quien nunca ha pagado; es la misma regla que usa el backend al cobrar.
   const chosenPlan = plans.find((p) => p.id === choosePlanId) ?? null;
@@ -266,7 +358,9 @@ function OwnerEstudioSuscripcion() {
       ? renewalPrice(chosenPlan, chooseInterval)
       : firstChargePrice(chosenPlan, chooseInterval)
     : 0;
-  const chosenRenewal = chosenPlan ? renewalPrice(chosenPlan, chooseInterval) : 0;
+  const chosenRenewal = chosenPlan
+    ? renewalPrice(chosenPlan, chooseInterval)
+    : 0;
   const chosenCurrency = (chosenPlan?.currency ?? "mxn").toUpperCase();
 
   return (
@@ -288,8 +382,8 @@ function OwnerEstudioSuscripcion() {
               </p>
               {currentPrice != null && (
                 <p className="text-sm text-slate-500 mt-1">
-                  ${formatMoney(currentPrice)} {currency} + IVA / {perLabel} · pago{" "}
-                  {cadence}
+                  ${formatMoney(currentPrice)} {currency} + IVA / {perLabel} ·
+                  pago {cadence}
                 </p>
               )}
             </div>
@@ -307,7 +401,9 @@ function OwnerEstudioSuscripcion() {
             <div>
               <dt className="text-xs text-slate-400">Estado</dt>
               <dd className="text-sm text-slate-800 mt-0.5">
-                {cancelling ? "Cancelación programada" : STATUS_LABEL[sub.status]}
+                {cancelling
+                  ? "Cancelación programada"
+                  : STATUS_LABEL[sub.status]}
               </dd>
             </div>
             {sub.started_at && (
@@ -330,11 +426,10 @@ function OwnerEstudioSuscripcion() {
 
           {manageable && !cancelling && sub.pending_plan && (
             <p className="text-sm text-ink bg-surface rounded-xl px-4 py-3 mt-6">
-              Cambiarás al plan <strong>{sub.pending_plan.name}</strong> {endPhrase}.
-              Desde ese día se cobrarán $
-              {formatMoney(renewalPrice(sub.pending_plan, interval))} {currency} +
-              IVA de
-              forma {cadence}.
+              Cambiarás al plan <strong>{sub.pending_plan.name}</strong>{" "}
+              {endPhrase}. Desde ese día se cobrarán $
+              {formatMoney(renewalPrice(sub.pending_plan, interval))} {currency}{" "}
+              + IVA de forma {cadence}.
             </p>
           )}
         </div>
@@ -384,10 +479,7 @@ function OwnerEstudioSuscripcion() {
 
         {manageable && !cancelling && (
           <button
-            onClick={() => {
-              setActionError("");
-              setCancelOpen(true);
-            }}
+            onClick={() => openWithImpact(() => setCancelOpen(true))}
             className="self-start text-sm text-red-500 hover:text-red-600 px-1 cursor-pointer"
           >
             Cancelar suscripción
@@ -458,10 +550,12 @@ function OwnerEstudioSuscripcion() {
           </div>
           <p className="text-xs text-slate-400 mt-4">
             Tu estudio vuelve a aparecer en el catálogo en cuanto se confirme el
-            pago. La suscripción se renueva de forma {chosenCadence} hasta que la
-            canceles.
+            pago. La suscripción se renueva de forma {chosenCadence} hasta que
+            la canceles.
           </p>
-          {actionError && <p className="text-sm text-red-500 mt-4">{actionError}</p>}
+          {actionError && (
+            <p className="text-sm text-red-500 mt-4">{actionError}</p>
+          )}
           <div className="flex flex-col-reverse sm:flex-row gap-3 mt-6">
             <button
               onClick={() => setChooseStep("pick")}
@@ -485,7 +579,10 @@ function OwnerEstudioSuscripcion() {
           <p className="text-xs text-slate-400 -mt-3 mb-5">
             Plan {chosenPlan.name} · {chosenCadence}
           </p>
-          <SubscriptionPayment cta="Pagar y activar" onSuccess={waitForActivation} />
+          <SubscriptionPayment
+            cta="Pagar y activar"
+            onSuccess={waitForActivation}
+          />
         </Modal>
       )}
 
@@ -496,12 +593,15 @@ function OwnerEstudioSuscripcion() {
       )}
 
       {cancelOpen && (
-        <Modal title="¿Cancelar tu suscripción?" onClose={() => setCancelOpen(false)}>
+        <Modal
+          title="¿Cancelar tu suscripción?"
+          onClose={() => setCancelOpen(false)}
+        >
           <div className="flex flex-col gap-3 text-sm text-slate-600 leading-relaxed">
             <p>
               Si cancelas tu suscripción, dejaremos de cobrarte y tu estudio
-              dejará de estar visible en el catálogo de estudios. Los usuarios ya
-              no podrán reservar tus clases.
+              dejará de estar visible en el catálogo de estudios. Los usuarios
+              ya no podrán reservar tus clases.
             </p>
             <p className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-amber-900">
               {periodEnd ? (
@@ -512,8 +612,57 @@ function OwnerEstudioSuscripcion() {
                 "Podrás usar Wellco hasta que termine el periodo que ya pagaste."
               )}
             </p>
+
+            {/* Cancelar no deja ninguna sucursal en pie, asi que a diferencia
+                de bajar de plan no hay a donde mover a los alumnos que ya
+                pagaron: hay que devolverles el dinero, y lo pone el estudio,
+                que es quien decidio irse. */}
+            {cancelNeedsCheck && (
+              <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3">
+                <p className="font-medium text-red-900">
+                  Tienes alumnos con clases ya pagadas
+                </p>
+                <ul className="text-sm text-red-800 mt-1.5 flex flex-col gap-0.5">
+                  {cancelBookings > 0 && (
+                    <li>
+                      <strong>{cancelBookings}</strong>{" "}
+                      {cancelBookings === 1
+                        ? "reservación futura"
+                        : "reservaciones futuras"}
+                    </li>
+                  )}
+                  {cancelPackages > 0 && (
+                    <li>
+                      <strong>{cancelPackages}</strong>{" "}
+                      {cancelPackages === 1
+                        ? "clase de paquete sin canjear"
+                        : "clases de paquete sin canjear"}
+                    </li>
+                  )}
+                </ul>
+                <p className="text-sm text-red-800 mt-2 leading-relaxed">
+                  Al cerrar tu estudio no hay otra sucursal donde puedan
+                  tomarlas, así que <strong>se les devuelve su dinero</strong>.
+                  El reembolso sale de tu estudio, no de Wellco, porque la baja
+                  es tu decisión.
+                </p>
+                <label className="flex items-start gap-2.5 mt-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={refundsAcknowledged}
+                    onChange={(e) => setRefundsAcknowledged(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-red-600 cursor-pointer shrink-0"
+                  />
+                  <span className="text-sm text-red-900">
+                    Acepto reembolsar a esos alumnos con cargo a mi estudio.
+                  </span>
+                </label>
+              </div>
+            )}
           </div>
-          {actionError && <p className="text-sm text-red-500 mt-4">{actionError}</p>}
+          {actionError && (
+            <p className="text-sm text-red-500 mt-4">{actionError}</p>
+          )}
           <div className="flex flex-col-reverse sm:flex-row gap-3 mt-6">
             <button
               onClick={() => setCancelOpen(false)}
@@ -522,9 +671,9 @@ function OwnerEstudioSuscripcion() {
               Mantener suscripción
             </button>
             <button
-              onClick={() => run(cancelSubscription)}
-              disabled={busy}
-              className="flex-1 px-5 py-2.5 rounded-full bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition-colors cursor-pointer disabled:opacity-60"
+              onClick={() => run(() => cancelSubscription(refundsAcknowledged))}
+              disabled={busy || cancelBlocked}
+              className="flex-1 px-5 py-2.5 rounded-full bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {busy ? "Cancelando..." : "Sí, cancelar"}
             </button>
@@ -571,7 +720,9 @@ function OwnerEstudioSuscripcion() {
                           selected ? "border-ink" : "border-slate-300"
                         }`}
                       >
-                        {selected && <span className="w-2 h-2 rounded-full bg-ink" />}
+                        {selected && (
+                          <span className="w-2 h-2 rounded-full bg-ink" />
+                        )}
                       </span>
                     </div>
                     {plan.id === sub.plan_id && (
@@ -580,7 +731,9 @@ function OwnerEstudioSuscripcion() {
                       </span>
                     )}
                     {plan.tagline && (
-                      <p className="text-xs text-slate-400 mb-3">{plan.tagline}</p>
+                      <p className="text-xs text-slate-400 mb-3">
+                        {plan.tagline}
+                      </p>
                     )}
                     <p className="text-sm text-slate-800 mb-3">
                       <span
@@ -594,9 +747,17 @@ function OwnerEstudioSuscripcion() {
                       </span>
                     </p>
                     <ul className="flex flex-col gap-2">
-                      {plan.features.map((f) => (
+                      {/* Las sucursales salen de `max_studios`: es el numero
+                          que decide cuales se duermen al bajar de plan, asi
+                          que tiene que verse aqui antes de elegir. Los avisos,
+                          de `notices`: al bajar a un plan sin ellos se pierde
+                          la pestaña. */}
+                      {planFeatureLines(plan).map((f) => (
                         <li key={f.id} className="flex gap-2 items-start">
-                          <Check size={13} className="text-ink mt-0.5 shrink-0" />
+                          <Check
+                            size={13}
+                            className="text-ink mt-0.5 shrink-0"
+                          />
                           <span className="text-xs text-slate-600 leading-relaxed">
                             {f.label}
                           </span>
@@ -620,10 +781,12 @@ function OwnerEstudioSuscripcion() {
               Cerrar
             </button>
             <button
-              onClick={() => {
-                setActionError("");
-                setConfirmOpen(true);
-              }}
+              onClick={() =>
+                openWithImpact(
+                  () => setConfirmOpen(true),
+                  selectedPlanId ?? undefined,
+                )
+              }
               disabled={!selectedPlan || selectedPlanId === upcomingPlanId}
               className="flex-1 px-5 py-2.5 rounded-full bg-ink text-white text-sm font-medium hover:bg-ink-soft transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
@@ -634,30 +797,182 @@ function OwnerEstudioSuscripcion() {
       )}
 
       {confirmOpen && selectedPlan && (
-        <Modal title="Confirmar cambio de plan" onClose={() => setConfirmOpen(false)}>
+        <Modal
+          title="Confirmar cambio de plan"
+          onClose={() => setConfirmOpen(false)}
+        >
           <div className="text-sm text-slate-600 leading-relaxed">
             {revertingChange ? (
               <p>
-                Conservarás tu plan <strong>{sub.plan_name}</strong> y se cancela
-                el cambio al plan {sub.pending_plan?.name}. Se seguirán cobrando $
-                {formatMoney(renewalPrice(selectedPlan, interval))} {currency} +
-                IVA de
-                forma {cadence}.
+                Conservarás tu plan <strong>{sub.plan_name}</strong> y se
+                cancela el cambio al plan {sub.pending_plan?.name}. Se seguirán
+                cobrando ${formatMoney(renewalPrice(selectedPlan, interval))}{" "}
+                {currency} + IVA de forma {cadence}.
               </p>
             ) : (
               <p>
                 Tu cambio al plan <strong>{selectedPlan.name}</strong> será{" "}
                 <strong>{endPhrase}</strong> y se cobrarán{" "}
                 <strong>
-                  ${formatMoney(renewalPrice(selectedPlan, interval))} {currency} +
-                  IVA
+                  ${formatMoney(renewalPrice(selectedPlan, interval))}{" "}
+                  {currency} + IVA
                 </strong>{" "}
                 de forma {cadence}. Hasta ese día conservas tu plan{" "}
                 {sub.plan_name} sin costo adicional.
               </p>
             )}
           </div>
-          {actionError && <p className="text-sm text-red-500 mt-4">{actionError}</p>}
+
+          {/* Las sucursales que el plan nuevo deja fuera, con lo que cuelga
+              de cada una. El numero es lo que hace pensar: "Sur tiene 12
+              reservaciones" pesa mas que "podrias perder sucursales". Nadie
+              debe enterarse de esto despues de confirmar. */}
+          {sleepingSoon.length > 0 && (
+            <div className="mt-5 rounded-2xl bg-amber-50 px-5 py-4">
+              <p className="flex items-center gap-2 font-medium text-amber-800">
+                <Lock size={15} className="shrink-0" />
+                {sleepingSoon.length === 1
+                  ? "Una de tus sucursales dejará de aparecer"
+                  : `${sleepingSoon.length} de tus sucursales dejarán de aparecer`}
+              </p>
+              <p className="text-sm text-amber-700 mt-1 leading-relaxed">
+                El plan {selectedPlan.name} incluye{" "}
+                {branchesFeature(selectedPlan)}.{" "}
+                {endPhrase.charAt(0).toUpperCase() + endPhrase.slice(1)}{" "}
+                {sleepingSoon.length === 1 ? "saldrá" : "saldrán"} del catálogo
+                y tus alumnos ya no{" "}
+                {sleepingSoon.length === 1 ? "la verán" : "las verán"}:
+              </p>
+
+              <ul className="flex flex-col gap-1.5 my-3">
+                {sleepingSoon.map((b) => (
+                  <li
+                    key={b.id}
+                    className="flex items-baseline justify-between gap-3 text-sm bg-white/60 rounded-xl px-3 py-2"
+                  >
+                    <span className="font-medium text-amber-900">
+                      {b.branch_name?.trim() || b.name}
+                    </span>
+                    <span className="text-amber-700 text-right shrink-0">
+                      {b.bookings === 0
+                        ? "sin reservaciones"
+                        : `${b.bookings} ${b.bookings === 1 ? "reservación" : "reservaciones"}`}
+                      {b.package_classes > 0 &&
+                        ` · ${b.package_classes} ${
+                          b.package_classes === 1
+                            ? "clase de paquete"
+                            : "clases de paquete"
+                        }`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              <p className="text-sm text-amber-700 leading-relaxed">
+                No se {sleepingSoon.length === 1 ? "borra" : "borran"}: sus
+                clases, reservaciones e ingresos siguen guardados y{" "}
+                {sleepingSoon.length === 1 ? "vuelve" : "vuelven"} si regresas
+                al plan {sub.plan_name}.
+              </p>
+
+              {/* Nadie pierde su dinero: los paquetes se canjean donde el
+                  dueño sí conserva sucursal y las clases sueltas se abonan.
+                  Es la respuesta a "¿y los que ya pagaron?". */}
+              {sleepingPackages > 0 && (
+                <p className="text-sm text-amber-700 leading-relaxed mt-2">
+                  Los alumnos que todavía tengan clases por canjear en sus
+                  paquetes <strong>podrán reservarlas</strong> en{" "}
+                  {selectedPlan.max_studios === 1
+                    ? "la sucursal que conservas"
+                    : "las sucursales que conservas"}{" "}
+                  con el plan {selectedPlan.name}.
+                </p>
+              )}
+              {creditClasses > 0 && (
+                <p className="text-sm text-amber-700 leading-relaxed mt-2">
+                  Las <strong>{creditClasses}</strong>{" "}
+                  {creditClasses === 1
+                    ? "clase suelta que ya te pagaron"
+                    : "clases sueltas que ya te pagaron"}{" "}
+                  en{" "}
+                  {sleepingSoon.length === 1
+                    ? "esa sucursal"
+                    : "esas sucursales"}{" "}
+                  se le {creditClasses === 1 ? "abonará" : "abonarán"} a cada
+                  alumno <strong>sin costo</strong> en la que conservas, con
+                  seis meses para usarla{creditClasses === 1 ? "" : "s"}. Les
+                  llega un correo explicándoles que no perdieron su dinero.
+                </p>
+              )}
+
+              {/* El check solo aparece cuando se queda con UNA sucursal: ahi
+                  no hay a donde mover a nadie. Con varias, los numeros de
+                  arriba y la pregunta bastan. */}
+              {needsBranchCheck ? (
+                <label className="flex items-start gap-2.5 mt-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={branchesAcknowledged}
+                    onChange={(e) => setBranchesAcknowledged(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-[#1b2c44] cursor-pointer shrink-0"
+                  />
+                  <span className="text-sm text-amber-800">
+                    {creditClasses > 0 ? (
+                      <>
+                        Acepto dar{" "}
+                        {creditClasses === 1
+                          ? "esa clase ya pagada"
+                          : `esas ${creditClasses} clases ya pagadas`}{" "}
+                        sin volver a cobrar, en la sucursal que conservo.
+                      </>
+                    ) : (
+                      <>
+                        Entiendo que{" "}
+                        {sleepingSoon.length === 1
+                          ? "esa sucursal dejará"
+                          : "esas sucursales dejarán"}{" "}
+                        de recibir reservaciones.
+                      </>
+                    )}
+                  </span>
+                </label>
+              ) : (
+                <p className="text-sm font-medium text-amber-900 mt-3">
+                  ¿Quieres seguir adelante con el cambio de plan?
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Encuesta de salida. Opcional a proposito: una suscripcion no se
+              queda detenida detras de una pregunta. */}
+          {isDowngrade && (
+            <div className="mt-5">
+              <label
+                htmlFor="motivo-baja"
+                className="block text-sm text-slate-600 mb-1.5"
+              >
+                ¿Por qué cambias a un plan más bajo?{" "}
+                <span className="text-slate-400">(opcional)</span>
+              </label>
+              <textarea
+                id="motivo-baja"
+                rows={3}
+                maxLength={500}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Nos ayuda a mejorar. Cuéntanos qué te faltó o qué cambió."
+                className="w-full px-4 py-3 rounded-xl border border-line bg-surface text-sm outline-none focus:border-slate-400 transition-colors resize-none"
+              />
+              <p className="text-xs text-slate-400 mt-1 text-right">
+                {reason.length}/500
+              </p>
+            </div>
+          )}
+
+          {actionError && (
+            <p className="text-sm text-red-500 mt-4">{actionError}</p>
+          )}
           <div className="flex flex-col-reverse sm:flex-row gap-3 mt-6">
             <button
               onClick={() => setConfirmOpen(false)}
@@ -666,9 +981,16 @@ function OwnerEstudioSuscripcion() {
               Volver
             </button>
             <button
-              onClick={() => run(() => changePlan(selectedPlan.id))}
-              disabled={busy}
-              className="flex-1 px-5 py-2.5 rounded-full bg-ink text-white text-sm font-medium hover:bg-ink-soft transition-colors cursor-pointer disabled:opacity-60"
+              onClick={() =>
+                run(() =>
+                  changePlan(selectedPlan.id, {
+                    reason: isDowngrade ? reason.trim() : undefined,
+                    confirmBranches: sleepingSoon.length > 0 || undefined,
+                  }),
+                )
+              }
+              disabled={busy || confirmBlocked}
+              className="flex-1 px-5 py-2.5 rounded-full bg-ink text-white text-sm font-medium hover:bg-ink-soft transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {busy ? "Guardando..." : "Confirmar"}
             </button>
