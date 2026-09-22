@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Store } from "lucide-react";
+import { ChevronLeft, ChevronRight, MoreVertical, Store } from "lucide-react";
 import AdminStudioModal from "../../components/AdminStudioModal";
+import AdminPlanModal from "../../components/AdminPlanModal";
 import DemoToggle from "../../components/DemoToggle";
 import type { StudioDetails } from "../../components/AdminStudioModal";
 
@@ -13,7 +14,9 @@ type Studio = {
   email: string;
   country: string;
   city: string | null;
-  plan: string;
+  /** null = dueño heredado, sin fila en subscriptions. */
+  plan: string | null;
+  subscription_status: string | null;
   is_demo: boolean;
 };
 
@@ -27,6 +30,9 @@ function AdminEstudios() {
   // setLoading(true) sincrono del efecto, que provocaba un render de mas.
   const [loadedPage, setLoadedPage] = useState(0);
   const loading = loadedPage !== page;
+  // Sube de uno en uno para volver a pedir la pagina cuando algo la cambia,
+  // como un cambio de plan: la columna Plan tiene que enseñar el nuevo.
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     // Si el usuario cambia de pagina antes de que llegue la respuesta anterior,
@@ -46,12 +52,16 @@ function AdminEstudios() {
     return () => {
       cancelled = true;
     };
-  }, [page]);
+  }, [page, reloadKey]);
 
   const [studioDetails, setStudioDetails] = useState<StudioDetails | null>(
     null,
   );
   const [loadingDetails, setLoadingDetails] = useState<number | null>(null);
+  // Que fila tiene abierto el menu de tres puntos, y de que estudio se esta
+  // cambiando el plan.
+  const [menuOpen, setMenuOpen] = useState<number | null>(null);
+  const [planStudio, setPlanStudio] = useState<number | null>(null);
 
   const handleShowDetails = async (studioId: number) => {
     setLoadingDetails(studioId);
@@ -157,7 +167,14 @@ function AdminEstudios() {
                         {studio.city ?? "—"}
                       </td>
                       <td className="px-6 py-4 text-slate-600">
-                        {studio.plan}
+                        {studio.plan ?? (
+                          <span
+                            className="text-slate-400"
+                            title="Se registró antes de que existieran los planes"
+                          >
+                            Heredado
+                          </span>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <DemoToggle
@@ -167,16 +184,63 @@ function AdminEstudios() {
                         />
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <button
-                          type="button"
-                          disabled={loadingDetails === studio.id}
-                          className="text-sm text-[#1b2c44] font-medium cursor-pointer hover:underline disabled:opacity-50 disabled:cursor-wait"
-                          onClick={() => handleShowDetails(studio.id)}
-                        >
-                          {loadingDetails === studio.id
-                            ? "Cargando..."
-                            : "Detalles"}
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            disabled={loadingDetails === studio.id}
+                            className="text-sm text-[#1b2c44] font-medium cursor-pointer hover:underline disabled:opacity-50 disabled:cursor-wait"
+                            onClick={() => handleShowDetails(studio.id)}
+                          >
+                            {loadingDetails === studio.id
+                              ? "Cargando..."
+                              : "Detalles"}
+                          </button>
+
+                          <div className="relative">
+                            <button
+                              type="button"
+                              aria-label={`Opciones de ${studio.studio_name}`}
+                              onClick={() =>
+                                setMenuOpen((open) =>
+                                  open === studio.id ? null : studio.id,
+                                )
+                              }
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                            >
+                              <MoreVertical size={16} />
+                            </button>
+
+                            {menuOpen === studio.id && (
+                              <>
+                                {/* Capa para cerrar el menu al hacer clic fuera. */}
+                                <div
+                                  className="fixed inset-0 z-10"
+                                  onClick={() => setMenuOpen(null)}
+                                />
+                                <div className="absolute right-0 top-full mt-1 z-20 w-56 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden">
+                                  {/* Una cuenta demo no tiene suscripcion de
+                                      verdad: no hay plan que cambiar. */}
+                                  <button
+                                    type="button"
+                                    disabled={studio.is_demo}
+                                    title={
+                                      studio.is_demo
+                                        ? "Las cuentas demo no tienen suscripción"
+                                        : undefined
+                                    }
+                                    onClick={() => {
+                                      setMenuOpen(null);
+                                      setPlanStudio(studio.id);
+                                    }}
+                                    className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer disabled:text-slate-300 disabled:hover:bg-white disabled:cursor-not-allowed"
+                                  >
+                                    Cambiar plan
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -217,6 +281,14 @@ function AdminEstudios() {
         <AdminStudioModal
           details={studioDetails}
           onClose={() => setStudioDetails(null)}
+        />
+      )}
+
+      {planStudio !== null && (
+        <AdminPlanModal
+          studioId={planStudio}
+          onClose={() => setPlanStudio(null)}
+          onChanged={() => setReloadKey((k) => k + 1)}
         />
       )}
     </div>

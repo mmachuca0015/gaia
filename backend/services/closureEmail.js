@@ -3,58 +3,17 @@
 // Ninguno truena hacia afuera. Un correo que no sale no debe deshacer un abono
 // que ya se dio ni una devolucion que Stripe ya acepto: se anota en el log y
 // la operacion sigue. Es la misma regla de bookingEmail.js.
-const { Resend } = require("resend");
 const ExcelJS = require("exceljs");
 
-// El cliente se arma la primera vez que se usa, no al cargar el archivo:
-// `new Resend()` truena si falta la llave, y este modulo lo carga el webhook
-// de suscripciones. Sin esto, un entorno sin RESEND_API_KEY no arranca.
-let resend = null;
-const cliente = () => (resend ??= new Resend(process.env.RESEND_API_KEY));
-
-const FROM = "Wellco <no-reply@wellcoapp.com>";
-
-// A donde llega el reporte de los que no se pudieron devolver.
-const ADMIN_EMAIL = "mmachuca@wellcoapp.com";
-
-const MESES = [
-  "enero", "febrero", "marzo", "abril", "mayo", "junio",
-  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
-];
-
-// "1 de octubre de 2026" desde un "YYYY-MM-DD". Se arma a mano y no con
-// toLocaleDateString del servidor: el de Render esta en ingles.
-//
-// Siempre recibe texto, nunca un Date: las consultas ya traen la fecha con
-// to_char en hora de Mexico. Un DATE convertido a Date por pg se corre un dia
-// cuando el servidor corre en UTC, y el alumno leeria la fecha equivocada.
-function fechaLarga(ymd) {
-  const [y, m, d] = String(ymd).slice(0, 10).split("-").map(Number);
-  return `${d} de ${MESES[m - 1]} de ${y}`;
-}
-
-const pesos = (centavos) => (centavos / 100).toFixed(2);
-
-// Envoltura comun: mismo encabezado y mismo pie para los tres correos.
-function plantilla(titulo, cuerpo) {
-  return `<div style="font-family:system-ui,-apple-system,sans-serif;max-width:560px;margin:0 auto;color:#1b2c44">
-  <h1 style="font-size:22px;margin:0 0 16px">${titulo}</h1>
-  ${cuerpo}
-  <p style="font-size:13px;color:#64748b;margin-top:28px;border-top:1px solid #e0e7ef;padding-top:16px">
-    Wellco · Si tienes dudas, responde a este correo.
-  </p>
-</div>`;
-}
-
-async function enviar(opciones) {
-  try {
-    await cliente().emails.send({ from: FROM, ...opciones });
-    return true;
-  } catch (err) {
-    console.error("No se pudo enviar el correo de cierre:", err.message);
-    return false;
-  }
-}
+// El remitente, la plantilla, las fechas en español y el envio que no truena
+// son los mismos de todos los correos: viven en services/mailer.js.
+const {
+  ADMIN_EMAIL,
+  fechaLarga,
+  pesos,
+  plantilla,
+  enviar,
+} = require("./mailer");
 
 /**
  * Al alumno, cuando su sucursal cerro pero el estudio sigue abierto en otra.

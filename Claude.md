@@ -301,6 +301,47 @@ Otras reglas de esta parte:
 - Si una renovación falla (`past_due`/`unpaid`), `/payment-intent` cobra la
   factura abierta de esa misma suscripción. No crea otra: cobraría dos veces.
 
+## Cambio de plan desde el admin (migración 019)
+
+- Tres puntos en la fila de `/admin/estudios` -> **Cambiar plan**
+  (`AdminPlanModal.tsx`), rutas `GET`/`POST /admin/studios/:id/plan`. Lo hace
+  soporte, no el dueño: para ayudar a un estudio o arreglarle una situación.
+- **Pasa por las mismas funciones que el cambio del dueño**
+  (`services/subscriptionPlan.js`: `loadOwnerSubscription`, `setStripePlan`).
+  Se sacaron de `routes/subscriptions.js` para no tener dos copias que un día
+  se separen.
+- **Dos formas de aplicarlo, no una fecha libre:**
+  - *Al terminar su periodo* (lo normal): `setStripePlan` con
+    `proration_behavior: "none"` y `pending_plan_id`. Idéntico al cambio del
+    dueño; el periodo pagado se respeta y `plan_id` solo lo mueve el webhook.
+  - *Inmediato*: `proration_behavior: "create_prorations"`. Stripe abona lo
+    que no se usó del plan anterior y cobra lo que queda del nuevo, y la
+    diferencia sale en el **siguiente recibo**. No se cobra la tarjeta en ese
+    momento a propósito: es soporte, y un cargo que falla dejaría la
+    suscripción en `past_due` justo ahí.
+- **Un cambio inmediato que duerme sucursales llama a `relocateStudents` en la
+  ruta**, no en el webhook: las sucursales se duermen en cuanto cambia
+  `plan_id`, y sin eso quedarían alumnos con reservas en una sucursal que ya
+  no le aparece a nadie.
+- **Las cuentas demo no se pueden cambiar** (`blockedReason`), ni las
+  heredadas, ni una suscripción que no esté `activa`, ni una ya programada
+  para terminar. El menú lo esconde y la ruta lo vuelve a comprobar: el pop up
+  puede llevar minutos abierto.
+- Antes de confirmar enseña a quién le pega (`sleepingImpact`, el mismo del
+  dueño) y exige la casilla si alguna sucursal se duerme.
+- **Al estudio le llega un correo** (`services/planChangeEmail.js`) con el
+  monto (sin IVA, como se guarda), lo que incluye el plan y la fecha del
+  próximo cobro. Volver al plan actual (cancelar un cambio programado) no
+  manda nada: no cambió de plan.
+- Queda anotado en `admin_plan_changes` (quién, de qué plan a cuál, cómo se
+  aplicó y un motivo opcional). Nadie lo lee todavía; se consulta a mano.
+- **Los correos comparten `services/mailer.js`** (remitente, plantilla, fechas
+  en español y el envío). Ahí se corrigió que el SDK de Resend **no lanza**
+  cuando el envío falla, devuelve `{ error }`: antes un correo rechazado se
+  anotaba como enviado.
+- La columna **Plan** de `/admin/estudios` era el texto fijo `'Sin plan'` para
+  todos. Ahora sale de `subscriptions` + `plans`; sin fila dice "Heredado".
+
 ## Paquetes de clases
 
 - **Dueño:** `/owner/paquetes` (`OwnerPaquetes.tsx`), rutas `ownerRouter` de
