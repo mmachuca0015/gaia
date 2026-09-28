@@ -31,6 +31,7 @@ import AdminUsuarios from "./pages/Admin/AdminUsuarios";
 import AdminEstudios from "./pages/Admin/AdminEstudios";
 import AdminClasesPagadas from "./pages/Admin/AdminClasesPagadas";
 import AdminSuscripciones from "./pages/Admin/AdminSuscripciones";
+import AdminCuenta from "./pages/Admin/AdminCuenta";
 import AdminPagos from "./pages/Admin/AdminPagos";
 import AdminCupones from "./pages/Admin/AdminCupones";
 
@@ -59,6 +60,7 @@ function App() {
             />
             <Route path="/admin/pagos" element={<AdminPagos />} />
             <Route path="/admin/cupones" element={<AdminCupones />} />
+            <Route path="/admin/cuenta" element={<AdminCuenta />} />
           </Route>
         </Route>
 

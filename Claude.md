@@ -51,6 +51,12 @@ Historial de nombres: GAIA Wellness -> GAIA -> PILA -> **wellco** (nombre actual
 - `localStorage` guarda solo datos de presentación (nombre, rol) para evitar un parpadeo en la interfaz. **No es una credencial**: el backend nunca lo mira. `ProtectedRoute` confirma la sesión contra `GET /users/me`.
 - Todo el frontend habla con el backend por `src/lib/api.ts`, que añade `credentials: "include"` (sin eso la cookie no viaja) y la URL base desde `VITE_API_URL`. No usar `fetch` directo.
 - Cambiar correo o contraseña exige la contraseña actual **en la misma petición**. Cambiar la contraseña cierra todas las demás sesiones.
+- **El admin cambia su contraseña en `/admin/cuenta`** (`AdminCuenta.tsx`, misma
+  ruta `/users/change-password`). **No tiene recuperación por correo, a
+  propósito**: `POST /users/test` ignora a los admins, porque quien se hiciera
+  del correo se haría del panel. Si la pierde: `node
+  scripts/reset-admin-password.js <correo>` desde `/backend`, con la External
+  Database URL de Render en `DATABASE_URL`; da una temporal y cierra sus sesiones.
 - **Link compartido de un estudio** (`ShareStudioButton.tsx`): es la página
   `/studios/:id`. Sin sesión, `ProtectedRoute` manda a `/login?redirect=...` y
   `Login.tsx` vuelve ahí tras iniciar sesión o registrarse como alumno. Solo
