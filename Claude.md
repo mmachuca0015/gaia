@@ -61,12 +61,21 @@ Historial de nombres: GAIA Wellness -> GAIA -> PILA -> **wellco** (nombre actual
 
 - **Wellco cobra por dos lados, ambos sobre el PRECIO de la clase** (o del
   paquete), no sobre el total (`backend/routes/payments.js`):
-  - **Cargo por servicio de 3%** (`SERVICE_FEE_PERCENT`) que paga el **alumno**
-    encima del precio. Sustituye a la cuota fija de $3 que pagaba antes.
-  - **Comisión de 1.5%** (`COMMISSION_PERCENT`) que se le descuenta al **estudio**.
+  - **Cargo por servicio de 3%** que paga el **alumno** encima del precio.
+    Sustituye a la cuota fija de $3 que pagaba antes.
+  - **Comisión de 1.5%** que se le descuenta al **estudio**.
+- **Los dos porcentajes viven en la base** (tabla `fee_settings`, una fila, en
+  puntos base: 300 = 3%; migración 022) y los edita el admin en
+  `/admin/suscripciones` ("Suscripciones y comisiones", `AdminFeesCard.tsx`,
+  `PUT /admin/fees`, con pop up de confirmación). Queda anotado en
+  `fee_changes`. El backend los lee con `getFees()` (`services/charges.js`,
+  cache de 30 s que el cambio limpia) y se los pasa a `splitCharge(base, fees)`.
+  En Stripe no hay nada que actualizar: el reparto se calcula en cada
+  PaymentIntent. **No vuelvas a escribirlos como constante.**
 - **El estudio absorbe la comisión completa de Stripe** (3.6% del total + $3).
-- La landing lo anuncia así: "1.5% más la de Stripe (3.6% + $3 MXN)". Es lo que
-  paga el estudio; el 3% del alumno se ve en el desglose al reservar.
+- La landing lo anuncia así: "1.5% más la de Stripe (3.6% + $3 MXN)", con el
+  porcentaje leído de la API (`Pricing.tsx`). Es lo que paga el estudio; el 3%
+  del alumno se ve en el desglose al reservar.
 
 ### El reparto, con P = precio y T = P + 3% de P
 
@@ -85,13 +94,23 @@ obvio del cálculo: Stripe cobra su comisión de la cuenta de la plataforma, no 
 la del estudio. Si no se resta ahí, sale del bolsillo de Wellco. No quites esa
 resta.
 
-El porcentaje del cargo por servicio se expone en `GET /payments/fees` y el
-frontend lo lee de ahí (`src/lib/fees.ts`, misma fórmula de redondeo que el
-backend). **No lo escribas también en el frontend**: dos copias acaban
+Los dos porcentajes se exponen en `GET /payments/fees` y el
+frontend los lee de ahí (`src/lib/fees.ts`, misma fórmula de redondeo que el
+backend). **No los escribas también en el frontend**: dos copias acaban
 desincronizadas y la pantalla diría un precio distinto al cobrado.
 
 La comisión real de Stripe varía según la tarjeta (internacional, AmEx, etc.),
 así que el neto de Wellco es aproximado, no exacto al centavo.
+
+**Cada cobro guarda sus dos cortes** (`service_fee_cents` y `commission_cents`
+en `bookings` y `package_purchases`, migración 021). Las métricas del admin
+(`FEE_ROWS` en `routes/admin.js`) suman eso, no el total por el porcentaje de
+hoy: si cambian los porcentajes, lo ya cobrado no se mueve.
+
+**Los cobros de suscripción** se guardan en `subscription_payments`
+(migración 020, lo escribe `invoice.paid`) para la gráfica del admin, que los
+muestra **sin IVA** (`net_cents`): el IVA es del SAT, no ingreso. Las facturas
+de antes se cargan con `node scripts/backfill-subscription-payments.js`.
 
 ### Suscripción de estudios
 

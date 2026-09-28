@@ -7,13 +7,37 @@ const { stripe, resourceMissing } = require("./stripe");
 // Wellco cobra por dos lados, los dos en porcentaje sobre el PRECIO de la
 // clase (o del paquete), no sobre el total:
 //
-//   - Cargo por servicio: 3% que paga el alumno ENCIMA del precio.
-//   - Comision: 1.5% que se le descuenta al estudio.
+//   - Cargo por servicio (3% de arranque) que paga el alumno ENCIMA del precio.
+//   - Comision (1.5% de arranque) que se le descuenta al estudio.
 //
-// El estudio ademas absorbe la comision completa de Stripe (3.6% del total
-// cobrado + $3 fijos). El alumno ya no paga los $3.
-const SERVICE_FEE_PERCENT = 3;
-const COMMISSION_PERCENT = 1.5;
+// Los porcentajes viven en la tabla fee_settings (migracion 022) y los edita
+// el admin en /admin/suscripciones. El estudio ademas absorbe la comision
+// completa de Stripe (3.6% del total cobrado + $3 fijos).
+//
+// Se cachean unos segundos para no ir a la base en cada tarjeta de clase; el
+// cambio del admin limpia el cache (invalidateFees) y aplica al momento.
+const FEES_TTL_MS = 30 * 1000;
+let feesCache = null;
+let feesAt = 0;
+
+/** { serviceFeePercent, commissionPercent } vigentes. */
+async function getFees() {
+  if (feesCache && Date.now() - feesAt < FEES_TTL_MS) return feesCache;
+  const { rows } = await pool.query(
+    "SELECT service_fee_bp, commission_bp FROM fee_settings WHERE id = 1",
+  );
+  if (!rows[0]) throw new Error("Falta la fila de fee_settings (migracion 022)");
+  feesCache = {
+    serviceFeePercent: rows[0].service_fee_bp / 100,
+    commissionPercent: rows[0].commission_bp / 100,
+  };
+  feesAt = Date.now();
+  return feesCache;
+}
+
+function invalidateFees() {
+  feesCache = null;
+}
 
 // Lo que cobra Stripe en Mexico por un cargo con tarjeta nacional. Solo se usa
 // para restarlo de la transferencia al estudio: Stripe lo descuenta de la
@@ -25,8 +49,13 @@ const STRIPE_FIXED_CENTS = 300;
 // Cargo por servicio en centavos. El frontend usa la misma formula
 // (src/lib/fees.ts) con el porcentaje que le da GET /payments/fees, para que
 // el desglose que ve el alumno sea exactamente lo que se cobra.
-function serviceFeeCents(classCents) {
-  return Math.round((classCents * SERVICE_FEE_PERCENT) / 100);
+function serviceFeeCents(classCents, fees) {
+  return Math.round((classCents * fees.serviceFeePercent) / 100);
+}
+
+// Lo que Stripe se queda de un cargo por `amountCents` (el total cobrado).
+function stripeFeeCents(amountCents) {
+  return Math.round((amountCents * STRIPE_PERCENT) / 100) + STRIPE_FIXED_CENTS;
 }
 
 // Devuelve el stripe_customer_id del usuario de la sesion, o null.
@@ -91,7 +120,8 @@ async function studioCanReceive(studioId, stripeAccountId) {
   return account.capabilities?.transfers === "active";
 }
 
-// Reparto de un cobro, con P = precio (clase o paquete) y T = P + 3% de P:
+// Reparto de un cobro, con P = precio (clase o paquete) y T = P + 3% de P.
+// `fees` sale de getFees(); se pide aparte para que la ruta lo lea una vez:
 //
 //   alumno paga       T
 //   Stripe se queda   3.6% de T + $3
@@ -101,12 +131,11 @@ async function studioCanReceive(studioId, stripeAccountId) {
 // La comision de Stripe se resta de la transferencia porque Stripe la cobra
 // de la cuenta de la plataforma, no de la del estudio: sin restarla aqui,
 // saldria del bolsillo de Wellco.
-function splitCharge(baseCents) {
-  const serviceFee = serviceFeeCents(baseCents);
+function splitCharge(baseCents, fees) {
+  const serviceFee = serviceFeeCents(baseCents, fees);
   const amountCents = baseCents + serviceFee;
-  const studioCommission = Math.round((baseCents * COMMISSION_PERCENT) / 100);
-  const stripeFee =
-    Math.round((amountCents * STRIPE_PERCENT) / 100) + STRIPE_FIXED_CENTS;
+  const studioCommission = Math.round((baseCents * fees.commissionPercent) / 100);
+  const stripeFee = stripeFeeCents(amountCents);
   return {
     serviceFee,
     amountCents,
@@ -140,8 +169,10 @@ async function savedCard(userId) {
 }
 
 module.exports = {
-  SERVICE_FEE_PERCENT,
+  getFees,
+  invalidateFees,
   serviceFeeCents,
+  stripeFeeCents,
   splitCharge,
   splitMetadata,
   getCustomerId,

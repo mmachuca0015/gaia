@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { api, apiJson } from "../../lib/api";
+import AdminFeesCard from "../../components/AdminFeesCard";
 import {
   toPesos,
   formatMoney,
@@ -19,9 +20,10 @@ import {
   type Plan,
 } from "../../lib/plans";
 
-/* Panel de planes.
+/* Panel de planes y comisiones.
    Lo que se cambia aqui es lo que ven la landing y el paso de plan del
-   registro, porque las tres vistas leen de la misma tabla. */
+   registro, porque las tres vistas leen de la misma tabla. Las comisiones
+   por cobro van en su propia tarjeta (AdminFeesCard). */
 function AdminSuscripciones() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,12 +121,12 @@ function AdminSuscripciones() {
           className="text-4xl md:text-6xl font-semibold text-slate-800"
           style={{ fontFamily: "Cormorant Garamond, serif" }}
         >
-          Planes{" "}
+          Suscripciones{" "}
           <span
             className="text-[#1b2c44]"
             style={{ fontFamily: "Cormorant Garamond, serif" }}
           >
-            de suscripción
+            y comisiones
           </span>
         </h1>
         <p className="text-slate-600 mt-2">
@@ -132,6 +134,8 @@ function AdminSuscripciones() {
           estudios.
         </p>
       </div>
+
+      <AdminFeesCard />
 
       {loading ? (
         <div className="bg-white rounded-2xl p-10 text-center text-slate-500">

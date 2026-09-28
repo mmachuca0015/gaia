@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, MoreVertical, Store } from "lucide-react";
 import AdminStudioModal from "../../components/AdminStudioModal";
 import AdminPlanModal from "../../components/AdminPlanModal";
 import DemoToggle from "../../components/DemoToggle";
+import AdminSearch from "../../components/AdminSearch";
 import type { StudioDetails } from "../../components/AdminStudioModal";
 
 import { api } from "../../lib/api";
@@ -25,20 +26,21 @@ function AdminEstudios() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
-  // `loading` es derivado en vez de un estado propio: mientras la pagina ya
-  // cargada no sea la que se pide, estamos esperando. Asi desaparece el
+  const [query, setQuery] = useState("");
+  // `loading` es derivado en vez de un estado propio: mientras lo ya cargado
+  // no sea lo que se pide, estamos esperando. Asi desaparece el
   // setLoading(true) sincrono del efecto, que provocaba un render de mas.
-  const [loadedPage, setLoadedPage] = useState(0);
-  const loading = loadedPage !== page;
   // Sube de uno en uno para volver a pedir la pagina cuando algo la cambia,
   // como un cambio de plan: la columna Plan tiene que enseñar el nuevo.
   const [reloadKey, setReloadKey] = useState(0);
+  const [loadedKey, setLoadedKey] = useState("");
+  const loading = loadedKey !== `${page}-${query}-${reloadKey}`;
 
   useEffect(() => {
     // Si el usuario cambia de pagina antes de que llegue la respuesta anterior,
     // esa respuesta tardia no debe pisar los datos de la pagina actual.
     let cancelled = false;
-    api(`/admin/studios?page=${page}`)
+    api(`/admin/studios?page=${page}&q=${encodeURIComponent(query)}`)
       .then((res) => res.json())
       .then((data) => {
         if (cancelled) return;
@@ -47,12 +49,12 @@ function AdminEstudios() {
         setTotal(data.total);
       })
       .finally(() => {
-        if (!cancelled) setLoadedPage(page);
+        if (!cancelled) setLoadedKey(`${page}-${query}-${reloadKey}`);
       });
     return () => {
       cancelled = true;
     };
-  }, [page, reloadKey]);
+  }, [page, query, reloadKey]);
 
   const [studioDetails, setStudioDetails] = useState<StudioDetails | null>(
     null,
@@ -91,17 +93,38 @@ function AdminEstudios() {
             App
           </span>
         </h1>
-        <p className="text-slate-600 mt-2">{total} estudios registrados</p>
+        <p className="text-slate-600 mt-2">
+          {query
+            ? `${total} ${total === 1 ? "resultado" : "resultados"}`
+            : `${total} estudios registrados`}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-end gap-3 mb-4">
+        {/* Buscar vuelve a la primera pagina: la 3 de la lista completa casi
+            nunca existe en el resultado. */}
+        <AdminSearch
+          placeholder="Buscar estudio, dueño, correo o ciudad"
+          onSearch={(q) => {
+            setQuery(q);
+            setPage(1);
+          }}
+        />
       </div>
 
       <div className="bg-white rounded-2xl overflow-hidden">
-        {loading ? (
+        {/* Solo se enseña "Cargando" cuando no hay nada que enseñar: al
+            buscar, la tabla anterior se atenua en vez de desaparecer en cada
+            tecla. */}
+        {loading && studios.length === 0 ? (
           <div className="p-10 text-center text-slate-500">Cargando...</div>
         ) : studios.length === 0 ? (
           <div className="p-10 flex flex-col items-center gap-4 text-center">
             <Store size={36} className="text-slate-300" />
             <p className="text-slate-600 font-medium">
-              No hay estudios registrados
+              {query
+                ? "Ningún estudio coincide con la búsqueda"
+                : "No hay estudios registrados"}
             </p>
           </div>
         ) : (
@@ -142,7 +165,9 @@ function AdminEstudios() {
                     </th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody
+                  className={`transition-opacity ${loading ? "opacity-40" : ""}`}
+                >
                   {studios.map((studio) => (
                     <tr
                       key={studio.id}
@@ -181,6 +206,13 @@ function AdminEstudios() {
                           path={`/admin/studios/${studio.id}/demo`}
                           value={studio.is_demo}
                           label={`Estudio demo: ${studio.studio_name}`}
+                          confirm={{
+                            name: studio.studio_name,
+                            encender:
+                              "Dejará de existir para todos menos para las cuentas demo: sale del catálogo, del buscador y de los favoritos de los demás alumnos. Sus reservas se simulan sin cobro y no cuentan en las métricas.",
+                            apagar:
+                              "Vuelve al catálogo y cualquier alumno podrá reservar ahí. Los cobros de sus clases serán reales y sus reservas vuelven a contar en las métricas.",
+                          }}
                         />
                       </td>
                       <td className="px-6 py-4 text-right">

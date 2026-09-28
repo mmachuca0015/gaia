@@ -10,6 +10,7 @@ import {
   formatMoney,
   type Plan,
 } from "../../../lib/plans";
+import { fetchFees, formatPercent } from "../../../lib/fees";
 
 function Pricing() {
   const [annual, setAnnual] = useState(false);
@@ -22,6 +23,15 @@ function Pricing() {
     fetchPlans()
       .then(setPlans)
       .catch(() => setError(true));
+  }, []);
+
+  // La comision del estudio tambien la edita el admin. Si no llega, el texto
+  // la omite en vez de enseñar un porcentaje que quiza ya no es.
+  const [commission, setCommission] = useState<number | null>(null);
+  useEffect(() => {
+    fetchFees()
+      .then((f) => setCommission(f.commission_percent))
+      .catch(() => setCommission(null));
   }, []);
 
   return (
@@ -220,8 +230,9 @@ function Pricing() {
               Comisión por reserva
             </p>
             <p className="text-sm text-slate-500 leading-relaxed">
-              Todos los planes tienen una comisión de 1.5% más una comisión de
-              Stripe (3.6% + $3 MXN) por cada transacción.
+              Todos los planes tienen una comisión
+              {commission !== null ? ` de ${formatPercent(commission)}%` : ""}{" "}
+              más una comisión de Stripe (3.6% + $3 MXN) por cada transacción.
             </p>
           </div>
           <div className="border border-line rounded-2xl p-5">

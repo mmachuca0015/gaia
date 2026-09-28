@@ -1,6 +1,8 @@
 // src/components/AdminSidebar.tsx
 import {
+  CalendarCheck,
   LayoutDashboard,
+  Receipt,
   Users,
   Store,
   CreditCard,
@@ -18,11 +20,18 @@ function AdminSidebar() {
     { icon: Users, label: "Usuarios", path: "/admin/usuarios", end: false },
     { icon: Store, label: "Estudios", path: "/admin/estudios", end: false },
     {
+      icon: CalendarCheck,
+      label: "Clases pagadas",
+      path: "/admin/clases-pagadas",
+      end: false,
+    },
+    {
       icon: CreditCard,
-      label: "Suscripciones",
+      label: "Suscripciones y comisiones",
       path: "/admin/suscripciones",
       end: false,
     },
+    { icon: Receipt, label: "Pagos", path: "/admin/pagos", end: false },
     { icon: Ticket, label: "Cupones", path: "/admin/cupones", end: false },
   ];
 

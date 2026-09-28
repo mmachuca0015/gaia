@@ -29,7 +29,9 @@ import AdminLayout from "./layouts/AdminLayout";
 import AdminDashboard from "./pages/Admin/AdminDashboard";
 import AdminUsuarios from "./pages/Admin/AdminUsuarios";
 import AdminEstudios from "./pages/Admin/AdminEstudios";
+import AdminClasesPagadas from "./pages/Admin/AdminClasesPagadas";
 import AdminSuscripciones from "./pages/Admin/AdminSuscripciones";
+import AdminPagos from "./pages/Admin/AdminPagos";
 import AdminCupones from "./pages/Admin/AdminCupones";
 
 function App() {
@@ -48,9 +50,14 @@ function App() {
             <Route path="/admin/usuarios" element={<AdminUsuarios />} />
             <Route path="/admin/estudios" element={<AdminEstudios />} />
             <Route
+              path="/admin/clases-pagadas"
+              element={<AdminClasesPagadas />}
+            />
+            <Route
               path="/admin/suscripciones"
               element={<AdminSuscripciones />}
             />
+            <Route path="/admin/pagos" element={<AdminPagos />} />
             <Route path="/admin/cupones" element={<AdminCupones />} />
           </Route>
         </Route>

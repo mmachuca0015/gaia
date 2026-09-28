@@ -6,7 +6,7 @@ const { stripe, resourceMissing } = require("../services/stripe");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const { STUDIO_PUBLISHED, viewerIsDemo } = require("../services/catalog");
 const {
-  SERVICE_FEE_PERCENT,
+  getFees,
   splitCharge,
   splitMetadata,
   getCustomerId,
@@ -24,8 +24,20 @@ const FRONTEND_URL = (process.env.FRONTEND_URL || "http://localhost:5173")
 // cobrar. Publico y de solo lectura: no revela nada que el cliente no vea ya
 // en su recibo, y evita tener el numero escrito en dos lugares que se puedan
 // desincronizar.
-router.get("/fees", (req, res) => {
-  res.json({ service_fee_percent: SERVICE_FEE_PERCENT });
+//
+// Lo leen el desglose del alumno, la landing (comision del estudio) y las
+// graficas del admin.
+router.get("/fees", async (req, res) => {
+  try {
+    const fees = await getFees();
+    res.json({
+      service_fee_percent: fees.serviceFeePercent,
+      commission_percent: fees.commissionPercent,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "No pudimos leer las comisiones" });
+  }
 });
 
 
@@ -195,7 +207,7 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
     }
 
     // Lo que paga el alumno y cuanto se queda cada quien.
-    const split = splitCharge(classCents);
+    const split = splitCharge(classCents, await getFees());
 
     let card = null;
     if (!simulated) {
@@ -275,8 +287,9 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
     const bookingResult = await client.query(
       `INSERT INTO bookings
          (user_id, schedule_id, status, class_date,
-          stripe_payment_intent_id, price_cents, service_fee_cents)
-       VALUES ($1, $2, 'activa', $3, $4, $5, $6) RETURNING id`,
+          stripe_payment_intent_id, price_cents, service_fee_cents,
+          commission_cents)
+       VALUES ($1, $2, 'activa', $3, $4, $5, $6, $7) RETURNING id`,
       [
         userId,
         scheduleId,
@@ -284,6 +297,7 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
         paymentIntent?.id ?? null,
         classCents,
         split.serviceFee,
+        split.studioCommission,
       ],
     );
 

@@ -13,6 +13,7 @@ const {
 } = require("../services/subscriptionPlan");
 const { ownerNotices } = require("../services/catalog");
 const { relocateStudents, refundStudents } = require("../services/closure");
+const { recordSubscriptionPayment } = require("../services/subscriptionPayments");
 const {
   ensureStripePrice,
   ensureIvaTaxRate,
@@ -692,6 +693,13 @@ async function webhookHandler(req, res) {
                updated_at = NOW()
            WHERE stripe_subscription_id = $1`,
           [typeof subId === "string" ? subId : subId.id, renewal, coveredUntil],
+        );
+
+        // Para la grafica de suscripciones del admin. Si falla se anota y se
+        // sigue: la suscripcion ya quedo activa, y el script de carga
+        // (scripts/backfill-subscription-payments.js) recupera la factura.
+        await recordSubscriptionPayment(invoice).catch((err) =>
+          console.error("No se guardo el cobro de suscripcion", invoice.id, err),
         );
 
         // Aqui es donde un cambio de plan de veras entra. Si dejo sucursales

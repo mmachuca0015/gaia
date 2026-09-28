@@ -19,6 +19,7 @@ const {
   viewerIsDemo,
 } = require("../services/catalog");
 const {
+  getFees,
   splitCharge,
   splitMetadata,
   studioCanReceive,
@@ -419,7 +420,7 @@ userRouter.post(
       const simulated = pkg.studio_is_demo && userIsDemo;
 
       const baseCents = packageChargeCents(pkg);
-      const split = splitCharge(baseCents);
+      const split = splitCharge(baseCents, await getFees());
       if (split.studioAmount <= 0) {
         return res
           .status(400)
@@ -455,16 +456,16 @@ userRouter.post(
            (package_id, user_id, studio_id, name, classes_total, any_class,
             permanent_only, price_cents, service_fee_cents, amount_cents,
             expires_at, simulated, list_price_cents, validity_value,
-            validity_unit)
+            validity_unit, commission_cents)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
                  NOW() + ${validityInterval(pkg.validity_value, pkg.validity_unit)},
-                 $11, $12, $13, $14)
+                 $11, $12, $13, $14, $15)
          RETURNING id, expires_at`,
         [
           pkg.id, userId, pkg.studio_id, pkg.name, pkg.class_count,
           pkg.any_class, pkg.permanent_only, baseCents, split.serviceFee,
           split.amountCents, simulated, pkg.price_cents, pkg.validity_value,
-          pkg.validity_unit,
+          pkg.validity_unit, split.studioCommission,
         ],
       );
       const purchaseId = purchase.rows[0].id;
@@ -607,7 +608,8 @@ userRouter.post("/redeem", requireAuth, requireRole("user"), async (req, res) =>
     // la comision de Stripe no se cobra: se le regala. Cobrar $1 cuesta mas
     // que $1, y rechazar la reserva por eso seria absurdo para el alumno.
     const difference = Number(chosen.difference_cents) || 0;
-    const split = difference > 0 ? splitCharge(difference) : null;
+    const split =
+      difference > 0 ? splitCharge(difference, await getFees()) : null;
     const cobrable = Boolean(split && split.studioAmount > 0);
 
     const userIsDemo = await viewerIsDemo(req.user);
@@ -684,13 +686,15 @@ userRouter.post("/redeem", requireAuth, requireRole("user"), async (req, res) =>
     const booking = await client.query(
       `INSERT INTO bookings
          (user_id, schedule_id, status, class_date, package_purchase_id,
-          stripe_payment_intent_id, price_cents, service_fee_cents)
-       VALUES ($1, $2, 'activa', $3, $4, $5, $6, $7) RETURNING id`,
+          stripe_payment_intent_id, price_cents, service_fee_cents,
+          commission_cents)
+       VALUES ($1, $2, 'activa', $3, $4, $5, $6, $7, $8) RETURNING id`,
       [
         userId, scheduleId, classDate, purchaseId,
         paymentIntent?.id ?? null,
         cobrable ? difference : 0,
         cobrable ? split.serviceFee : 0,
+        cobrable ? split.studioCommission : 0,
       ],
     );
     await client.query(

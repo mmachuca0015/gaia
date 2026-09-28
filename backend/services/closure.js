@@ -17,7 +17,7 @@ const pool = require("../db");
 const { stripe } = require("./stripe");
 const { studioWithinPlan } = require("./catalog");
 const { TODAY_MX } = require("./packages");
-const { splitCharge } = require("./charges");
+const { stripeFeeCents } = require("./charges");
 const {
   sendClosureCredit,
   sendClosureRefund,
@@ -57,7 +57,7 @@ const AFFECTED_BOOKINGS = `
 // cierre (package_id NULL) no entran: no se pago nada por ellos.
 const AFFECTED_PURCHASES = `
   SELECT pp.id, pp.user_id, pp.name, pp.classes_total, pp.classes_used,
-         pp.price_cents, pp.stripe_payment_intent_id,
+         pp.price_cents, pp.service_fee_cents, pp.stripe_payment_intent_id,
          to_char(pp.expires_at AT TIME ZONE 'America/Mexico_City', 'YYYY-MM-DD')
            AS expires_at,
          studios.id AS studio_id, studios.name AS studio_name,
@@ -258,13 +258,16 @@ async function refundOne({
  * venia sin esta comision. Se anota en cada renglon de `refunds` y sale en el
  * Excel del admin para poder medir cuanto es.
  *
- * Sale de `splitCharge`, el mismo reparto con el que se cobro, no de una
- * formula escrita aparte. En un paquete devuelto a medias se prorratea igual
- * que el dinero.
+ * Se calcula sobre el total que de verdad se cobro (precio + el cargo por
+ * servicio GUARDADO en ese cobro), no con el porcentaje de hoy: el admin lo
+ * puede haber cambiado desde entonces. En un paquete devuelto a medias se
+ * prorratea igual que el dinero.
  */
-function stripeFeeOf(baseCents, proporcion = 1) {
+function stripeFeeOf(baseCents, serviceFeeCents, proporcion = 1) {
   if (baseCents <= 0) return 0;
-  return Math.round(splitCharge(baseCents).stripeFee * proporcion);
+  return Math.round(
+    stripeFeeCents(baseCents + (serviceFeeCents ?? 0)) * proporcion,
+  );
 }
 
 /**
@@ -308,7 +311,7 @@ async function refundStudents(ownerId) {
       studioId: r.studio_id,
       paymentIntentId: r.stripe_payment_intent_id,
       cents: r.price_cents ?? 0,
-      stripeFee: stripeFeeOf(r.price_cents ?? 0),
+      stripeFee: stripeFeeOf(r.price_cents ?? 0, r.service_fee_cents),
     });
     if (!res) continue;
     reembolsadas.push(r.id);
@@ -338,7 +341,7 @@ async function refundStudents(ownerId) {
       studioId: c.studio_id,
       paymentIntentId: c.stripe_payment_intent_id,
       cents,
-      stripeFee: stripeFeeOf(c.price_cents, sinUsar),
+      stripeFee: stripeFeeOf(c.price_cents, c.service_fee_cents, sinUsar),
     });
     if (!res) continue;
     const fila = {

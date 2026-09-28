@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Users } from "lucide-react";
 
 import { api } from "../../lib/api";
 import DemoToggle from "../../components/DemoToggle";
+import AdminSearch from "../../components/AdminSearch";
 type User = {
   id: number;
   name: string;
@@ -64,19 +65,20 @@ function buildPages(page: number, totalPages: number) {
 function AdminUsuarios() {
   const [users, setUsers] = useState<User[]>([]);
   const [page, setPage] = useState(1);
+  const [query, setQuery] = useState("");
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   // `loading` es derivado en vez de un estado propio: mientras la pagina ya
   // cargada no sea la que se pide, estamos esperando. Asi desaparece el
   // setLoading(true) sincrono del efecto, que provocaba un render de mas.
-  const [loadedPage, setLoadedPage] = useState(0);
-  const loading = loadedPage !== page;
+  const [loadedKey, setLoadedKey] = useState("");
+  const loading = loadedKey !== `${page}-${query}`;
 
   useEffect(() => {
     // Si el usuario cambia de pagina antes de que llegue la respuesta anterior,
     // esa respuesta tardia no debe pisar los datos de la pagina actual.
     let cancelled = false;
-    api(`/admin/users?page=${page}`)
+    api(`/admin/users?page=${page}&q=${encodeURIComponent(query)}`)
       .then((res) => res.json())
       .then((data) => {
         if (cancelled) return;
@@ -85,12 +87,12 @@ function AdminUsuarios() {
         setTotal(data.total);
       })
       .finally(() => {
-        if (!cancelled) setLoadedPage(page);
+        if (!cancelled) setLoadedKey(`${page}-${query}`);
       });
     return () => {
       cancelled = true;
     };
-  }, [page]);
+  }, [page, query]);
 
   const from = total === 0 ? 0 : (page - 1) * PER_PAGE + 1;
   const to = Math.min(page * PER_PAGE, total);
@@ -110,7 +112,23 @@ function AdminUsuarios() {
             App
           </span>
         </h1>
-        <p className="text-slate-600 mt-2">{total} usuarios registrados</p>
+        <p className="text-slate-600 mt-2">
+          {query
+            ? `${total} ${total === 1 ? "resultado" : "resultados"}`
+            : `${total} usuarios registrados`}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-end gap-3 mb-4">
+        {/* Buscar vuelve a la primera pagina: la 3 de la lista completa casi
+            nunca existe en el resultado. */}
+        <AdminSearch
+          placeholder="Buscar nombre o correo"
+          onSearch={(q) => {
+            setQuery(q);
+            setPage(1);
+          }}
+        />
       </div>
 
       <div className="bg-white rounded-2xl overflow-hidden">
@@ -120,7 +138,9 @@ function AdminUsuarios() {
           <div className="p-10 flex flex-col items-center gap-4 text-center">
             <Users size={36} className="text-slate-300" />
             <p className="text-slate-600 font-medium">
-              No hay usuarios registrados
+              {query
+                ? "Ningún usuario coincide con la búsqueda"
+                : "No hay usuarios registrados"}
             </p>
           </div>
         ) : (
@@ -197,6 +217,13 @@ function AdminUsuarios() {
                             path={`/admin/users/${user.id}/demo`}
                             value={user.is_demo}
                             label={`Usuario demo: ${user.name} ${user.last_name}`}
+                            confirm={{
+                              name: `${user.name} ${user.last_name}`,
+                              encender:
+                                "Dejará de ver los estudios reales y solo verá los demo, donde reserva sin que se le cobre nada. Sus reservas no cuentan en las métricas.",
+                              apagar:
+                                "Vuelve a ver el catálogo real y deja de ver los estudios demo. Sus próximas reservas se le cobrarán de verdad.",
+                            }}
                           />
                         ) : user.is_demo ? (
                           <span className="text-xs text-[#1b2c44]">Estudio demo</span>
