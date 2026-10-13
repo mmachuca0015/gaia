@@ -19,6 +19,11 @@ const { sleepingImpact } = require("../services/planImpact");
 const { relocateStudents } = require("../services/closure");
 const { sendPlanChange } = require("../services/planChangeEmail");
 const { getFees, invalidateFees } = require("../services/charges");
+const {
+  ROLES,
+  deletionImpact,
+  deleteAccount,
+} = require("../services/deleteAccount");
 
 // Lo que Wellco cobro en cada cargo, separado en sus dos lados: el cargo por
 // servicio que paga el alumno y la comision que se le descuenta al estudio.
@@ -875,6 +880,57 @@ async function setDemo(table, req, res) {
 
 router.patch("/studios/:id/demo", (req, res) => setDemo("studios", req, res));
 router.patch("/users/:id/demo", (req, res) => setDemo("users", req, res));
+
+// Borrar una cuenta (alumno o dueño) con todo lo suyo. Los ids se repiten
+// entre tablas, asi que la ruta lleva el rol: /accounts/user/7 y
+// /accounts/owner/7 son cuentas distintas.
+function accountParams(req, res) {
+  const { role } = req.params;
+  const id = Number(req.params.id);
+  if (!ROLES.includes(role) || !Number.isInteger(id)) {
+    res.status(400).json({ error: "Cuenta no válida" });
+    return null;
+  }
+  return { role, id };
+}
+
+router.get("/accounts/:role/:id/delete-impact", async (req, res) => {
+  const params = accountParams(req, res);
+  if (!params) return;
+  try {
+    const impact = await deletionImpact(params.role, params.id);
+    if (!impact) return res.status(404).json({ error: "Cuenta no encontrada" });
+    res.json(impact);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "No se pudo revisar la cuenta" });
+  }
+});
+
+router.delete("/accounts/:role/:id", async (req, res) => {
+  const params = accountParams(req, res);
+  if (!params) return;
+  try {
+    // El correo se escribe a mano en el pop up y se vuelve a comparar aqui:
+    // es irreversible y un id equivocado borraria a otra persona.
+    const impact = await deletionImpact(params.role, params.id);
+    if (!impact) return res.status(404).json({ error: "Cuenta no encontrada" });
+    const typed = String(req.body?.confirm_email || "").trim().toLowerCase();
+    if (typed !== impact.email.trim().toLowerCase()) {
+      return res.status(400).json({ error: "El correo no coincide" });
+    }
+
+    const result = await deleteAccount(params.role, params.id);
+    if (!result) return res.status(404).json({ error: "Cuenta no encontrada" });
+    console.log(
+      `Admin ${req.user.id} borro la cuenta ${params.role} ${params.id} (${result.email})`,
+    );
+    res.json({ ok: true, stripe: result.stripe });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "No se pudo eliminar la cuenta" });
+  }
+});
 
 router.get("/studios/:id/details", async (req, res) => {
   const { id } = req.params;

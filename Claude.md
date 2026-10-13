@@ -367,6 +367,22 @@ Otras reglas de esta parte:
 - La columna **Plan** de `/admin/estudios` era el texto fijo `'Sin plan'` para
   todos. Ahora sale de `subscriptions` + `plans`; sin fila dice "Heredado".
 
+## Eliminar cuentas desde el admin
+
+- Bote de basura al final de cada fila de `/admin/usuarios`
+  (`AdminDeleteAccountModal.tsx`), rutas `GET
+  /admin/accounts/:role/:id/delete-impact` y `DELETE /admin/accounts/:role/:id`
+  (`services/deleteAccount.js`). La ruta lleva el **rol** porque los ids se
+  repiten entre `users` y `studio_owners`.
+- Es un **DELETE físico** pensado para cuentas de prueba: se lleva reservas,
+  paquetes, favoritos y, para un dueño, sucursales, clases, las reservas de
+  sus alumnos, la suscripción y sus `subscription_payments`. Las métricas
+  bajan. Pide escribir el correo, y el backend lo vuelve a comparar.
+- **Stripe va después del COMMIT**: borrar el customer cancela la suscripción
+  al momento, y si la fila de `subscriptions` siguiera ahí el webhook
+  `customer.subscription.deleted` correría `refundStudents`. No inviertas el
+  orden. No toca la cuenta Connect del estudio ni las imágenes de Cloudinary.
+
 ## Paquetes de clases
 
 - **Dueño:** `/owner/paquetes` (`OwnerPaquetes.tsx`), rutas `ownerRouter` de

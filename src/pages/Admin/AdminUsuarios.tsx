@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, Trash2, Users } from "lucide-react";
 
 import { api } from "../../lib/api";
 import DemoToggle from "../../components/DemoToggle";
 import AdminSearch from "../../components/AdminSearch";
+import AdminDeleteAccountModal from "../../components/AdminDeleteAccountModal";
 type User = {
   id: number;
   name: string;
@@ -73,6 +74,10 @@ function AdminUsuarios() {
   // setLoading(true) sincrono del efecto, que provocaba un render de mas.
   const [loadedKey, setLoadedKey] = useState("");
   const loading = loadedKey !== `${page}-${query}`;
+  // Cuenta abierta en el pop up de eliminar. Tras borrarla se vuelve a pedir
+  // la pagina (cambia `reload`) para que la lista y el total cuadren.
+  const [deleting, setDeleting] = useState<User | null>(null);
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     // Si el usuario cambia de pagina antes de que llegue la respuesta anterior,
@@ -92,7 +97,7 @@ function AdminUsuarios() {
     return () => {
       cancelled = true;
     };
-  }, [page, query]);
+  }, [page, query, reload]);
 
   const from = total === 0 ? 0 : (page - 1) * PER_PAGE + 1;
   const to = Math.min(page * PER_PAGE, total);
@@ -176,6 +181,9 @@ function AdminUsuarios() {
                     >
                       Demo
                     </th>
+                    <th className="px-6 py-4">
+                      <span className="sr-only">Eliminar</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody
@@ -230,6 +238,16 @@ function AdminUsuarios() {
                         ) : (
                           <span className="text-slate-300">—</span>
                         )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button
+                          onClick={() => setDeleting(user)}
+                          aria-label={`Eliminar cuenta de ${user.name} ${user.last_name}`}
+                          title="Eliminar cuenta"
+                          className="p-2 rounded-full text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -291,6 +309,18 @@ function AdminUsuarios() {
           </>
         )}
       </div>
+
+      {deleting && (
+        <AdminDeleteAccountModal
+          role={deleting.role}
+          id={deleting.id}
+          onClose={() => setDeleting(null)}
+          onDeleted={() => {
+            setDeleting(null);
+            setReload((n) => n + 1);
+          }}
+        />
+      )}
     </div>
   );
 }
