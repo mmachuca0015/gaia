@@ -4,6 +4,8 @@ import { apiJson } from "./api";
 import { toPesos, type BillingInterval } from "./plans";
 
 export type SubscriptionStatus =
+  /** Se registro con "escoger plan despues": tiene cuenta, no plan. */
+  | "sin_plan"
   | "pendiente"
   | "activa"
   | "vencida"
@@ -129,7 +131,10 @@ export function changePlan(
   });
 }
 
-/** Guarda plan e intervalo de un estudio cuya suscripcion ya termino. */
+/**
+ * Guarda plan e intervalo de un estudio cuya suscripcion ya termino o que
+ * todavia no escoge plan ('sin_plan').
+ */
 export function selectPlan(planId: number, interval: BillingInterval) {
   return apiJson("/subscriptions/select-plan", {
     method: "POST",

@@ -192,14 +192,22 @@ function AdminEstudios() {
                         {studio.city ?? "—"}
                       </td>
                       <td className="px-6 py-4 text-slate-600">
-                        {studio.plan ?? (
-                          <span
-                            className="text-slate-400"
-                            title="Se registró antes de que existieran los planes"
-                          >
-                            Heredado
-                          </span>
-                        )}
+                        {studio.plan ??
+                          (studio.subscription_status === "sin_plan" ? (
+                            <span
+                              className="text-slate-400"
+                              title="Se registró y todavía no escoge plan"
+                            >
+                              Sin plan
+                            </span>
+                          ) : (
+                            <span
+                              className="text-slate-400"
+                              title="Se registró antes de que existieran los planes"
+                            >
+                              Heredado
+                            </span>
+                          ))}
                       </td>
                       <td className="px-6 py-4">
                         <DemoToggle

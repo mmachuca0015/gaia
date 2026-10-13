@@ -109,15 +109,24 @@ async function studioCanReceive(studioId, stripeAccountId) {
     throw err;
   });
 
+  // La cuenta es del dueño y la comparten sus sucursales: lo que se sepa
+  // aqui se guarda en todas, para que el catalogo (`stripe_ready`) deje de
+  // publicar las que no pueden cobrar, o vuelva a publicarlas.
   if (!account) {
     await pool.query(
-      "UPDATE studios SET stripe_account_id = NULL WHERE id = $1",
-      [studioId],
+      `UPDATE studios SET stripe_account_id = NULL, stripe_ready = FALSE
+        WHERE stripe_account_id = $1`,
+      [stripeAccountId],
     );
     return false;
   }
 
-  return account.capabilities?.transfers === "active";
+  const ready = account.capabilities?.transfers === "active";
+  await pool.query(
+    "UPDATE studios SET stripe_ready = $2 WHERE stripe_account_id = $1",
+    [stripeAccountId, ready],
+  );
+  return ready;
 }
 
 // Reparto de un cobro, con P = precio (clase o paquete) y T = P + 3% de P.

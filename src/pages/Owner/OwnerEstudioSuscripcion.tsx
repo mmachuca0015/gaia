@@ -29,6 +29,7 @@ import {
 } from "../../lib/subscription";
 
 const STATUS_LABEL = {
+  sin_plan: "Sin plan",
   activa: "Activa",
   pendiente: "Pendiente de pago",
   vencida: "Pago rechazado",
@@ -378,7 +379,7 @@ function OwnerEstudioSuscripcion() {
                 className="text-3xl font-semibold text-slate-800"
                 style={{ fontFamily: "Cormorant Garamond, serif" }}
               >
-                {sub.plan_name}
+                {sub.plan_name ?? "Sin plan"}
               </p>
               {currentPrice != null && (
                 <p className="text-sm text-slate-500 mt-1">
@@ -406,7 +407,7 @@ function OwnerEstudioSuscripcion() {
                   : STATUS_LABEL[sub.status]}
               </dd>
             </div>
-            {sub.started_at && (
+            {sub.started_at && sub.status !== "sin_plan" && (
               <div>
                 <dt className="text-xs text-slate-400">Suscrito desde</dt>
                 <dd className="text-sm text-slate-800 mt-0.5">
@@ -454,11 +455,12 @@ function OwnerEstudioSuscripcion() {
           <p className="text-sm text-red-500">{actionError}</p>
         )}
 
-        {sub.status === "cancelada" && (
+        {(sub.status === "cancelada" || sub.status === "sin_plan") && (
           <div className="bg-white rounded-2xl p-6 flex flex-col items-center gap-4 text-center">
             <p className="text-md text-slate-600">
-              Tu suscripción terminó y tu estudio ya no aparece en el catálogo.
-              Elige una suscripción para volver a publicarlo.
+              {sub.status === "sin_plan"
+                ? "Todavía no escoges tu plan. Tu estudio no aparece en el catálogo hasta que escojas uno y lo pagues."
+                : "Tu suscripción terminó y tu estudio ya no aparece en el catálogo. Elige una suscripción para volver a publicarlo."}
             </p>
             <button
               onClick={openChooser}

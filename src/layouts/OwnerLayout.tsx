@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
 import OwnerSidebar from "../components/OwnerSidebar";
 import SubscriptionBanner from "../components/SubscriptionBanner";
+import OnboardingChecklist from "../components/OnboardingChecklist";
 function OwnerLayout() {
   return (
     <div className="flex h-screen bg-[#f4f7fa]">
@@ -11,6 +12,9 @@ function OwnerLayout() {
         {/* Va en el layout, no en cada pagina: el aviso debe verse en
             cualquier pantalla del panel, no solo en el inicio. */}
         <SubscriptionBanner />
+        {/* Lo que le falta al estudio para publicarse: pop up la primera
+            vez, franja despues. */}
+        <OnboardingChecklist />
         <Outlet />
       </main>
     </div>

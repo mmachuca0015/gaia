@@ -325,45 +325,99 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
   }
 });
 
-// Onboarding de Stripe Connect. El estudio se toma de la sesion del dueño:
-// antes el studioId llegaba en el body, asi que cualquiera podia sobrescribir
-// el stripe_account_id de otro estudio y desviarse sus cobros.
+// La cuenta Connect del dueño de la sesion, ya comprobada contra Stripe.
+//
+// Es del dueño, no de cada sucursal: todas cobran con la misma (migracion
+// 023). Se toma la de cualquiera de sus sucursales; si Stripe ya no la
+// reconoce (un `acct_` de modo prueba tras el corte a live) se suelta de
+// todas para que el dueño vea otra vez el boton de alta.
+async function ownerConnectAccount(ownerId) {
+  const { rows } = await pool.query(
+    `SELECT stripe_account_id FROM studios
+      WHERE owner_id = $1 AND stripe_account_id IS NOT NULL
+      ORDER BY stripe_ready DESC, created_at, id
+      LIMIT 1`,
+    [ownerId],
+  );
+  const accountId = rows[0]?.stripe_account_id;
+  if (!accountId) return null;
+
+  const account = await stripe.accounts.retrieve(accountId).catch((err) => {
+    if (resourceMissing(err)) return null;
+    throw err;
+  });
+  if (!account) {
+    await pool.query(
+      `UPDATE studios SET stripe_account_id = NULL, stripe_ready = FALSE
+        WHERE owner_id = $1 AND stripe_account_id = $2`,
+      [ownerId, accountId],
+    );
+    return null;
+  }
+  return account;
+}
+
+// Guarda en todas las sucursales del dueño la cuenta y si ya puede recibir
+// pagos. `stripe_ready` es lo que pide el catalogo para publicar.
+async function saveConnectAccount(ownerId, account) {
+  const ready = account.capabilities?.transfers === "active";
+  await pool.query(
+    `UPDATE studios SET stripe_account_id = $2, stripe_ready = $3
+      WHERE owner_id = $1`,
+    [ownerId, account.id, ready],
+  );
+  return ready;
+}
+
+// Estado de la cuenta Connect del dueño. Lo pide la pantalla de Pagos al
+// abrirse, que es tambien a donde Stripe regresa al terminar el alta: asi
+// `stripe_ready` se actualiza sin depender de un webhook de Connect.
+router.get(
+  "/connect-status",
+  requireAuth,
+  requireRole("owner"),
+  async (req, res) => {
+    try {
+      const account = await ownerConnectAccount(req.user.id);
+      if (!account) return res.json({ connected: false, ready: false });
+      const ready = await saveConnectAccount(req.user.id, account);
+      res.json({
+        connected: true,
+        ready,
+        // Lleno el formulario pero Stripe todavia lo revisa o pide algo mas.
+        details_submitted: account.details_submitted === true,
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "No pudimos revisar tu cuenta de Stripe" });
+    }
+  },
+);
+
+// Onboarding de Stripe Connect. El dueño se toma de la sesion: antes el
+// studioId llegaba en el body, asi que cualquiera podia sobrescribir el
+// stripe_account_id de otro estudio y desviarse sus cobros.
 router.post(
   "/create-connect-account",
   requireAuth,
   requireRole("owner"),
   async (req, res) => {
     try {
-      const studioResult = await pool.query(
-        "SELECT id, stripe_account_id FROM studios WHERE owner_id = $1",
+      const { rows } = await pool.query(
+        "SELECT 1 FROM studios WHERE owner_id = $1 LIMIT 1",
         [req.user.id],
       );
-      if (studioResult.rows.length === 0) {
+      if (rows.length === 0) {
         return res.status(404).json({ error: "Estudio no encontrado" });
       }
-      const studioId = studioResult.rows[0].id;
 
       // Si ya hay una cuenta valida se reusa y solo se genera un enlace nuevo.
       // Los enlaces de onboarding caducan, asi que volver aqui es normal: sin
       // esta comprobacion, cada regreso creaba OTRA cuenta Connect y dejaba
       // huerfana la anterior, con el papeleo que el dueño ya habia llenado.
-      //
-      // Tambien es el camino del corte a live: el `acct_` de modo prueba no
-      // existe con la llave nueva, se descarta y el dueño se da de alta otra
-      // vez, ahora en la cuenta real.
-      let accountId = studioResult.rows[0].stripe_account_id;
-      if (accountId) {
-        const existing = await stripe.accounts
-          .retrieve(accountId)
-          .catch((err) => {
-            if (resourceMissing(err)) return null;
-            throw err;
-          });
-        if (!existing) accountId = null;
-      }
-
-      if (!accountId) {
-        const account = await stripe.accounts.create({
+      let account = await ownerConnectAccount(req.user.id);
+      if (!account) {
+        account = await stripe.accounts.create({
           type: "express",
           country: "MX",
           capabilities: {
@@ -371,16 +425,11 @@ router.post(
             transfers: { requested: true },
           },
         });
-        accountId = account.id;
-
-        await pool.query(
-          "UPDATE studios SET stripe_account_id = $1 WHERE id = $2",
-          [accountId, studioId],
-        );
       }
+      await saveConnectAccount(req.user.id, account);
 
       const accountLink = await stripe.accountLinks.create({
-        account: accountId,
+        account: account.id,
         refresh_url: `${FRONTEND_URL}/owner/estudio/pagos`,
         return_url: `${FRONTEND_URL}/owner/estudio/pagos`,
         type: "account_onboarding",

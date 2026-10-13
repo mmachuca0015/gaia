@@ -142,9 +142,17 @@ de antes se cargan con `node scripts/backfill-subscription-payments.js`.
   Stripe y así no aparecen los 198.99999.
 - Las características son filas en `plan_features`, no un array, porque el admin
   las agrega y quita de una en una.
-- **Un dueño no puede crear perfil sin plan.** `POST /studios/register-studio`
-  exige `plan_id`, lo valida contra la base (que exista y esté activo) y crea la
-  fila de `subscriptions` dentro de la misma transacción que el dueño y el estudio.
+- **El registro de estudio pide solo lo básico** (nombre, apellido, nombre del
+  estudio, correo y contraseña). El plan es opcional: con **"Escoger plan
+  después"** la fila de `subscriptions` nace en **`sin_plan`** con `plan_id`
+  NULL (migración 023). **Nunca sin fila**: sin fila es un dueño heredado, que
+  se publica sin pagar. `sin_plan` vale 1 sucursal y sin avisos (el `CASE` de
+  `ownerBranchLimit`/`ownerNotices`), no se publica, y elige plan con
+  `/subscriptions/select-plan`, que lo pasa a `pendiente`. Con plan, se valida
+  contra la base y se crea la fila en la misma transacción que el dueño.
+- **Lo demás se llena en el panel.** `OnboardingChecklist.tsx` (en
+  `OwnerLayout`) lo enseña como pop up la primera vez y luego como franja,
+  leyendo `missing` de `/studios/mine` y el estado de la suscripción.
 - **El cobro es dentro de la app, no con Checkout hospedado.** `POST
   /subscriptions/payment-intent` crea la suscripción en Stripe con
   `payment_behavior: "default_incomplete"` y devuelve un `clientSecret`; el
@@ -285,6 +293,12 @@ Otras reglas de esta parte:
 - **Las fechas de los correos salen de SQL con `to_char`** en hora de México.
   Un `DATE` que pg convierte a `Date` se corre un día con el servidor en UTC y
   el alumno leería la fecha equivocada.
+- **La cuenta de Stripe Connect es requisito para publicarse**
+  (`studios.stripe_ready` dentro de `STUDIO_COMPLETE`, migración 023). Es **del
+  dueño**: todas sus sucursales la comparten y una sucursal nueva la hereda.
+  `stripe_ready` lo actualizan `GET /payments/connect-status` (lo pide la
+  pantalla de Pagos, que es el `return_url` del alta) y cada cobro
+  (`studioCanReceive`). No hay webhook de Connect.
 - **Qué estudios se publican** (`backend/services/catalog.js`,
   `STUDIO_PUBLISHED`): `activa` sí; `pendiente` y `vencida` solo hasta
   `paid_until`; `cancelada` no; sin fila (heredados) sí. Si no se publica, no

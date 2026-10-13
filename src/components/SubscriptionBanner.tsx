@@ -43,12 +43,21 @@ function SubscriptionBanner() {
     return null;
   }
   // En la pantalla de suscripcion el aviso sobra: ahi mismo se resuelve.
-  if (sub.status === "cancelada" && pathname === SUBSCRIPTION_PATH) return null;
+  if (
+    (sub.status === "cancelada" || sub.status === "sin_plan") &&
+    pathname === SUBSCRIPTION_PATH
+  )
+    return null;
 
   const visibleUntil =
     stillPublished(sub) && sub.paid_until ? formatLongDate(sub.paid_until) : null;
 
   const copy = {
+    sin_plan: {
+      title: "Todavía no escoges tu plan",
+      body: "Tu estudio no aparecerá en el catálogo hasta que escojas un plan y lo pagues.",
+      cta: "Escoger plan",
+    },
     pendiente: {
       title: "Tu suscripción está pendiente de pago",
       body: visibleUntil
@@ -82,7 +91,7 @@ function SubscriptionBanner() {
           onClick={() =>
             // Quien vuelve elige plan e intervalo antes de pagar; eso vive en
             // la pantalla de suscripcion.
-            sub.status === "cancelada"
+            sub.status === "cancelada" || sub.status === "sin_plan"
               ? navigate(SUBSCRIPTION_PATH)
               : setPaying(true)
           }

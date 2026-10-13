@@ -370,13 +370,18 @@ router.post("/change-plan", requireAuth, requireRole("owner"), async (req, res) 
   }
 });
 
-// Un estudio con la suscripcion ya terminada elige plan e intervalo antes de
-// pagar. El cobro lo arma despues /payment-intent con lo que quede guardado
-// aqui, igual que en el registro.
+// Un estudio con la suscripcion ya terminada, o que en el registro escogio
+// "elegir plan despues", elige plan e intervalo antes de pagar. El cobro lo
+// arma despues /payment-intent con lo que quede guardado aqui, igual que en
+// el registro.
 router.post("/select-plan", requireAuth, requireRole("owner"), async (req, res) => {
   try {
     const sub = await loadOwnerSubscription(req.user.id);
-    if (!sub || sub.is_demo || sub.status !== "cancelada") {
+    if (
+      !sub ||
+      sub.is_demo ||
+      (sub.status !== "cancelada" && sub.status !== "sin_plan")
+    ) {
       return res
         .status(409)
         .json({ error: "Solo puedes elegir un plan nuevo si tu suscripción terminó" });
@@ -411,9 +416,12 @@ router.post("/select-plan", requireAuth, requireRole("owner"), async (req, res) 
     // El id viejo se suelta para que los eventos tardios de esa suscripcion
     // (que ya termino) no pisen el estado de la nueva.
     await pool.query(
+      // 'sin_plan' pasa a 'pendiente': ya tiene plan y le falta pagarlo.
+      // 'cancelada' se queda asi hasta que el webhook la active.
       `UPDATE subscriptions
        SET plan_id = $1, billing_interval = $2, pending_plan_id = NULL,
            stripe_subscription_id = NULL, cancel_at_period_end = FALSE,
+           status = CASE WHEN status = 'sin_plan' THEN 'pendiente' ELSE status END,
            updated_at = NOW()
        WHERE id = $3`,
       [rows[0].id, interval, sub.subscription_id],

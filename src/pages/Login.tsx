@@ -14,8 +14,6 @@ import {
 } from "../lib/plans";
 import { validateCoupon, type CouponCheck } from "../lib/coupons";
 import PlanPicker from "../components/PlanPicker";
-import StudioHoursEditor from "../components/StudioHoursEditor";
-import { defaultWeek, toPayload, validateWeek } from "../lib/hours";
 import SubscriptionPayment from "../components/SubscriptionPayment";
 
 type Step =
@@ -77,17 +75,11 @@ function Login() {
     last_name: "",
     studio_name: "",
     country: "México",
-    state: "",
-    phone: "",
     email: "",
     confirmEmail: "",
     password: "",
     confirmPassword: "",
   });
-
-  // Horario de atencion del estudio: con el, el marketplace sabe cuando
-  // esta abierto de verdad.
-  const [studioHours, setStudioHours] = useState(defaultWeek);
 
   {
     /*Formulario de recuperar contraseña */
@@ -242,12 +234,9 @@ function Login() {
       !registerStudioForm.last_name ||
       !registerStudioForm.email ||
       !registerStudioForm.password ||
-      !registerStudioForm.state ||
-      !registerStudioForm.country ||
       !registerStudioForm.confirmEmail ||
       !registerStudioForm.confirmPassword ||
-      !registerStudioForm.studio_name ||
-      !registerStudioForm.phone
+      !registerStudioForm.studio_name.trim()
     ) {
       alert("Por favor llena todos los campos");
       return;
@@ -260,12 +249,6 @@ function Login() {
 
     if (registerStudioForm.password !== registerStudioForm.confirmPassword) {
       alert("Las contraseñas no coinciden");
-      return;
-    }
-
-    const hoursError = validateWeek(studioHours);
-    if (hoursError) {
-      alert(hoursError);
       return;
     }
 
@@ -284,9 +267,11 @@ function Login() {
     }
   };
 
-  // Paso 2: crea el estudio con el plan elegido y manda directo al pago.
-  const handleRegisterStudio = async () => {
-    if (!selectedPlanId) {
+  // Paso 2: crea el estudio. Con plan, manda directo al pago. Con "escoger
+  // plan despues" (`later`) entra al panel; su suscripcion nace 'sin_plan' y
+  // el panel le recuerda que sin plan no se publica.
+  const handleRegisterStudio = async (later = false) => {
+    if (!later && !selectedPlanId) {
       alert("Elige un plan para continuar");
       return;
     }
@@ -298,10 +283,9 @@ function Login() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...registerStudioForm,
-          hours: toPayload(studioHours),
-          plan_id: selectedPlanId,
+          plan_id: later ? null : selectedPlanId,
           billing_interval: billingInterval,
-          coupon_code: coupon?.code ?? null,
+          coupon_code: later ? null : (coupon?.code ?? null),
         }),
       });
       const data = await res.json();
@@ -319,6 +303,11 @@ function Login() {
       }
 
       setCachedUser(data);
+
+      if (later) {
+        navigate("/panel-de-control");
+        return;
+      }
 
       // La cuenta ya existe y la sesion tambien, pero la suscripcion nace
       // pendiente. El cobro se hace en el siguiente paso, sin salir de la app;
@@ -348,7 +337,7 @@ function Login() {
   return (
     <div className="min-h-screen bg-[#f4f7fa] flex items-center justify-center p-4">
       <div
-        className={`bg-white rounded-3xl p-8 w-full ${step === "Registrar estudio" || step === "Elegir plan" ? "max-w-3xl" : "max-w-sm"} shadow-sm`}
+        className={`bg-white rounded-3xl p-8 w-full ${step === "Elegir plan" ? "max-w-3xl" : step === "Registrar estudio" ? "max-w-xl" : "max-w-sm"} shadow-sm`}
       >
         {/* Logo. Es la salida del formulario: de vuelta a la landing. */}
         <div className="text-center mb-8">
@@ -679,196 +668,135 @@ function Login() {
               <p className="font-semibold text-slate-800">Nuevo estudio</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-              {/* Columna izquierda */}
-              <div className="flex flex-col gap-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-slate-400 block mb-1.5">
-                      Nombre
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Carlos"
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
-                      value={registerStudioForm.name}
-                      onChange={(e) =>
-                        setRegisterStudioForm({
-                          ...registerStudioForm,
-                          name: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-slate-400 block mb-1.5">
-                      Apellido
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="García"
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
-                      value={registerStudioForm.last_name}
-                      onChange={(e) =>
-                        setRegisterStudioForm({
-                          ...registerStudioForm,
-                          last_name: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1.5">
-                    Nombre del estudio
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Mi estudio"
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
-                    value={registerStudioForm.studio_name}
-                    onChange={(e) =>
-                      setRegisterStudioForm({
-                        ...registerStudioForm,
-                        studio_name: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-slate-400 block mb-1.5">
-                      País
-                    </label>
-                    <select className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors text-slate-600">
-                      <option value="México">México</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs text-slate-400 block mb-1.5">
-                      Estado
-                    </label>
-                    <select
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors text-slate-600"
-                      value={registerStudioForm.state}
-                      onChange={(e) =>
-                        setRegisterStudioForm({
-                          ...registerStudioForm,
-                          state: e.target.value,
-                        })
-                      }
-                    >
-                      <option value="">Selecciona</option>
-                      {estados.map((estado) => (
-                        <option key={estado} value={estado}>
-                          {estado}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1.5">
-                    Teléfono
-                  </label>
-                  <input
-                    type="tel"
-                    placeholder="33 1234 5678"
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
-                    value={registerStudioForm.phone}
-                    onChange={(e) =>
-                      setRegisterStudioForm({
-                        ...registerStudioForm,
-                        phone: e.target.value,
-                      })
-                    }
-                  />
-                </div>
+            {/* Solo lo basico. Descripcion, direccion, telefono, horario,
+                imagenes y Stripe se llenan en el panel, que le dice al dueño
+                que le falta para publicarse. */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
+              <div>
+                <label className="text-xs text-slate-400 block mb-1.5">
+                  Nombre
+                </label>
+                <input
+                  type="text"
+                  placeholder="Carlos"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
+                  value={registerStudioForm.name}
+                  onChange={(e) =>
+                    setRegisterStudioForm({
+                      ...registerStudioForm,
+                      name: e.target.value,
+                    })
+                  }
+                />
               </div>
-
-              {/* Columna derecha */}
-              <div className="flex flex-col gap-4">
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1.5">
-                    Correo electrónico
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="correo@ejemplo.com"
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
-                    value={registerStudioForm.email}
-                    onChange={(e) =>
-                      setRegisterStudioForm({
-                        ...registerStudioForm,
-                        email: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1.5">
-                    Confirmar correo
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="correo@ejemplo.com"
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
-                    value={registerStudioForm.confirmEmail}
-                    onChange={(e) =>
-                      setRegisterStudioForm({
-                        ...registerStudioForm,
-                        confirmEmail: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1.5">
-                    Contraseña
-                  </label>
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
-                    value={registerStudioForm.password}
-                    onChange={(e) =>
-                      setRegisterStudioForm({
-                        ...registerStudioForm,
-                        password: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1.5">
-                    Confirmar contraseña
-                  </label>
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
-                    value={registerStudioForm.confirmPassword}
-                    onChange={(e) =>
-                      setRegisterStudioForm({
-                        ...registerStudioForm,
-                        confirmPassword: e.target.value,
-                      })
-                    }
-                  />
-                </div>
+              <div>
+                <label className="text-xs text-slate-400 block mb-1.5">
+                  Apellido
+                </label>
+                <input
+                  type="text"
+                  placeholder="García"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
+                  value={registerStudioForm.last_name}
+                  onChange={(e) =>
+                    setRegisterStudioForm({
+                      ...registerStudioForm,
+                      last_name: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="text-xs text-slate-400 block mb-1.5">
+                  Nombre del estudio
+                </label>
+                <input
+                  type="text"
+                  placeholder="Mi estudio"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
+                  value={registerStudioForm.studio_name}
+                  onChange={(e) =>
+                    setRegisterStudioForm({
+                      ...registerStudioForm,
+                      studio_name: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 block mb-1.5">
+                  Correo electrónico
+                </label>
+                <input
+                  type="email"
+                  placeholder="correo@ejemplo.com"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
+                  value={registerStudioForm.email}
+                  onChange={(e) =>
+                    setRegisterStudioForm({
+                      ...registerStudioForm,
+                      email: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 block mb-1.5">
+                  Confirmar correo
+                </label>
+                <input
+                  type="email"
+                  placeholder="correo@ejemplo.com"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
+                  value={registerStudioForm.confirmEmail}
+                  onChange={(e) =>
+                    setRegisterStudioForm({
+                      ...registerStudioForm,
+                      confirmEmail: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 block mb-1.5">
+                  Contraseña
+                </label>
+                <input
+                  type="password"
+                  placeholder="••••••••"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
+                  value={registerStudioForm.password}
+                  onChange={(e) =>
+                    setRegisterStudioForm({
+                      ...registerStudioForm,
+                      password: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 block mb-1.5">
+                  Confirmar contraseña
+                </label>
+                <input
+                  type="password"
+                  placeholder="••••••••"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
+                  value={registerStudioForm.confirmPassword}
+                  onChange={(e) =>
+                    setRegisterStudioForm({
+                      ...registerStudioForm,
+                      confirmPassword: e.target.value,
+                    })
+                  }
+                />
               </div>
             </div>
 
-            <div>
-              <p className="text-sm font-medium text-slate-800">
-                Horario del estudio
-              </p>
-              <p className="text-xs text-slate-400 mb-3">
-                Marca los días que abres y a qué hora. Así tus alumnos saben
-                cuándo estás abierto. Lo puedes cambiar después.
-              </p>
-              <StudioHoursEditor value={studioHours} onChange={setStudioHours} />
-            </div>
+            <p className="text-xs text-slate-400">
+              Lo demás (dirección, horario, fotos y tu cuenta para recibir
+              pagos) lo completas después desde tu panel.
+            </p>
 
             <button
               onClick={handleStudioFormNext}
@@ -891,7 +819,7 @@ function Login() {
               <div>
                 <p className="font-semibold text-slate-800">Elige tu plan</p>
                 <p className="text-xs text-slate-400">
-                  Tu estudio se crea al confirmar el pago
+                  Puedes escogerlo ahora o después desde tu panel
                 </p>
               </div>
             </div>
@@ -965,7 +893,7 @@ function Login() {
             </div>
 
             <button
-              onClick={handleRegisterStudio}
+              onClick={() => handleRegisterStudio()}
               disabled={!selectedPlanId || creatingStudio}
               className="block mx-auto bg-[#1b2c44] text-white py-3 px-16 rounded-xl text-sm font-medium hover:bg-[#33506f] transition-colors mt-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -986,6 +914,15 @@ function Login() {
                 {billingInterval === "year" ? " por el año" : " el primer mes"}.
               </p>
             )}
+            {/* Crea la cuenta sin plan. El estudio no se publica hasta que
+                escoja uno y lo pague desde Estudio > Suscripción. */}
+            <button
+              onClick={() => handleRegisterStudio(true)}
+              disabled={creatingStudio}
+              className="block mx-auto text-sm text-slate-500 hover:text-[#1b2c44] underline underline-offset-4 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Escoger plan después
+            </button>
           </div>
         )}
 

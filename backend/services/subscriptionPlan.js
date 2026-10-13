@@ -31,7 +31,8 @@ const OWNER_SUBSCRIPTION_QUERY = `
          pp.price_cents AS pending_price_cents,
          ${annualSql("pp")} AS pending_annual_price_cents
   FROM subscriptions s
-  JOIN plans p       ON p.id = s.plan_id
+  -- LEFT: un dueño en 'sin_plan' tiene fila pero todavia no plan.
+  LEFT JOIN plans p  ON p.id = s.plan_id
   LEFT JOIN plans pp ON pp.id = s.pending_plan_id
   WHERE s.owner_id = $1`;
 

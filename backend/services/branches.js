@@ -50,6 +50,7 @@ function missingFields(studio) {
   if (!studio.hours || studio.hours.length === 0) falta.push("Horario");
   if (vacio(studio.logo_url)) falta.push("Imagen de perfil");
   if (vacio(studio.cover_url)) falta.push("Imagen de portada");
+  if (!studio.stripe_ready) falta.push("Cuenta de Stripe");
   return falta;
 }
 

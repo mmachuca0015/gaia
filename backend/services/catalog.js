@@ -2,10 +2,13 @@
 const pool = require("../db");
 
 // Los campos que tiene que tener una sucursal para salir en el catalogo. El
-// registro solo pide nombre, estado, telefono y horario, asi que un estudio
-// recien creado esta incompleto a proposito: el panel le dice al dueño que le
-// falta y no lo publica hasta que lo llene. `int_number` no cuenta, no todos
-// los locales tienen.
+// registro solo pide el nombre del estudio, asi que uno recien creado esta
+// incompleto a proposito: el panel le dice al dueño que le falta (pop up de
+// `OnboardingChecklist`) y no lo publica hasta que lo llene. `int_number` no
+// cuenta, no todos los locales tienen.
+//
+// `stripe_ready` es la cuenta Connect que ya puede recibir transferencias: sin
+// ella un alumno no tiene como pagarle la clase al estudio.
 //
 // Es un fragmento de WHERE que espera la tabla `studios` en la consulta.
 const STUDIO_COMPLETE = `(
@@ -23,6 +26,7 @@ const STUDIO_COMPLETE = `(
   AND btrim(COALESCE(studios.logo_url, '')) <> ''
   AND btrim(COALESCE(studios.cover_url, '')) <> ''
   AND EXISTS (SELECT 1 FROM studio_hours h WHERE h.studio_id = studios.id)
+  AND studios.stripe_ready
 )`;
 
 // Una sucursal borrada sale del catalogo, pero no de la base: las reservas y
@@ -35,9 +39,14 @@ const STUDIO_LIVE = `studios.deleted_at IS NULL`;
 // Sin fila en `subscriptions` es un dueño heredado (se registro antes de que
 // existieran los planes) y a esos no se les bloquea nada, asi que se les da el
 // limite mas alto que haya. Un plan sin limite capturado vale por una.
+//
+// 'sin_plan' (se registro y escogera plan despues) SI tiene fila, con plan_id
+// NULL, y vale por una. El CASE no sobra: con un JOIN la subconsulta no
+// devolveria nada y caeria al limite de los heredados.
 const ownerBranchLimit = (ownerRef) => `COALESCE(
-  (SELECT p.max_studios FROM subscriptions sub
-     JOIN plans p ON p.id = sub.plan_id
+  (SELECT CASE WHEN sub.plan_id IS NULL THEN 1 ELSE p.max_studios END
+     FROM subscriptions sub
+     LEFT JOIN plans p ON p.id = sub.plan_id
     WHERE sub.owner_id = ${ownerRef}),
   (SELECT MAX(p.max_studios) FROM plans p WHERE p.is_active),
   1
@@ -47,9 +56,11 @@ const ownerBranchLimit = (ownerRef) => `COALESCE(
 // que el limite de sucursales, y por las mismas razones: el permiso vive en la
 // base (`plans.notices`, que edita el admin) y no en el codigo, y al dueño
 // heredado no se le quita nada que ya tuviera.
+// Sin plan elegido no hay avisos (mismo CASE que el limite de sucursales).
 const ownerNotices = (ownerRef) => `COALESCE(
-  (SELECT p.notices FROM subscriptions sub
-     JOIN plans p ON p.id = sub.plan_id
+  (SELECT CASE WHEN sub.plan_id IS NULL THEN FALSE ELSE p.notices END
+     FROM subscriptions sub
+     LEFT JOIN plans p ON p.id = sub.plan_id
     WHERE sub.owner_id = ${ownerRef}),
   (SELECT BOOL_OR(p.notices) FROM plans p WHERE p.is_active),
   FALSE
@@ -87,7 +98,7 @@ const STUDIO_WITHIN_PLAN = studioWithinPlan();
 //   - 'pendiente' o 'vencida': solo hasta `paid_until`, el ultimo dia cubierto
 //     por un cobro exitoso. Si el dueño no resuelve el pago, ahi desaparece.
 //     Quien nunca ha pagado no tiene ese dia y no se publica.
-//   - 'cancelada': no.
+//   - 'cancelada' y 'sin_plan': no.
 // Los dueños sin fila en `subscriptions` (heredados) siguen visibles.
 //
 // Ademas tiene que estar completo, no borrado y caber en el plan: un Basic

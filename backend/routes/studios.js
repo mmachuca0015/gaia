@@ -88,6 +88,14 @@ router.get("/", optionalAuth, async (req, res) => {
 });
 
 //Registro de estudio
+//
+// Solo pide lo basico: el dueño, el nombre del estudio y su acceso. Lo demas
+// (descripcion, direccion, telefono, horario, imagenes, Stripe) se llena en el
+// panel, y el estudio no se publica hasta tenerlo (STUDIO_COMPLETE). Estado,
+// telefono y horario se siguen aceptando si vienen.
+//
+// El plan es opcional: sin `plan_id` el dueño escoge despues y su suscripcion
+// nace en 'sin_plan'.
 router.post("/register-studio", async (req, res) => {
   const {
     name,
@@ -109,29 +117,40 @@ router.post("/register-studio", async (req, res) => {
 
   const client = await pool.connect();
   try {
-    if (!name || !last_name || !studio_name || !normalizedEmail || !country) {
+    if (!name || !last_name || !studio_name || !normalizedEmail) {
       return res.status(400).json({ error: "Faltan campos obligatorios" });
     }
 
-    // El horario se pide desde el registro: con el, el marketplace sabe
-    // cuando el estudio esta abierto de verdad.
-    const parsedHours = parseHours(hours);
-    if (parsedHours.error) {
-      return res.status(400).json({ error: parsedHours.error });
+    let parsedHours = { hours: [] };
+    if (Array.isArray(hours) && hours.length > 0) {
+      parsedHours = parseHours(hours);
+      if (parsedHours.error) {
+        return res.status(400).json({ error: parsedHours.error });
+      }
     }
 
-    // Sin plan no hay estudio. Se valida contra la base y no solo su
-    // presencia: un plan_id inventado dejaria una suscripcion apuntando a
-    // nada, y uno desactivado permitiria contratar una tarifa retirada.
-    if (!plan_id) {
-      return res.status(400).json({ error: "Elige un plan para continuar" });
+    let cleanPhone = null;
+    if (phone != null && String(phone).trim() !== "") {
+      cleanPhone = parsePhone(phone);
+      if (!cleanPhone) {
+        return res
+          .status(400)
+          .json({ error: "Escribe un teléfono válido de 10 dígitos" });
+      }
     }
-    const planCheck = await client.query(
-      "SELECT id FROM plans WHERE id = $1 AND is_active = TRUE",
-      [plan_id],
-    );
-    if (planCheck.rows.length === 0) {
-      return res.status(400).json({ error: "El plan seleccionado no esta disponible" });
+
+    // Si eligio plan, se valida contra la base y no solo su presencia: un
+    // plan_id inventado dejaria una suscripcion apuntando a nada, y uno
+    // desactivado permitiria contratar una tarifa retirada.
+    const planId = plan_id ? Number(plan_id) : null;
+    if (planId) {
+      const planCheck = await client.query(
+        "SELECT id FROM plans WHERE id = $1 AND is_active = TRUE",
+        [planId],
+      );
+      if (planCheck.rows.length === 0) {
+        return res.status(400).json({ error: "El plan seleccionado no esta disponible" });
+      }
     }
     if (typeof password !== "string" || password.length < MIN_PASSWORD_LENGTH) {
       return res.status(400).json({
@@ -166,11 +185,26 @@ router.post("/register-studio", async (req, res) => {
     const ownerId = registerOwner.rows[0].id;
     const result = await client.query(
       "INSERT INTO studios ( name, country, state, phone, owner_id) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-      [studio_name, country, state, phone, ownerId],
+      [String(studio_name).trim(), country || "México", state || null, cleanPhone, ownerId],
     );
-    await replaceHours(client, result.rows[0].id, parsedHours.hours);
+    if (parsedHours.hours.length > 0) {
+      await replaceHours(client, result.rows[0].id, parsedHours.hours);
+    }
 
     const interval = billing_interval === "year" ? "year" : "month";
+
+    // Escoge plan despues: la fila existe igual, en 'sin_plan'. Sin fila
+    // seria un dueño heredado, que se publica sin pagar. El cupon necesita
+    // un plan, asi que aqui no se canjea.
+    if (!planId) {
+      await client.query(
+        "INSERT INTO subscriptions (owner_id, plan_id, status, billing_interval) VALUES ($1, NULL, 'sin_plan', $2)",
+        [ownerId, interval],
+      );
+      await client.query("COMMIT");
+      await createSession(res, { userId: ownerId, role: "owner", req });
+      return res.status(201).json({ ...result.rows[0], role: "owner" });
+    }
 
     // El cupon se canja aqui dentro, con el renglon bloqueado, y no antes:
     // asi el "un solo uso" se decide en el mismo instante en que se crea el
@@ -190,7 +224,7 @@ router.post("/register-studio", async (req, res) => {
     // reventar el CHECK de la tabla.
     await client.query(
       "INSERT INTO subscriptions (owner_id, plan_id, status, billing_interval, coupon_id) VALUES ($1, $2, 'pendiente', $3, $4)",
-      [ownerId, plan_id, interval, canje.couponId],
+      [ownerId, planId, interval, canje.couponId],
     );
 
     await client.query("COMMIT");
@@ -295,12 +329,22 @@ router.post("/mine", requireAuth, requireRole("owner"), async (req, res) => {
       });
     }
 
+    // La cuenta de Stripe es del dueño: la sucursal nueva cobra con la misma
+    // que ya dio de alta, sin pasar otra vez por el papeleo de Stripe.
     const { rows } = await client.query(
       `INSERT INTO studios
          (name, branch_name, description, street, ext_number, int_number,
           neighborhood, city, state, country, zip_code, latitude, longitude,
-          phone, logo_url, cover_url, owner_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+          phone, logo_url, cover_url, owner_id, stripe_account_id, stripe_ready)
+       SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
+              cuenta.stripe_account_id, COALESCE(cuenta.stripe_ready, FALSE)
+         FROM (SELECT 1) AS uno
+         LEFT JOIN LATERAL (
+           SELECT stripe_account_id, stripe_ready FROM studios
+            WHERE owner_id = $17 AND stripe_account_id IS NOT NULL
+            ORDER BY stripe_ready DESC, created_at, id
+            LIMIT 1
+         ) AS cuenta ON TRUE
        RETURNING id`,
       [
         String(name).trim(),
