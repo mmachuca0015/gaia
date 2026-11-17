@@ -449,6 +449,46 @@ const SUBSCRIPTION_EXPAND = [
   "latest_invoice.payment_intent",
 ];
 
+// Un /payment-intent a la vez por dueño.
+//
+// Dos POST simultaneos (el efecto doble de React StrictMode, un doble clic, un
+// remontaje) veian los dos `stripe_subscription_id` en NULL y creaban dos
+// suscripciones en Stripe. El navegador pagaba una y la base se quedaba con la
+// otra: el dueño cobrado y su suscripcion en 'pendiente' para siempre, porque
+// el webhook busca la fila por el id de la pagada.
+//
+// Con el candado el segundo espera al primero y encuentra la suscripcion ya
+// guardada, asi que la reusa. Es un candado de sesion de transaccion
+// (advisory), no un FOR UPDATE sobre la fila: el handler escribe esa misma
+// fila con `pool` y se bloquearia contra si mismo.
+const PAYMENT_LOCK = 4207;
+
+function onePerOwner(handler) {
+  return async (req, res) => {
+    let client;
+    try {
+      client = await pool.connect();
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock($1, $2)", [
+        PAYMENT_LOCK,
+        req.user.id,
+      ]);
+    } catch (err) {
+      client?.release();
+      console.error(err);
+      return res.status(500).json({ error: "No pudimos preparar el pago" });
+    }
+    try {
+      await handler(req, res);
+    } finally {
+      // El COMMIT suelta el candado. Para entonces el UPDATE del handler ya
+      // se confirmo por su lado, y el siguiente lo ve.
+      await client.query("COMMIT").catch(() => {});
+      client.release();
+    }
+  };
+}
+
 // Prepara el cobro y devuelve el secreto para confirmarlo DENTRO de la app.
 //
 // No se usa Checkout hospedado: la tarjeta se captura en el formulario y queda
@@ -461,7 +501,7 @@ router.post(
   "/payment-intent",
   requireAuth,
   requireRole("owner"),
-  async (req, res) => {
+  onePerOwner(async (req, res) => {
     try {
       const { rows } = await pool.query(
         `SELECT s.id AS subscription_id, s.status, s.stripe_customer_id,
@@ -640,7 +680,7 @@ router.post(
       console.error(err);
       res.status(500).json({ error: "No pudimos preparar el pago" });
     }
-  },
+  }),
 );
 
 // --------------------------------------------------------------- webhook
