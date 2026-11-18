@@ -447,7 +447,80 @@ function extractClientSecret(invoice) {
 const SUBSCRIPTION_EXPAND = [
   "latest_invoice.confirmation_secret",
   "latest_invoice.payment_intent",
+  "pending_setup_intent",
 ];
+
+// Marca como activa la suscripcion de una factura PAGADA y la anota para la
+// grafica del admin. Devuelve el id de la suscripcion de Stripe, o null.
+//
+// La llama el webhook `invoice.paid` y, para una factura de $0 (cupon del
+// 100%), tambien /payment-intent. En los dos casos el dato viene de Stripe,
+// nunca del navegador. Es idempotente: correr dos veces deja lo mismo.
+async function applyPaidInvoice(invoice) {
+  if (invoice?.status !== "paid") return null;
+  const raw =
+    invoice.subscription ?? invoice.parent?.subscription_details?.subscription;
+  if (!raw) return null;
+  const subId = typeof raw === "string" ? raw : raw.id;
+
+  // Un cambio de plan programado se aplica con el primer cobro de
+  // renovacion, que es el primero que ya sale con el precio nuevo.
+  const renewal = invoice.billing_reason === "subscription_cycle";
+  // Hasta donde cubre este cobro: el fin del periodo de servicio de sus
+  // lineas. El invoice.period_end de Stripe NO sirve para esto: en una
+  // renovacion apunta al periodo anterior.
+  const coveredUntil = Math.max(
+    0,
+    ...(invoice.lines?.data ?? []).map((line) => line.period?.end ?? 0),
+  );
+  await pool.query(
+    `UPDATE subscriptions
+     SET status = 'activa',
+         started_at = COALESCE(started_at, NOW()),
+         paid_until = CASE WHEN $3 > 0
+                           THEN GREATEST(paid_until, to_timestamp($3))
+                           ELSE paid_until END,
+         plan_id = CASE WHEN $2 THEN COALESCE(pending_plan_id, plan_id)
+                        ELSE plan_id END,
+         pending_plan_id = CASE WHEN $2 THEN NULL ELSE pending_plan_id END,
+         updated_at = NOW()
+     WHERE stripe_subscription_id = $1`,
+    [subId, renewal, coveredUntil],
+  );
+
+  // Para la grafica de suscripciones del admin. Si falla se anota y se
+  // sigue: la suscripcion ya quedo activa, y el script de carga
+  // (scripts/backfill-subscription-payments.js) recupera la factura.
+  await recordSubscriptionPayment(invoice).catch((err) =>
+    console.error("No se guardo el cobro de suscripcion", invoice.id, err),
+  );
+  return subId;
+}
+
+// Una primera factura de $0 (cupon del 100%) no tiene cobro que confirmar:
+// Stripe la marca pagada al crearla y la suscripcion nace `active`. Lo que
+// queda es guardar la tarjeta para la renovacion, y para eso Stripe da un
+// SetupIntent (`pending_setup_intent`). Al confirmarlo, Stripe la deja como
+// metodo por defecto de la suscripcion (probado en modo prueba).
+//
+// La activacion se hace aqui y no se espera al webhook: `invoice.paid` llega
+// casi al mismo tiempo que la respuesta de subscriptions.create, antes de que
+// se guarde el `stripe_subscription_id`, y no encontraria la fila.
+async function settleFreeInvoice(subscription, res, currency) {
+  await applyPaidInvoice(subscription.latest_invoice);
+  const setup = subscription.pending_setup_intent;
+  return res.json({
+    mode: setup?.client_secret ? "setup" : "none",
+    clientSecret: setup?.client_secret ?? null,
+    amount: 0,
+    currency: subscription.latest_invoice?.currency ?? currency,
+    reused: false,
+  });
+}
+
+function isFreeInvoice(invoice) {
+  return invoice?.status === "paid" && invoice.amount_due === 0;
+}
 
 // Un /payment-intent a la vez por dueño.
 //
@@ -581,6 +654,16 @@ router.post(
             throw err;
           });
 
+        // Una de $0 que ya nacio pagada pero cuya activacion no se guardo (se
+        // cayo la conexion a la base justo ahi): se termina de activar y se
+        // vuelve a ofrecer guardar la tarjeta.
+        if (
+          existing?.status === "active" &&
+          isFreeInvoice(existing.latest_invoice)
+        ) {
+          return settleFreeInvoice(existing, res, sub.currency);
+        }
+
         // 'incomplete': primer cobro sin terminar. 'past_due' / 'unpaid': fallo
         // una renovacion. En los dos casos lo que hay que pagar es la factura
         // abierta de ESA suscripcion; crear otra cobraria dos veces.
@@ -589,6 +672,7 @@ router.post(
           const clientSecret = extractClientSecret(existing.latest_invoice);
           if (clientSecret) {
             return res.json({
+              mode: "payment",
               clientSecret,
               amount: existing.latest_invoice?.amount_due ?? null,
               currency: existing.latest_invoice?.currency ?? sub.currency,
@@ -656,6 +740,17 @@ router.post(
         },
       });
 
+      // El id se guarda ANTES de mirar la factura: si algo falla despues, el
+      // siguiente intento reusa esta suscripcion en vez de crear otra.
+      await pool.query(
+        "UPDATE subscriptions SET stripe_subscription_id = $1, updated_at = NOW() WHERE id = $2",
+        [subscription.id, sub.subscription_id],
+      );
+
+      if (isFreeInvoice(subscription.latest_invoice)) {
+        return settleFreeInvoice(subscription, res, sub.currency);
+      }
+
       const clientSecret = extractClientSecret(subscription.latest_invoice);
       if (!clientSecret) {
         console.error(
@@ -665,12 +760,8 @@ router.post(
         return res.status(500).json({ error: "No pudimos preparar el pago" });
       }
 
-      await pool.query(
-        "UPDATE subscriptions SET stripe_subscription_id = $1, updated_at = NOW() WHERE id = $2",
-        [subscription.id, sub.subscription_id],
-      );
-
       res.json({
+        mode: "payment",
         clientSecret,
         amount: subscription.latest_invoice?.amount_due ?? null,
         currency: subscription.latest_invoice?.currency ?? sub.currency,
@@ -715,49 +806,17 @@ async function webhookHandler(req, res) {
       // Stripe termine, y el cobro puede completarse igual.
       case "invoice.paid": {
         const invoice = event.data.object;
-        const subId =
-          invoice.subscription ?? invoice.parent?.subscription_details?.subscription;
+        const subId = await applyPaidInvoice(invoice);
         if (!subId) break;
-        // Un cambio de plan programado se aplica con el primer cobro de
-        // renovacion, que es el primero que ya sale con el precio nuevo.
-        const renewal = invoice.billing_reason === "subscription_cycle";
-        // Hasta donde cubre este cobro: el fin del periodo de servicio de sus
-        // lineas. El invoice.period_end de Stripe NO sirve para esto: en una
-        // renovacion apunta al periodo anterior.
-        const coveredUntil = Math.max(
-          0,
-          ...(invoice.lines?.data ?? []).map((line) => line.period?.end ?? 0),
-        );
-        await pool.query(
-          `UPDATE subscriptions
-           SET status = 'activa',
-               started_at = COALESCE(started_at, NOW()),
-               paid_until = CASE WHEN $3 > 0
-                                 THEN GREATEST(paid_until, to_timestamp($3))
-                                 ELSE paid_until END,
-               plan_id = CASE WHEN $2 THEN COALESCE(pending_plan_id, plan_id)
-                              ELSE plan_id END,
-               pending_plan_id = CASE WHEN $2 THEN NULL ELSE pending_plan_id END,
-               updated_at = NOW()
-           WHERE stripe_subscription_id = $1`,
-          [typeof subId === "string" ? subId : subId.id, renewal, coveredUntil],
-        );
-
-        // Para la grafica de suscripciones del admin. Si falla se anota y se
-        // sigue: la suscripcion ya quedo activa, y el script de carga
-        // (scripts/backfill-subscription-payments.js) recupera la factura.
-        await recordSubscriptionPayment(invoice).catch((err) =>
-          console.error("No se guardo el cobro de suscripcion", invoice.id, err),
-        );
 
         // Aqui es donde un cambio de plan de veras entra. Si dejo sucursales
         // fuera, se resuelve a sus alumnos: las clases que ya pagaron se les
         // abonan gratis en la que sobrevive. Hasta hoy la clase se daba
         // normal, por eso no se hizo nada al confirmar el cambio.
-        if (renewal) {
+        if (invoice.billing_reason === "subscription_cycle") {
           const { rows: dueño } = await pool.query(
             "SELECT owner_id FROM subscriptions WHERE stripe_subscription_id = $1",
-            [typeof subId === "string" ? subId : subId.id],
+            [subId],
           );
           if (dueño[0]) await reubicarConCuidado(dueño[0].owner_id);
         }

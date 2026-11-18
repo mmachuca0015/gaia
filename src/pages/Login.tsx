@@ -15,6 +15,7 @@ import {
 import { validateCoupon, type CouponCheck } from "../lib/coupons";
 import PlanPicker from "../components/PlanPicker";
 import SubscriptionPayment from "../components/SubscriptionPayment";
+import PasswordInput from "../components/PasswordInput";
 
 type Step =
   | "Iniciar sesión"
@@ -426,8 +427,7 @@ function Login() {
               <label className="text-xs text-slate-400 block mb-1.5">
                 Contraseña
               </label>
-              <input
-                type="password"
+              <PasswordInput
                 autoComplete="current-password"
                 placeholder="••••••••"
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
@@ -615,8 +615,7 @@ function Login() {
               <label className="text-xs text-slate-400 block mb-1.5">
                 Contraseña
               </label>
-              <input
-                type="password"
+              <PasswordInput
                 placeholder="••••••••"
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                 value={registerUserForm.password}
@@ -633,8 +632,7 @@ function Login() {
               <label className="text-xs text-slate-400 block mb-1.5">
                 Confirmar contraseña
               </label>
-              <input
-                type="password"
+              <PasswordInput
                 placeholder="••••••••"
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                 value={registerUserForm.confirmPassword}
@@ -761,8 +759,7 @@ function Login() {
                 <label className="text-xs text-slate-400 block mb-1.5">
                   Contraseña
                 </label>
-                <input
-                  type="password"
+                <PasswordInput
                   placeholder="••••••••"
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                   value={registerStudioForm.password}
@@ -778,8 +775,7 @@ function Login() {
                 <label className="text-xs text-slate-400 block mb-1.5">
                   Confirmar contraseña
                 </label>
-                <input
-                  type="password"
+                <PasswordInput
                   placeholder="••••••••"
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors"
                   value={registerStudioForm.confirmPassword}

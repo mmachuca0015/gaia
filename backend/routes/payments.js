@@ -457,6 +457,92 @@ router.post(
   },
 );
 
+// Saldo y depositos de la cuenta Connect del dueño, para el resumen de la
+// pantalla de Pagos. Se le pregunta a Stripe en cada peticion (no se guarda
+// nada): es el mismo numero que el dueño veria en su panel de Stripe.
+//
+// - `pending`: cobrado pero Stripe todavia no lo libera.
+// - `available`: liberado, sale en el siguiente deposito automatico.
+// - `payouts`: los ultimos depositos a su banco, con su estado.
+const PAYOUT_LIMIT = 10;
+
+function mxn(list) {
+  return (list ?? [])
+    .filter((b) => b.currency === "mxn")
+    .reduce((sum, b) => sum + b.amount, 0);
+}
+
+router.get("/balance", requireAuth, requireRole("owner"), async (req, res) => {
+  try {
+    const account = await ownerConnectAccount(req.user.id);
+    if (!account) return res.json({ connected: false });
+
+    const opts = { stripeAccount: account.id };
+    const [balance, payouts] = await Promise.all([
+      stripe.balance.retrieve({}, opts),
+      stripe.payouts.list({ limit: PAYOUT_LIMIT }, opts),
+    ]);
+
+    // Un deposito que ya va en camino deja de estar en `available`, pero
+    // todavia no llega al banco: se muestra aparte para que la suma cuadre.
+    const inTransit = payouts.data
+      .filter((p) => p.status === "pending" || p.status === "in_transit")
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    const schedule = account.settings?.payouts?.schedule ?? null;
+
+    res.json({
+      connected: true,
+      pending_cents: mxn(balance.pending),
+      available_cents: mxn(balance.available),
+      in_transit_cents: inTransit,
+      schedule: schedule && {
+        interval: schedule.interval,
+        delay_days: schedule.delay_days,
+        weekly_anchor: schedule.weekly_anchor ?? null,
+        monthly_anchor: schedule.monthly_anchor ?? null,
+      },
+      payouts: payouts.data.map((p) => ({
+        id: p.id,
+        amount_cents: p.amount,
+        status: p.status,
+        arrival_date: p.arrival_date,
+        created: p.created,
+      })),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "No pudimos leer tu saldo de Stripe" });
+  }
+});
+
+// Enlace de un solo uso al panel de Stripe Express del dueño, para ver el
+// detalle de cada movimiento o cambiar su cuenta bancaria. Caduca en minutos,
+// asi que se pide al hacer clic, no al abrir la pantalla.
+router.post(
+  "/dashboard-link",
+  requireAuth,
+  requireRole("owner"),
+  async (req, res) => {
+    try {
+      const account = await ownerConnectAccount(req.user.id);
+      if (!account) {
+        return res.status(404).json({ error: "No tienes cuenta de Stripe" });
+      }
+      if (!account.details_submitted) {
+        return res
+          .status(409)
+          .json({ error: "Termina primero el alta en Stripe" });
+      }
+      const link = await stripe.accounts.createLoginLink(account.id);
+      res.json({ url: link.url });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "No pudimos abrir tu panel de Stripe" });
+    }
+  },
+);
+
 // Se elimino /create-payment-intent: recibia el monto del body y no lo usaba
 // ninguna pantalla. El cobro real pasa por /charge, que lee el precio de la
 // base de datos.

@@ -173,6 +173,14 @@ de antes se cargan con `node scripts/backfill-subscription-payments.js`.
   `payment_behavior: "default_incomplete"` y devuelve un `clientSecret`; el
   `PaymentElement` de `SubscriptionPayment.tsx` lo confirma con
   `redirect: "if_required"`. Solo se sale de la app si el banco pide 3D Secure.
+- **Cupón del 100% (factura de $0):** Stripe la marca pagada al crearla y no
+  hay cobro que confirmar. `/payment-intent` responde `mode: "setup"` con el
+  secreto del `pending_setup_intent` y `SubscriptionPayment.tsx` usa
+  `confirmSetup` para guardar la tarjeta (Stripe la deja como método de la
+  suscripción). La activación la hace la misma ruta con `applyPaidInvoice`,
+  con la factura leída de Stripe: el `invoice.paid` llega antes de que se
+  guarde el `stripe_subscription_id` y no encontraría la fila. Es la única
+  excepción a "solo el webhook activa", y el dato sigue viniendo de Stripe.
 - `save_default_payment_method: "on_subscription"` es lo que **deja la tarjeta
   guardada** para el cobro automático del siguiente periodo. Si se quita, la
   renovación falla y la suscripción cae a `vencida`.
@@ -319,6 +327,12 @@ Otras reglas de esta parte:
   `stripe_ready` lo actualizan `GET /payments/connect-status` (lo pide la
   pantalla de Pagos, que es el `return_url` del alta) y cada cobro
   (`studioCanReceive`). No hay webhook de Connect.
+- **"Tu dinero" en Pagos** (`StripeBalanceCard.tsx`, `GET /payments/balance`
+  y `POST /payments/dashboard-link`): saldo en proceso, disponible y en
+  camino, más los últimos depósitos, leídos de Stripe en cada petición (no se
+  guarda nada) y refrescados cada minuto. Los depósitos al banco son
+  automáticos (cuenta Express); "Ver en Stripe" abre su panel Express con un
+  login link de un solo uso, que se pide al hacer clic porque caduca.
 - **Qué estudios se publican** (`backend/services/catalog.js`,
   `STUDIO_PUBLISHED`): `activa` sí; `pendiente` y `vencida` solo hasta
   `paid_until`; `cancelada` no; sin fila (heredados) sí. Si no se publica, no

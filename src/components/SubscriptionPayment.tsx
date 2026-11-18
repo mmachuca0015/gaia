@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Elements,
   PaymentElement,
@@ -19,11 +19,13 @@ type Props = {
 /* Formulario interno. Va dentro del <Elements> con clientSecret, porque
    useStripe y useElements solo funcionan ahi adentro. */
 function PaymentFields({
+  mode,
   amount,
   currency,
   onSuccess,
   cta,
 }: {
+  mode: "payment" | "setup";
   amount: number | null;
   currency: string;
   onSuccess: () => void;
@@ -41,13 +43,24 @@ function PaymentFields({
 
     // redirect: "if_required" mantiene al dueño dentro de la app. Solo se sale
     // si el banco pide 3D Secure, y en ese caso vuelve al panel.
-    const { error: stripeError } = await stripe.confirmPayment({
-      elements,
-      confirmParams: {
-        return_url: `${window.location.origin}/panel-de-control`,
-      },
-      redirect: "if_required",
-    });
+    //
+    // Con un cupon del 100% no hay cobro: la suscripcion ya quedo activa y solo
+    // se guarda la tarjeta (SetupIntent) para la renovacion.
+    const confirmParams = {
+      return_url: `${window.location.origin}/panel-de-control`,
+    };
+    const { error: stripeError } =
+      mode === "setup"
+        ? await stripe.confirmSetup({
+            elements,
+            confirmParams,
+            redirect: "if_required",
+          })
+        : await stripe.confirmPayment({
+            elements,
+            confirmParams,
+            redirect: "if_required",
+          });
 
     if (stripeError) {
       setError(stripeError.message || "No pudimos procesar el pago");
@@ -77,7 +90,9 @@ function PaymentFields({
       >
         {paying
           ? "Procesando..."
-          : amount !== null
+          : mode === "setup"
+            ? "Guardar tarjeta · primer mes sin costo"
+            : amount !== null
             ? // Monto de la factura de Stripe, ya con IVA. Con centavos:
               // $578.84 redondeado diria un precio que no es el cobrado.
               `${cta} · $${(amount / 100).toLocaleString("es-MX", {
@@ -100,9 +115,16 @@ function PaymentFields({
    Pide el clientSecret al backend y monta Elements con el. */
 function SubscriptionPayment({ onSuccess, cta = "Pagar" }: Props) {
   const [clientSecret, setClientSecret] = useState("");
+  const [mode, setMode] = useState<"payment" | "setup">("payment");
   const [amount, setAmount] = useState<number | null>(null);
   const [currency, setCurrency] = useState("mxn");
   const [error, setError] = useState("");
+  // El pedido al backend se hace UNA vez al montar; con onSuccess en las
+  // dependencias, cada render del padre lo repetiria.
+  const onSuccessRef = useRef(onSuccess);
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -114,6 +136,13 @@ function SubscriptionPayment({ onSuccess, cta = "Pagar" }: Props) {
           setError(data.error || "No pudimos preparar el pago");
           return;
         }
+        // Cupon del 100% y la tarjeta ya estaba guardada: no hay nada que
+        // pedir, la suscripcion quedo activa en el backend.
+        if (data.mode === "none") {
+          onSuccessRef.current();
+          return;
+        }
+        setMode(data.mode === "setup" ? "setup" : "payment");
         setClientSecret(data.clientSecret);
         setAmount(data.amount ?? null);
         setCurrency(data.currency || "mxn");
@@ -153,6 +182,7 @@ function SubscriptionPayment({ onSuccess, cta = "Pagar" }: Props) {
       }}
     >
       <PaymentFields
+        mode={mode}
         amount={amount}
         currency={currency}
         onSuccess={onSuccess}

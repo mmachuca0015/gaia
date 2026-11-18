@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 
 import { apiJson } from "../../lib/api";
+import StripeBalanceCard from "../../components/StripeBalanceCard";
 
 type ConnectStatus = {
   connected: boolean;
@@ -119,6 +120,9 @@ function OwnerEstudioPagos() {
             {button("Conectar cuenta bancaria")}
           </div>
         )}
+        {/* Con la cuenta a medio dar de alta tambien puede haber saldo
+            pendiente, asi que basta con que exista. */}
+        {status?.connected && <StripeBalanceCard />}
         {error && <p className="text-sm text-red-500 mt-3">{error}</p>}
       </div>
     </div>

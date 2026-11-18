@@ -12,7 +12,28 @@ import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 
 import { logout } from "../lib/api";
-import { fetchOwnerSubscription } from "../lib/subscription";
+import {
+  fetchOwnerSubscription,
+  type OwnerSubscription,
+} from "../lib/subscription";
+
+// Lo que dice la etiqueta bajo el logo. Solo se nombra un plan cuando de veras
+// lo tiene contratado: uno sin pagar o cancelado diria un plan que no opera.
+function planLabel(sub: OwnerSubscription) {
+  switch (sub.status) {
+    case "activa":
+    case "vencida":
+      return sub.plan_name ? `Plan ${sub.plan_name}` : null;
+    case "pendiente":
+      return sub.plan_name ? `Plan ${sub.plan_name} · sin pagar` : null;
+    case "demo":
+      return "Demo";
+    case "heredada":
+      return null;
+    default:
+      return "Sin plan";
+  }
+}
 function OwnerSidebar() {
   const navigate = useNavigate();
 
@@ -23,10 +44,14 @@ function OwnerSidebar() {
   // Arranca en false: mas vale que la pestaña aparezca un instante despues a
   // que parpadee y desaparezca en la cara de quien no la tiene.
   const [notices, setNotices] = useState(false);
+  const [plan, setPlan] = useState<string | null>(null);
 
   useEffect(() => {
     fetchOwnerSubscription()
-      .then((sub) => setNotices(sub.notices === true))
+      .then((sub) => {
+        setNotices(sub.notices === true);
+        setPlan(planLabel(sub));
+      })
       .catch(() => setNotices(false));
   }, []);
 
@@ -56,6 +81,11 @@ function OwnerSidebar() {
         >
           Wellco
         </h1>
+        {plan && (
+          <span className="inline-block mt-2 px-3 py-1 rounded-full bg-[#1b2c44] text-white text-xs font-medium">
+            {plan}
+          </span>
+        )}
       </div>
 
       {/* Nav */}
