@@ -2,6 +2,7 @@
 // de un paquete; solo cambia la linea de pago.
 const { Resend } = require("resend");
 const pool = require("../db");
+const { FROM } = require("./mailer");
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -81,7 +82,9 @@ async function sendBookingConfirmation(bookingId, paymentLine) {
     const booking = rows[0];
 
     await resend.emails.send({
-      from: "Wellco <onboarding@resend.dev>",
+      // El remitente del dominio, no onboarding@resend.dev: esa direccion de
+      // pruebas de Resend solo entrega al dueño de la cuenta de Resend.
+      from: FROM,
       to: booking.email,
       subject: "¡Reserva confirmada!",
       html: `

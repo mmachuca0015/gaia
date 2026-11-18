@@ -78,8 +78,10 @@ Historial de nombres: GAIA Wellness -> GAIA -> PILA -> **wellco** (nombre actual
   cache de 30 s que el cambio limpia) y se los pasa a `splitCharge(base, fees)`.
   En Stripe no hay nada que actualizar: el reparto se calcula en cada
   PaymentIntent. **No vuelvas a escribirlos como constante.**
-- **El estudio absorbe la comisión completa de Stripe** (3.6% del total + $3).
-- La landing lo anuncia así: "1.5% más la de Stripe (3.6% + $3 MXN)", con el
+- **El estudio absorbe la comisión completa de Stripe** (3.6% del total + $3,
+  **más el 16% de IVA que Stripe le carga a esa comisión**; en el balance sale
+  como `stripe_fee` + `tax`). Sin el IVA, salía del bolsillo de Wellco.
+- La landing lo anuncia así: "1.5% más la de Stripe (3.6% + $3 MXN, más IVA)", con el
   porcentaje leído de la API (`Pricing.tsx`). Es lo que paga el estudio; el 3%
   del alumno se ve en el desglose al reservar.
 
@@ -87,13 +89,15 @@ Historial de nombres: GAIA Wellness -> GAIA -> PILA -> **wellco** (nombre actual
 
 ```
 alumno paga       T
-Stripe se queda   3.6% de T + $3
+Stripe se queda   (3.6% de T + $3) + 16% de IVA sobre eso
 Wellco se queda   3% de P + 1.5% de P
-estudio recibe    P - 1.5% de P - (3.6% de T + $3)
+estudio recibe    P - 1.5% de P - lo de Stripe
 ```
 
-Con una clase de $150: el alumno paga $154.50, Stripe cobra $8.56, Wellco se
-queda $6.75 y el estudio recibe $139.19.
+Con una clase de $150: el alumno paga $154.50, Stripe cobra $9.93 ($8.56 +
+$1.37 de IVA), Wellco se queda $6.75 y el estudio recibe $137.82. Medido contra
+Stripe en modo prueba con una tarjeta mexicana (`pm_card_mx`); con una tarjeta
+extranjera Stripe cobra 0.5% más y esa diferencia la absorbe Wellco.
 
 **La comisión de Stripe se resta de `transfer_data.amount`.** Es lo menos
 obvio del cálculo: Stripe cobra su comisión de la cuenta de la plataforma, no de
@@ -104,6 +108,17 @@ Los dos porcentajes se exponen en `GET /payments/fees` y el
 frontend los lee de ahí (`src/lib/fees.ts`, misma fórmula de redondeo que el
 backend). **No los escribas también en el frontend**: dos copias acaban
 desincronizadas y la pantalla diría un precio distinto al cobrado.
+
+**3D Secure** (`chargeSavedCard` en `services/charges.js`, `src/lib/sca.ts`).
+Clases, paquetes y la diferencia del canje cobran la tarjeta guardada
+`off_session`. Si el banco pide autenticación, la ruta responde 402
+`requires_action` con el `clientSecret` de un PaymentIntent que **solo
+autoriza** (`capture_method: "manual"`) y no guarda nada; el frontend abre la
+ventana del banco y repite la misma petición con `paymentIntentId`. La segunda
+vuelta revalida todo, compara monto, destino y `metadata` (alumno, tipo, clase
+y fecha) y **captura dentro de la transacción**. Lo que no se usa se cancela al
+momento (`releaseAuthorization`) o Stripe lo suelta a los 7 días. Las
+pantallas llaman `payJson`, no `api`, para esas tres rutas.
 
 La comisión real de Stripe varía según la tarjeta (internacional, AmEx, etc.),
 así que el neto de Wellco es aproximado, no exacto al centavo.
@@ -251,6 +266,11 @@ caminos, y la diferencia es si le queda alguna sucursal.
     3%** de cargo por servicio, que cobró Wellco y no tuvo que ver con la baja.
   - De un paquete se devuelve lo proporcional a las clases sin usar
     (`unusedPackageCents`): 0 de 4 usadas devuelve todo, 2 de 4 la mitad.
+    **Una clase canjeada para una fecha futura cuenta como no tomada**
+    (`classesNotTaken`): con el estudio cerrado no se da, y su reserva pasa
+    a `reembolsada` junto con el paquete.
+  - Una reserva sin cargo guardado (anterior a la migración 015) se anota
+    como `sin_cargo` con el precio actual de la clase y va al Excel del admin.
   - `reverse_transfer: true` le saca el dinero a la cuenta del estudio, no al
     bolsillo de Wellco. **No lo quites**: es la misma razón que la resta de
     `transfer_data.amount`.

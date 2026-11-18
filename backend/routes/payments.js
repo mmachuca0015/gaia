@@ -12,6 +12,9 @@ const {
   getCustomerId,
   studioCanReceive,
   savedCard,
+  chargeSavedCard,
+  releaseAuthorization,
+  respondChargeError,
 } = require("../services/charges");
 const { sendBookingConfirmation } = require("../services/bookingEmail");
 const { lockSpot } = require("../services/spots");
@@ -154,6 +157,10 @@ router.delete("/card", requireAuth, requireRole("user"), async (req, res) => {
 router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
   const { scheduleId, classDate } = req.body;
   const userId = req.user.id;
+  // Segunda vuelta tras 3D Secure (ver chargeSavedCard): la autorizacion que
+  // el alumno ya confirmo con su banco.
+  const authorizedId = req.body.paymentIntentId || null;
+  let captured = false;
 
   const client = await pool.connect();
   try {
@@ -266,19 +273,20 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
 
     const paymentIntent = simulated
       ? null
-      : await stripe.paymentIntents.create({
-          amount: split.amountCents,
-          currency: "mxn",
-          customer: card.customerId,
-          payment_method: card.paymentMethodId,
-          confirm: true,
-          off_session: true,
-          transfer_data: {
-            destination: stripeAccountId,
-            amount: split.studioAmount,
+      : await chargeSavedCard({
+          userId,
+          card,
+          split,
+          destination: stripeAccountId,
+          paymentIntentId: authorizedId,
+          metadata: {
+            tipo: "clase",
+            horario_id: String(scheduleId),
+            fecha: String(classDate),
+            ...splitMetadata(classCents, split),
           },
-          metadata: { tipo: "clase", ...splitMetadata(classCents, split) },
         });
+    captured = Boolean(paymentIntent);
 
     // Se guarda con que cargo se pago y cuanto. Sin el PaymentIntent no hay
     // forma de devolverle el dinero al alumno si el estudio cierra, y el
@@ -318,10 +326,16 @@ router.post("/charge", requireAuth, requireRole("user"), async (req, res) => {
     });
   } catch (err) {
     await client.query("ROLLBACK").catch(() => {});
+    // 3D Secure, tarjeta rechazada o autorizacion que no corresponde: es
+    // cosa de la tarjeta, no del servidor, y el alumno tiene que saberlo.
+    if (respondChargeError(res, err)) return;
     console.error(err);
     res.status(500).json({ error: "Error al procesar el pago" });
   } finally {
     client.release();
+    // Una autorizacion confirmada que no termino en reserva (se lleno la
+    // clase, ya tenia una) se suelta ya, no a los 7 dias.
+    if (authorizedId && !captured) await releaseAuthorization(authorizedId, userId);
   }
 });
 

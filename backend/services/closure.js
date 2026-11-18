@@ -39,7 +39,7 @@ const AFFECTED_BOOKINGS = `
   SELECT b.id, b.user_id, b.package_purchase_id,
          to_char(b.class_date, 'YYYY-MM-DD') AS class_date,
          b.stripe_payment_intent_id, b.price_cents, b.service_fee_cents,
-         cl.name AS class_name, cl.id AS class_id,
+         cl.name AS class_name, cl.id AS class_id, cl.price AS class_price,
          studios.id AS studio_id, studios.name AS studio_name,
          studios.branch_name,
          u.email, u.name AS user_name
@@ -53,10 +53,20 @@ const AFFECTED_BOOKINGS = `
      AND b.status = 'activa'
      AND b.class_date >= ${TODAY_MX}`;
 
-// Compras de paquete con clases sin canjear y todavia vigentes. Los abonos por
-// cierre (package_id NULL) no entran: no se pago nada por ellos.
+// Reservas futuras hechas con esta compra. Cuentan en `classes_used` desde
+// que se canjean, pero si el estudio cierra esa clase ya no se da.
+const FUTURE_REDEEMED = `
+  SELECT COUNT(*)::int FROM bookings fb
+   WHERE fb.package_purchase_id = pp.id
+     AND fb.status = 'activa'
+     AND fb.class_date >= ${TODAY_MX}`;
+
+// Compras de paquete con clases sin canjear y todavia vigentes, o con clases
+// canjeadas para una fecha que ya no se va a dar. Los abonos por cierre
+// (package_id NULL) no entran: no se pago nada por ellos.
 const AFFECTED_PURCHASES = `
   SELECT pp.id, pp.user_id, pp.name, pp.classes_total, pp.classes_used,
+         (${FUTURE_REDEEMED}) AS future_redeemed,
          pp.price_cents, pp.service_fee_cents, pp.stripe_payment_intent_id,
          to_char(pp.expires_at AT TIME ZONE 'America/Mexico_City', 'YYYY-MM-DD')
            AS expires_at,
@@ -68,8 +78,11 @@ const AFFECTED_PURCHASES = `
    WHERE studios.owner_id = $1
      AND studios.deleted_at IS NULL
      AND pp.package_id IS NOT NULL
-     AND pp.classes_used < pp.classes_total
-     AND (pp.expires_at AT TIME ZONE 'America/Mexico_City')::date >= ${TODAY_MX}`;
+     AND (
+       ((pp.classes_used < pp.classes_total)
+         AND (pp.expires_at AT TIME ZONE 'America/Mexico_City')::date >= ${TODAY_MX})
+       OR (${FUTURE_REDEEMED}) > 0
+     )`;
 
 /** Las sucursales del dueño separadas en las que siguen y las que no. */
 async function splitBranches(ownerId, db = pool) {
@@ -279,8 +292,23 @@ function stripeFeeOf(baseCents, serviceFeeCents, proporcion = 1) {
  */
 function unusedPackageCents(purchase) {
   if (purchase.classes_total <= 0) return 0;
-  const quedan = purchase.classes_total - purchase.classes_used;
-  return Math.round((purchase.price_cents * quedan) / purchase.classes_total);
+  return Math.round(
+    (purchase.price_cents * classesNotTaken(purchase)) / purchase.classes_total,
+  );
+}
+
+/**
+ * Clases del paquete que el alumno no va a tomar: las que no canjeo mas las
+ * que canjeo para una fecha futura. Esas cuentan en `classes_used` desde el
+ * canje, pero con el estudio cerrado no se dan; sin sumarlas, el alumno perdia
+ * una clase pagada por cada reserva que ya tenia agendada.
+ */
+function classesNotTaken(purchase) {
+  return (
+    purchase.classes_total -
+    purchase.classes_used +
+    (Number(purchase.future_redeemed) || 0)
+  );
 }
 
 /**
@@ -299,19 +327,36 @@ async function refundStudents(ownerId) {
   const devueltos = [];
   const reembolsadas = [];
 
+  // Reservas futuras hechas con paquete, por compra: se devuelven con el
+  // paquete (classesNotTaken) y se marcan junto con el.
+  const porCompra = new Map();
+
   for (const r of reservas) {
     // Una clase sacada de un paquete no se devuelve aqui: su dinero esta en la
     // compra del paquete y se devuelve alla. Devolver las dos seria pagar dos
     // veces la misma clase.
-    if (r.package_purchase_id) continue;
+    if (r.package_purchase_id) {
+      const ids = porCompra.get(r.package_purchase_id) ?? [];
+      ids.push(r.id);
+      porCompra.set(r.package_purchase_id, ids);
+      continue;
+    }
+    // Las reservas de antes de la migracion 015 no guardaron lo que se cobro.
+    // No se devuelven solas (no hay cargo de donde), pero tienen que llegar al
+    // Excel del admin: con 0 centavos refundOne las descartaba sin anotarlas.
+    // El precio de hoy de la clase es la mejor referencia que queda.
+    const sinRegistro = r.price_cents == null;
+    const cents = sinRegistro
+      ? Math.round(Number(r.class_price) * 100)
+      : r.price_cents;
     const res = await refundOne({
       kind: "reserva",
       id: r.id,
       userId: r.user_id,
       studioId: r.studio_id,
       paymentIntentId: r.stripe_payment_intent_id,
-      cents: r.price_cents ?? 0,
-      stripeFee: stripeFeeOf(r.price_cents ?? 0, r.service_fee_cents),
+      cents,
+      stripeFee: stripeFeeOf(cents, r.service_fee_cents),
     });
     if (!res) continue;
     reembolsadas.push(r.id);
@@ -319,8 +364,10 @@ async function refundStudents(ownerId) {
       email: r.email,
       userName: r.user_name,
       tipo: "Clase reservada",
-      nombre: r.class_name,
-      centavos: r.price_cents ?? 0,
+      nombre: sinRegistro
+        ? `${r.class_name} (sin registro del cobro; precio actual de la clase)`
+        : r.class_name,
+      centavos: cents,
       comisionStripe: res.stripeFee,
       estudio: r.studio_name,
       fecha: r.class_date,
@@ -333,7 +380,8 @@ async function refundStudents(ownerId) {
     const cents = unusedPackageCents(c);
     // La comision de Stripe fue sobre el paquete entero; de una devolucion
     // parcial toca la parte proporcional.
-    const sinUsar = (c.classes_total - c.classes_used) / c.classes_total;
+    const libres = classesNotTaken(c);
+    const sinUsar = libres / c.classes_total;
     const res = await refundOne({
       kind: "paquete",
       id: c.id,
@@ -344,11 +392,14 @@ async function refundStudents(ownerId) {
       stripeFee: stripeFeeOf(c.price_cents, c.service_fee_cents, sinUsar),
     });
     if (!res) continue;
+    // Las clases agendadas con este paquete se resuelven con el (devueltas o
+    // en el Excel del admin), igual que una reserva suelta.
+    reembolsadas.push(...(porCompra.get(c.id) ?? []));
     const fila = {
       email: c.email,
       userName: c.user_name,
       tipo: "Paquete",
-      nombre: `${c.name} (${c.classes_total - c.classes_used} de ${c.classes_total} sin usar)`,
+      nombre: `${c.name} (${libres} de ${c.classes_total} sin tomar)`,
       centavos: cents,
       comisionStripe: res.stripeFee,
       estudio: c.studio_name,

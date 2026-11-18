@@ -12,7 +12,6 @@ const {
   requireRole,
   requireStudioOwner,
 } = require("../middleware/auth");
-const { stripe } = require("../services/stripe");
 const {
   STUDIO_PUBLISHED,
   studioVisibleTo,
@@ -24,6 +23,9 @@ const {
   splitMetadata,
   studioCanReceive,
   savedCard,
+  chargeSavedCard,
+  releaseAuthorization,
+  respondChargeError,
 } = require("../services/charges");
 const {
   PACKAGE_STATUS,
@@ -390,6 +392,9 @@ userRouter.post(
   requireRole("user"),
   async (req, res) => {
     const userId = req.user.id;
+    // Segunda vuelta tras 3D Secure (ver chargeSavedCard en services/charges).
+    const authorizedId = req.body?.paymentIntentId || null;
+    let captured = false;
     const client = await pool.connect();
     try {
       const { rows } = await client.query(
@@ -479,24 +484,23 @@ userRouter.post(
       );
 
       if (!simulated) {
-        const paymentIntent = await stripe.paymentIntents.create({
-          amount: split.amountCents,
-          currency: "mxn",
-          customer: card.customerId,
-          payment_method: card.paymentMethodId,
-          confirm: true,
-          off_session: true,
-          transfer_data: {
-            destination: pkg.stripe_account_id,
-            amount: split.studioAmount,
-          },
+        const paymentIntent = await chargeSavedCard({
+          userId,
+          card,
+          split,
+          destination: pkg.stripe_account_id,
+          paymentIntentId: authorizedId,
           metadata: {
             tipo: "paquete",
             paquete_id: String(pkg.id),
-            compra_id: String(purchaseId),
             ...splitMetadata(baseCents, split),
           },
+          // La compra nace en esta transaccion: en la primera vuelta de 3D
+          // Secure se deshace, asi que su id no puede ser parte de lo que se
+          // compara.
+          extraMetadata: { compra_id: String(purchaseId) },
         });
+        captured = true;
         await client.query(
           "UPDATE package_purchases SET stripe_payment_intent_id = $1 WHERE id = $2",
           [paymentIntent.id, purchaseId],
@@ -512,15 +516,12 @@ userRouter.post(
       });
     } catch (err) {
       await client.query("ROLLBACK").catch(() => {});
+      if (respondChargeError(res, err)) return;
       console.error(err);
-      if (err.type === "StripeCardError") {
-        return res
-          .status(402)
-          .json({ error: "Tu tarjeta fue rechazada. Prueba con otra." });
-      }
       res.status(500).json({ error: "No pudimos completar la compra" });
     } finally {
       client.release();
+      if (authorizedId && !captured) await releaseAuthorization(authorizedId, userId);
     }
   },
 );
@@ -554,6 +555,9 @@ userRouter.post("/redeem", requireAuth, requireRole("user"), async (req, res) =>
   if (!purchaseId || !scheduleId || !ISO_DATE.test(classDate)) {
     return res.status(400).json({ error: "Faltan datos de la reserva" });
   }
+  // Segunda vuelta tras 3D Secure, si la diferencia la pidio.
+  const authorizedId = req.body.paymentIntentId || null;
+  let captured = false;
 
   const client = await pool.connect();
   try {
@@ -664,23 +668,21 @@ userRouter.post("/redeem", requireAuth, requireRole("user"), async (req, res) =>
     // una clase descontada.
     let paymentIntent = null;
     if (cobrable && !simulated) {
-      paymentIntent = await stripe.paymentIntents.create({
-        amount: split.amountCents,
-        currency: "mxn",
-        customer: card.customerId,
-        payment_method: card.paymentMethodId,
-        confirm: true,
-        off_session: true,
-        transfer_data: {
-          destination: sede.stripe_account_id,
-          amount: split.studioAmount,
-        },
+      paymentIntent = await chargeSavedCard({
+        userId,
+        card,
+        split,
+        destination: sede.stripe_account_id,
+        paymentIntentId: authorizedId,
         metadata: {
           tipo: "diferencia_de_abono",
           compra_id: String(purchaseId),
+          horario_id: String(scheduleId),
+          fecha: classDate,
           ...splitMetadata(difference, split),
         },
       });
+      captured = true;
     }
 
     const booking = await client.query(
@@ -720,10 +722,12 @@ userRouter.post("/redeem", requireAuth, requireRole("user"), async (req, res) =>
     });
   } catch (err) {
     await client.query("ROLLBACK").catch(() => {});
+    if (respondChargeError(res, err)) return;
     console.error(err);
     res.status(500).json({ error: "No pudimos hacer la reserva" });
   } finally {
     client.release();
+    if (authorizedId && !captured) await releaseAuthorization(authorizedId, userId);
   }
 });
 

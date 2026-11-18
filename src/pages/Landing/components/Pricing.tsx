@@ -232,7 +232,7 @@ function Pricing() {
             <p className="text-sm text-slate-500 leading-relaxed">
               Todos los planes tienen una comisión
               {commission !== null ? ` de ${formatPercent(commission)}%` : ""}{" "}
-              más una comisión de Stripe (3.6% + $3 MXN) por cada transacción.
+              más la comisión de Stripe (3.6% + $3 MXN, más IVA) por cada transacción.
             </p>
           </div>
           <div className="border border-line rounded-2xl p-5">

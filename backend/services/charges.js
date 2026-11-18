@@ -12,7 +12,8 @@ const { stripe, resourceMissing } = require("./stripe");
 //
 // Los porcentajes viven en la tabla fee_settings (migracion 022) y los edita
 // el admin en /admin/suscripciones. El estudio ademas absorbe la comision
-// completa de Stripe (3.6% del total cobrado + $3 fijos).
+// completa de Stripe (3.6% del total cobrado + $3 fijos, mas el IVA que Stripe
+// le carga a esa comision).
 //
 // Se cachean unos segundos para no ir a la base en cada tarjeta de clase; el
 // cambio del admin limpia el cache (invalidateFees) y aplica al momento.
@@ -43,8 +44,13 @@ function invalidateFees() {
 // para restarlo de la transferencia al estudio: Stripe lo descuenta de la
 // cuenta de la plataforma, no de la del estudio. La comision real varia con la
 // tarjeta (internacional, AmEx), asi que el neto de Wellco es aproximado.
+//
+// Stripe Mexico le suma 16% de IVA a su comision y lo descuenta junto con ella
+// (en el balance sale como `stripe_fee` + `tax`). Sin contarlo, ese IVA salia
+// del bolsillo de Wellco: en una clase de $150 se quedaba $5.38 y no $6.75.
 const STRIPE_PERCENT = 3.6;
 const STRIPE_FIXED_CENTS = 300;
+const STRIPE_FEE_IVA_PERCENT = 16;
 
 // Cargo por servicio en centavos. El frontend usa la misma formula
 // (src/lib/fees.ts) con el porcentaje que le da GET /payments/fees, para que
@@ -53,9 +59,12 @@ function serviceFeeCents(classCents, fees) {
   return Math.round((classCents * fees.serviceFeePercent) / 100);
 }
 
-// Lo que Stripe se queda de un cargo por `amountCents` (el total cobrado).
+// Lo que Stripe se queda de un cargo por `amountCents` (el total cobrado),
+// con su IVA. Se redondea en dos pasos, como Stripe: primero la comision y
+// luego el IVA sobre ella.
 function stripeFeeCents(amountCents) {
-  return Math.round((amountCents * STRIPE_PERCENT) / 100) + STRIPE_FIXED_CENTS;
+  const fee = Math.round((amountCents * STRIPE_PERCENT) / 100) + STRIPE_FIXED_CENTS;
+  return fee + Math.round((fee * STRIPE_FEE_IVA_PERCENT) / 100);
 }
 
 // Devuelve el stripe_customer_id del usuario de la sesion, o null.
@@ -133,9 +142,9 @@ async function studioCanReceive(studioId, stripeAccountId) {
 // `fees` sale de getFees(); se pide aparte para que la ruta lo lea una vez:
 //
 //   alumno paga       T
-//   Stripe se queda   3.6% de T + $3
+//   Stripe se queda   (3.6% de T + $3) + 16% de IVA sobre eso
 //   Wellco se queda   3% de P (del alumno) + 1.5% de P (del estudio)
-//   estudio recibe    P - 1.5% de P - (3.6% de T + $3)
+//   estudio recibe    P - 1.5% de P - lo de Stripe
 //
 // La comision de Stripe se resta de la transferencia porque Stripe la cobra
 // de la cuenta de la plataforma, no de la del estudio: sin restarla aqui,
@@ -177,7 +186,184 @@ async function savedCard(userId) {
   return { customerId, paymentMethodId: paymentMethods.data[0].id };
 }
 
+// ------------------------------------------------------------ 3D Secure
+//
+// Las clases y los paquetes se cobran a la tarjeta guardada sin el alumno
+// presente (`off_session`). Si su banco pide 3D Secure, ese cobro no puede
+// pasar: hay que confirmarlo en el navegador. Entonces:
+//
+//   1. chargeSavedCard intenta el cobro normal. Si el banco pide
+//      autenticacion, crea un PaymentIntent que SOLO AUTORIZA
+//      (`capture_method: "manual"`) y lanza NeedsAuthentication. La ruta hace
+//      ROLLBACK, asi que no queda reserva ni compra.
+//   2. El frontend abre la ventana del banco (src/lib/sca.ts) y repite la
+//      MISMA peticion con `paymentIntentId`.
+//   3. La ruta vuelve a validar todo (lugar, duplicados, precio) y
+//      chargeSavedCard, en vez de cobrar otra vez, comprueba que esa
+//      autorizacion sea de este alumno, por este monto y para esto mismo, y la
+//      captura dentro de la transaccion.
+//
+// Se autoriza y no se cobra de una vez porque entre la ventana del banco y la
+// reserva pueden pasar cosas (se llena la clase, cierran la pestaña). Lo que
+// nunca se captura, Stripe lo libera solo a los 7 dias; si la ruta lo descarta
+// antes, releaseAuthorization lo libera al momento.
+
+class NeedsAuthentication extends Error {
+  constructor(paymentIntent) {
+    super("El banco pide 3D Secure");
+    this.clientSecret = paymentIntent.client_secret;
+    this.paymentIntentId = paymentIntent.id;
+  }
+}
+
+/** Respuesta para el frontend cuando hay que pasar por el banco. */
+function authenticationResponse(res, err) {
+  return res.status(402).json({
+    requires_action: true,
+    clientSecret: err.clientSecret,
+    paymentIntentId: err.paymentIntentId,
+    error: "Tu banco pide confirmar el pago.",
+  });
+}
+
+/** Mensaje para el alumno cuando Stripe rechaza la tarjeta. */
+function cardErrorResponse(res, err) {
+  return res.status(402).json({
+    error:
+      err.code === "authentication_required"
+        ? "Tu banco pidió confirmar el pago y no se pudo. Prueba con otra tarjeta."
+        : "Tu tarjeta fue rechazada. Prueba con otra.",
+  });
+}
+
+/**
+ * Cobra `split` a la tarjeta guardada con la parte del estudio para
+ * `destination`.
+ *
+ * `metadata` identifica lo que se paga (tipo, clase y fecha, paquete...). Va
+ * en el PaymentIntent y, en la segunda vuelta, se compara campo por campo:
+ * una autorizacion de una clase de $150 no puede pagar un paquete de $500.
+ * `extraMetadata` es lo que solo existe dentro de la transaccion (el id de la
+ * compra) y se agrega al final, sin compararse.
+ */
+async function chargeSavedCard({
+  userId,
+  card,
+  split,
+  destination,
+  metadata,
+  extraMetadata = {},
+  paymentIntentId = null,
+}) {
+  const expected = { ...metadata, user_id: String(userId) };
+
+  if (paymentIntentId) {
+    const pi = await stripe.paymentIntents
+      .retrieve(String(paymentIntentId))
+      .catch((err) => {
+        if (resourceMissing(err)) return null;
+        throw err;
+      });
+    const matches =
+      pi &&
+      pi.status === "requires_capture" &&
+      pi.amount === split.amountCents &&
+      pi.currency === "mxn" &&
+      pi.transfer_data?.destination === destination &&
+      pi.transfer_data?.amount === split.studioAmount &&
+      Object.entries(expected).every(([k, v]) => pi.metadata?.[k] === v);
+    if (!matches) {
+      const err = new Error("Autorizacion de pago invalida");
+      err.status = 409;
+      err.publicMessage =
+        "El pago confirmado no corresponde a esta reserva. Inténtalo de nuevo.";
+      throw err;
+    }
+    const captured = await stripe.paymentIntents.capture(pi.id);
+    if (Object.keys(extraMetadata).length > 0) {
+      await stripe.paymentIntents
+        .update(pi.id, { metadata: extraMetadata })
+        .catch((err) => console.error("No se anoto la metadata", pi.id, err));
+    }
+    return captured;
+  }
+
+  const base = {
+    amount: split.amountCents,
+    currency: "mxn",
+    customer: card.customerId,
+    payment_method: card.paymentMethodId,
+    transfer_data: { destination, amount: split.studioAmount },
+  };
+
+  try {
+    return await stripe.paymentIntents.create({
+      ...base,
+      confirm: true,
+      off_session: true,
+      metadata: { ...expected, ...extraMetadata },
+    });
+  } catch (err) {
+    if (err.type !== "StripeCardError" || err.code !== "authentication_required") {
+      throw err;
+    }
+    // El intento fallido no sirve para nada mas; se cancela para que no se
+    // quede colgado en el dashboard como "requiere metodo de pago".
+    const failed = err.raw?.payment_intent?.id;
+    if (failed) await stripe.paymentIntents.cancel(failed).catch(() => {});
+
+    const pi = await stripe.paymentIntents.create({
+      ...base,
+      capture_method: "manual",
+      payment_method_types: ["card"],
+      metadata: expected,
+    });
+    throw new NeedsAuthentication(pi);
+  }
+}
+
+/**
+ * Suelta una autorizacion que la ruta no llego a capturar (la clase se lleno,
+ * ya tenia reserva...). Solo la del propio alumno y solo si sigue sin
+ * capturar: nunca cancela un cobro hecho.
+ */
+async function releaseAuthorization(paymentIntentId, userId) {
+  if (!paymentIntentId) return;
+  try {
+    const pi = await stripe.paymentIntents.retrieve(String(paymentIntentId));
+    if (pi.status === "requires_capture" && pi.metadata?.user_id === String(userId)) {
+      await stripe.paymentIntents.cancel(pi.id);
+    }
+  } catch (err) {
+    if (!resourceMissing(err)) console.error("No se libero la autorizacion", err);
+  }
+}
+
+/**
+ * Lo que comparten las tres rutas de cobro al fallar: 3D Secure, tarjeta
+ * rechazada o una autorizacion que no corresponde. Devuelve true si respondio.
+ */
+function respondChargeError(res, err) {
+  if (err instanceof NeedsAuthentication) {
+    authenticationResponse(res, err);
+    return true;
+  }
+  if (err.type === "StripeCardError") {
+    cardErrorResponse(res, err);
+    return true;
+  }
+  if (err.publicMessage) {
+    res.status(err.status || 400).json({ error: err.publicMessage });
+    return true;
+  }
+  return false;
+}
+
 module.exports = {
+  chargeSavedCard,
+  releaseAuthorization,
+  respondChargeError,
+  NeedsAuthentication,
   getFees,
   invalidateFees,
   serviceFeeCents,

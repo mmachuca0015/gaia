@@ -1,6 +1,7 @@
 // Paquetes de clases: tipos y textos compartidos por el panel del dueño, el
 // tab de paquetes del alumno y la reserva de una clase.
 import { apiJson } from "./api";
+import { payJson } from "./sca";
 
 export type ValidityUnit = "day" | "month";
 
@@ -162,10 +163,11 @@ export function fetchMyPackages() {
   return apiJson<PurchasedPackage[]>("/packages/mine");
 }
 
+// Las dos pueden pedir 3D Secure: payJson abre la ventana del banco
+// (src/lib/sca.ts).
 export function purchasePackage(packageId: number) {
-  return apiJson<{ success: boolean; expiresAt: string; simulated: boolean }>(
+  return payJson<{ success: boolean; expiresAt: string; simulated: boolean }>(
     `/packages/${packageId}/purchase`,
-    { method: "POST" },
   );
 }
 
@@ -180,13 +182,10 @@ export function redeemPackage(
   scheduleId: number,
   classDate: string,
 ) {
-  return apiJson<{
+  return payJson<{
     success: boolean;
     remaining: number;
     /** Lo cobrado por la diferencia, con el 3%. 0 si no hubo cobro. */
     charged_cents: number;
-  }>("/packages/redeem", {
-    method: "POST",
-    body: JSON.stringify({ purchaseId, scheduleId, classDate }),
-  });
+  }>("/packages/redeem", { purchaseId, scheduleId, classDate });
 }

@@ -2,8 +2,9 @@ import { Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { api, ApiError, getCachedUser } from "../lib/api";
+import { ApiError, getCachedUser } from "../lib/api";
 import { fetchServiceFeePercent, serviceFeeCents } from "../lib/fees";
+import { payJson } from "../lib/sca";
 import {
   fetchUsablePurchases,
   money,
@@ -136,22 +137,17 @@ function ClassCard({
 
   //Función que realiza el pago
   const handlePagar = async () => {
-    const res = await api("/payments/charge", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    // payJson abre la ventana del banco si pide 3D Secure (src/lib/sca.ts).
+    try {
+      await payJson("/payments/charge", {
         scheduleId: schedule_id,
         classDate: classDate,
-      }),
-    });
-
-    const data = await res.json();
-    if (res.ok) {
+      });
       setShowConfirmPopUp(false);
       alert("¡Reserva confirmada!");
       onReservaExitosa();
-    } else {
-      alert(data.error);
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Error al procesar el pago");
     }
   };
 

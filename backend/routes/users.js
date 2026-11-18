@@ -5,6 +5,7 @@ const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const rateLimit = require("express-rate-limit");
 const { Resend } = require("resend");
+const { FROM } = require("../services/mailer");
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const {
@@ -258,7 +259,9 @@ router.post("/test", passwordResetLimiter, async (req, res) => {
     );
 
     await resend.emails.send({
-      from: "Wellco <onboarding@resend.dev>",
+      // El remitente del dominio, no onboarding@resend.dev: esa direccion de
+      // pruebas de Resend solo entrega al dueño de la cuenta de Resend.
+      from: FROM,
       to: email,
       subject: "Recupera tu contraseña",
       html: `<p>Haz click en el siguiente link para recuperar tu contraseña. Este link expira en 30 minutos.</p>
