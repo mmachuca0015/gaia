@@ -72,6 +72,14 @@ export function fetchBranches() {
   return apiJson<BranchesResponse>("/studios/mine");
 }
 
+// Evento de ventana para decir "cambiaron los datos de una sucursal" sin una
+// libreria de estado global (mismo patron que `wellco:avisos`).
+export const BRANCHES_CHANGED = "wellco:sucursales";
+
+export function branchesChanged() {
+  window.dispatchEvent(new Event(BRANCHES_CHANGED));
+}
+
 export function createBranch(branch: NewBranch) {
   return apiJson<{ id: number }>("/studios/mine", {
     method: "POST",
@@ -164,8 +172,19 @@ export function useBranches() {
     setLoaded(true);
   }, []);
 
-  /** Para volver a pedirlas despues de crear o borrar una. */
-  const reload = useCallback(() => fetchBranches().then(apply), [apply]);
+  /**
+   * Para volver a pedirlas despues de guardar algo. Avisa con `branchesChanged`
+   * para que la lista de pendientes (`OnboardingChecklist`, que vive en el
+   * layout y solo se relee al cambiar de pantalla) palomee lo recien guardado.
+   */
+  const reload = useCallback(
+    () =>
+      fetchBranches().then((data) => {
+        apply(data);
+        branchesChanged();
+      }),
+    [apply],
+  );
 
   useEffect(() => {
     // `cancelled` evita pintar la respuesta de una pantalla que el dueño ya

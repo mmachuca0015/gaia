@@ -13,3 +13,17 @@
 html {
   scroll-behavior: smooth;
 }
+
+/* Tarjeta de estudio en el mapa de Explorar (StudiosMap.tsx): Leaflet le pone
+   padding y margen al popup; sin ellos la portada llega a las orillas. */
+.studio-map-popup .leaflet-popup-content-wrapper {
+  padding: 0;
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(27, 44, 68, 0.18);
+}
+.studio-map-popup .leaflet-popup-content {
+  margin: 0;
+  width: auto !important;
+  line-height: 1.4;
+}

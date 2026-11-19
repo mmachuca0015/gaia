@@ -3,7 +3,11 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Check, ChevronRight, Circle, Store, X } from "lucide-react";
 
 import { getCachedUser } from "../lib/api";
-import { fetchBranches, type Branch } from "../lib/branches";
+import {
+  BRANCHES_CHANGED,
+  fetchBranches,
+  type Branch,
+} from "../lib/branches";
 import {
   fetchOwnerSubscription,
   stillPublished,
@@ -112,9 +116,18 @@ function OnboardingChecklist() {
   const [items, setItems] = useState<Item[] | null>(null);
   const [open, setOpen] = useState(false);
   const ownerId = getCachedUser()?.id ?? 0;
+  // Sube cada vez que una pantalla guarda datos de la sucursal.
+  const [changes, setChanges] = useState(0);
 
-  // Se relee al cambiar de pantalla: lo que el dueño acaba de llenar se
-  // palomea sin recargar.
+  useEffect(() => {
+    const bump = () => setChanges((n) => n + 1);
+    window.addEventListener(BRANCHES_CHANGED, bump);
+    return () => window.removeEventListener(BRANCHES_CHANGED, bump);
+  }, []);
+
+  // Se relee al cambiar de pantalla y cuando una pantalla avisa que guardo
+  // (`branchesChanged`): sin lo segundo, subir el logo en Estudio > General
+  // dejaba la franja diciendo que faltaba hasta cambiar de pantalla.
   useEffect(() => {
     let cancelled = false;
     Promise.all([
@@ -143,7 +156,7 @@ function OnboardingChecklist() {
     return () => {
       cancelled = true;
     };
-  }, [pathname, ownerId]);
+  }, [pathname, ownerId, changes]);
 
   if (!items) return null;
   const pending = items.filter((i) => !i.done).length;

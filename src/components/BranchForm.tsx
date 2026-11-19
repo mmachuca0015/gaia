@@ -10,6 +10,7 @@ import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 import { ApiError } from "../lib/api";
 import { createBranch } from "../lib/branches";
 import StudioHoursEditor from "./StudioHoursEditor";
+import ImageUploadField from "./ImageUploadField";
 import { defaultWeek, toPayload, validateWeek, type DayHours } from "../lib/hours";
 import { estados } from "../data/estados";
 
@@ -90,26 +91,6 @@ function BranchForm({ onClose, onCreated }: Props) {
       state: data.places[0]["state"],
       city: data.places[0]["place name"],
     }));
-  };
-
-  const uploadImage = async (file: File, field: "logo_url" | "cover_url") => {
-    setUploading(field === "logo_url" ? "logo" : "cover");
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append(
-        "upload_preset",
-        import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET,
-      );
-      const res = await fetch(
-        `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`,
-        { method: "POST", body: formData },
-      );
-      const data = await res.json();
-      if (data.secure_url) setForm((prev) => ({ ...prev, [field]: data.secure_url }));
-    } finally {
-      setUploading(null);
-    }
   };
 
   const handleSave = async () => {
@@ -370,24 +351,14 @@ function BranchForm({ onClose, onCreated }: Props) {
             ).map(({ field, titulo, key }) => (
               <div key={field}>
                 <label className={label}>{titulo}</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) uploadImage(file, field);
-                  }}
-                  className="w-full text-md text-slate-600 hover:cursor-pointer"
+                <ImageUploadField
+                  value={form[field]}
+                  onChange={(url) => setForm((prev) => ({ ...prev, [field]: url }))}
+                  onUploadingChange={(up) =>
+                    setUploading((prev) => (up ? key : prev === key ? null : prev))
+                  }
+                  previewClassName="w-full h-28 object-cover rounded-xl"
                 />
-                {uploading === key && (
-                  <p className="text-md text-slate-400 mt-1">Subiendo…</p>
-                )}
-                {form[field] && (
-                  <img
-                    src={form[field]}
-                    className="w-full h-28 object-cover rounded-xl mt-2"
-                  />
-                )}
               </div>
             ))}
           </div>

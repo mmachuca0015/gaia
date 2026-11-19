@@ -7,6 +7,7 @@ import { api, apiJson, ApiError } from "../../lib/api";
 import StudioHoursEditor from "../../components/StudioHoursEditor";
 import BranchForm from "../../components/BranchForm";
 import BranchTabs from "../../components/BranchTabs";
+import ImageUploadField from "../../components/ImageUploadField";
 import { branchLabel, deleteBranch, useBranches } from "../../lib/branches";
 import {
   DAY_NAMES,
@@ -100,6 +101,9 @@ function OwnerEstudioGeneral() {
   // Horario en edicion y error de cualquiera de los pop ups.
   const [hoursDraft, setHoursDraft] = useState<DayHours[]>([]);
   const [modalError, setModalError] = useState("");
+  // Mientras sube la imagen, Guardar queda bloqueado: guardar antes de que
+  // termine mandaba la URL vieja (o vacia) y la imagen no aparecia.
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const handleSavePhone = async () => {
     setModalError("");
@@ -171,23 +175,6 @@ function OwnerEstudioGeneral() {
       setEditMode(null);
       reloadStudio();
     }
-  };
-
-  //Cloudinary upload
-  const uploadImage = async (file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append(
-      "upload_preset",
-      import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET,
-    );
-
-    const res = await fetch(
-      `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`,
-      { method: "POST", body: formData },
-    );
-    const data = await res.json();
-    return data.secure_url;
   };
 
   const [markerPosition, setMarkerPosition] = useState<[number, number]>([
@@ -881,24 +868,13 @@ function OwnerEstudioGeneral() {
                 Imagen de portada
               </p>
 
-              <input
-                type="file"
-                accept="image/*"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  const url = await uploadImage(file);
-                  setEditForm({ ...editForm, cover_url: url });
-                }}
-                className="w-full text-md text-slate-600 hover:cursor-pointer"
+              <ImageUploadField
+                value={editForm.cover_url}
+                onChange={(url) =>
+                  setEditForm((prev) => ({ ...prev, cover_url: url }))
+                }
+                onUploadingChange={setUploadingImage}
               />
-
-              {editForm.cover_url && (
-                <img
-                  src={editForm.cover_url}
-                  className="w-full h-32 object-cover rounded-xl"
-                />
-              )}
 
               <div className="flex gap-3 mt-2">
                 <button
@@ -909,7 +885,8 @@ function OwnerEstudioGeneral() {
                 </button>
                 <button
                   onClick={handleUpdateStudio}
-                  className="flex-1 bg-[#1b2c44] text-white py-2.5 rounded-xl text-md hover:bg-[#33506f] transition-colors cursor-pointer"
+                  disabled={uploadingImage}
+                  className="flex-1 bg-[#1b2c44] text-white py-2.5 rounded-xl text-md hover:bg-[#33506f] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Guardar
                 </button>
@@ -1026,24 +1003,13 @@ function OwnerEstudioGeneral() {
                 Logo del estudio
               </p>
 
-              <input
-                type="file"
-                accept="image/*"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  const url = await uploadImage(file);
-                  setEditForm({ ...editForm, logo_url: url });
-                }}
-                className="w-full text-md text-slate-600 hover:cursor-pointer"
+              <ImageUploadField
+                value={editForm.logo_url}
+                onChange={(url) =>
+                  setEditForm((prev) => ({ ...prev, logo_url: url }))
+                }
+                onUploadingChange={setUploadingImage}
               />
-
-              {editForm.logo_url && (
-                <img
-                  src={editForm.logo_url}
-                  className="w-full h-32 object-cover rounded-xl"
-                />
-              )}
 
               <div className="flex gap-3 mt-2">
                 <button
@@ -1054,7 +1020,8 @@ function OwnerEstudioGeneral() {
                 </button>
                 <button
                   onClick={handleUpdateStudio}
-                  className="flex-1 bg-[#1b2c44] text-white py-2.5 rounded-xl text-md hover:bg-[#33506f] transition-colors cursor-pointer"
+                  disabled={uploadingImage}
+                  className="flex-1 bg-[#1b2c44] text-white py-2.5 rounded-xl text-md hover:bg-[#33506f] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Guardar
                 </button>

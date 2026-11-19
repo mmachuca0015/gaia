@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import StudioCard from "../../components/StudioCard";
-import { ChevronDown, Search } from "lucide-react";
+import { ChevronDown, LayoutGrid, Map as MapIcon, Search } from "lucide-react";
+import StudiosMap from "../../components/StudiosMap";
 
 import { api } from "../../lib/api";
 import {
@@ -28,6 +29,8 @@ function Explorar() {
     name: string;
     street: string;
     cover_url: string;
+    /** Foto de perfil del estudio; la tarjeta del mapa la usa. */
+    logo_url: string | null;
     /** Abierto ahora, segun su horario (o el interruptor viejo). */
     open_now: boolean;
     rating: number;
@@ -52,6 +55,8 @@ function Explorar() {
   const priceActive =
     activeFilter === "Menor precio" || activeFilter === "Mayor precio";
   const [search, setSearch] = useState("");
+  // Lista o mapa. Los filtros y la busqueda valen para los dos.
+  const [view, setView] = useState<"list" | "map">("list");
 
   // Ubicacion del alumno. Se pide solo al elegir "Más cerca"; si ya la dio
   // antes, se usa desde el principio para mostrar la distancia.
@@ -142,6 +147,23 @@ function Explorar() {
       {/* Filtros */}
       <div className="flex flex-wrap gap-2 mb-6">
         <button
+          onClick={() => setView((v) => (v === "map" ? "list" : "map"))}
+          className="flex items-center gap-1.5 px-5 py-2 rounded-full text-sm transition-colors cursor-pointer bg-white text-[#1b2c44] border border-[#1b2c44] hover:bg-[#e8eef7]"
+        >
+          {view === "map" ? (
+            <>
+              <LayoutGrid size={15} />
+              Ver lista
+            </>
+          ) : (
+            <>
+              <MapIcon size={15} />
+              Ver mapa
+            </>
+          )}
+        </button>
+
+        <button
           onClick={() => {
             setActiveFilter("Más cerca");
             setPriceMenuOpen(false);
@@ -210,23 +232,26 @@ function Explorar() {
         </p>
       )}
 
-      {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {sortedStudios.map((studio) => (
-          <div key={studio.id}>
-            <StudioCard
-              id={studio.id}
-              cover_url={studio.cover_url}
-              is_open={studio.open_now}
-              name={studio.name}
-              rating={studio.rating}
-              price_from={studio.min_price}
-              neighborhood={studio.neighborhood}
-              distanceKm={distanceTo(studio)}
-            />
-          </div>
-        ))}
-      </div>
+      {view === "map" ? (
+        <StudiosMap studios={sortedStudios} userCoords={coords} />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {sortedStudios.map((studio) => (
+            <div key={studio.id}>
+              <StudioCard
+                id={studio.id}
+                cover_url={studio.cover_url}
+                is_open={studio.open_now}
+                name={studio.name}
+                rating={studio.rating}
+                price_from={studio.min_price}
+                neighborhood={studio.neighborhood}
+                distanceKm={distanceTo(studio)}
+              />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
