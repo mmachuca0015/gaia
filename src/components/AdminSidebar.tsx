@@ -8,6 +8,7 @@ import {
   CreditCard,
   Ticket,
   KeyRound,
+  Landmark,
   LogOut,
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
@@ -33,6 +34,7 @@ function AdminSidebar() {
       end: false,
     },
     { icon: Receipt, label: "Pagos", path: "/admin/pagos", end: false },
+    { icon: Landmark, label: "Fondos Stripe", path: "/admin/fondos", end: false },
     { icon: Ticket, label: "Cupones", path: "/admin/cupones", end: false },
     { icon: KeyRound, label: "Mi cuenta", path: "/admin/cuenta", end: false },
   ];

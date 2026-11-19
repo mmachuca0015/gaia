@@ -34,6 +34,7 @@ import AdminSuscripciones from "./pages/Admin/AdminSuscripciones";
 import AdminCuenta from "./pages/Admin/AdminCuenta";
 import AdminPagos from "./pages/Admin/AdminPagos";
 import AdminCupones from "./pages/Admin/AdminCupones";
+import AdminFondos from "./pages/Admin/AdminFondos";
 
 function App() {
   return (
@@ -60,6 +61,7 @@ function App() {
             />
             <Route path="/admin/pagos" element={<AdminPagos />} />
             <Route path="/admin/cupones" element={<AdminCupones />} />
+            <Route path="/admin/fondos" element={<AdminFondos />} />
             <Route path="/admin/cuenta" element={<AdminCuenta />} />
           </Route>
         </Route>

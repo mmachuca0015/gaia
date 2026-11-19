@@ -19,6 +19,7 @@ const { sleepingImpact } = require("../services/planImpact");
 const { relocateStudents } = require("../services/closure");
 const { sendPlanChange } = require("../services/planChangeEmail");
 const { getFees, invalidateFees } = require("../services/charges");
+const { platformFunds } = require("../services/platformFunds");
 const {
   ROLES,
   deletionImpact,
@@ -573,6 +574,17 @@ async function facturasDeClientes(ids) {
   );
   return listas.flat().sort((a, b) => cobradoEn(b) - cobradoEn(a));
 }
+
+// Saldo de Wellco en Stripe, siguiente deposito y movimientos de 90 dias
+// (services/platformFunds.js). Lo pide /admin/fondos.
+router.get("/fondos", async (req, res) => {
+  try {
+    res.json(await platformFunds());
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "No pudimos leer el saldo de Stripe" });
+  }
+});
 
 router.get("/pagos-suscripciones", async (req, res) => {
   // Stripe pagina con cursor, no con numero de pagina: el cursor es el id de
