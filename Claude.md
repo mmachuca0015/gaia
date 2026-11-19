@@ -333,6 +333,15 @@ Otras reglas de esta parte:
   guarda nada) y refrescados cada minuto. Los depósitos al banco son
   automáticos (cuenta Express); "Ver en Stripe" abre su panel Express con un
   login link de un solo uso, que se pide al hacer clic porque caduca.
+- **"Fondos Stripe" del admin** (`/admin/fondos`, `AdminFondos.tsx`, `GET
+  /admin/fondos`, `services/platformFunds.js`): lo mismo que "Tu dinero" pero
+  de la cuenta de Wellco, más el siguiente depósito automático y los
+  **depósitos al banco** de 90 días (no los cobros: esos ya están en Pagos y
+  Clases pagadas). El calendario y el **saldo mínimo** (reserva para
+  reembolsos) se leen de Balance Settings de Stripe; no los escribas en el
+  código. El monto del siguiente depósito es **estimado** (disponible + lo que
+  se libera antes de ese día − el mínimo): Stripe no lo publica antes de
+  crearlo.
 - **Qué estudios se publican** (`backend/services/catalog.js`,
   `STUDIO_PUBLISHED`): `activa` sí; `pendiente` y `vencida` solo hasta
   `paid_until`; `cancelada` no; sin fila (heredados) sí. Si no se publica, no
