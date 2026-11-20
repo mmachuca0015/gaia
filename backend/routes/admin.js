@@ -21,6 +21,11 @@ const { sendPlanChange } = require("../services/planChangeEmail");
 const { getFees, invalidateFees } = require("../services/charges");
 const { platformFunds } = require("../services/platformFunds");
 const {
+  refundBookingByAdmin,
+  blockedReason: refundBlockedReason,
+  RefundError,
+} = require("../services/adminRefund");
+const {
   ROLES,
   deletionImpact,
   deleteAccount,
@@ -294,10 +299,10 @@ router.get("/charts", async (req, res) => {
   }
 });
 
-// Clases pagadas: una fila por clase Y FECHA (no por horario), con la lista de
-// alumnos que la pagaron. Un horario permanente se da cada semana, asi que la
-// llave de una clase dada es (schedule_id, fecha), que es justo lo que guarda
-// cada reserva.
+// Clases pagadas: una fila por PAGO (cada reserva cobrada con tarjeta), con
+// quien pago, la tarjeta, el id del cobro en Stripe y el boton de reembolsar.
+// Antes era una fila por clase y fecha con los alumnos adentro; para rastrear
+// un cobro eso escondia los pagos.
 const CLASES_PAGADAS_PAGE = 25;
 
 // Como ordenar segun lo que se pide: lo proximo de la fecha mas cercana en
@@ -335,114 +340,114 @@ router.get("/clases-pagadas", async (req, res) => {
         ? `AND (${YA_PASO})`
         : "";
 
-  // El buscador entra como %texto%; vacio significa "no filtres".
+  // El buscador entra como %texto%; vacio significa "no filtres". Tambien
+  // busca por el id del cobro (pi_...) y por el numero de reserva.
   const q = (req.query.q || "").trim();
   const search = q ? `%${q}%` : "";
 
   try {
-    // Los alumnos vienen agregados en la misma consulta (json_agg) en vez de
-    // una consulta por clase: son 25 clases por pagina y serian 25 viajes.
+    // Un renglon por PAGO: cada reserva cobrada con tarjeta. Las que salieron
+    // de un paquete no van: el cobro fue al comprar el paquete.
     //
-    // COUNT(*) OVER () cuenta las clases que pasan el filtro ANTES del LIMIT,
-    // asi que el total de la paginacion sale de la misma consulta.
+    // Las reembolsadas y reubicadas se quedan, con su estado, para poder
+    // rastrear un cobro aunque ya se haya devuelto.
     const result = await pool.query(
       `
-      WITH ocurrencias AS (
+      WITH pagos AS (
         SELECT
-          bookings.schedule_id,
+          bookings.id AS booking_id,
+          bookings.status,
+          bookings.stripe_payment_intent_id AS payment_intent_id,
+          bookings.price_cents,
+          bookings.service_fee_cents,
           ${FECHA_CLASE} AS fecha,
-          classes.id AS class_id,
+          schedules.time,
+          bookings.created_at,
           classes.name AS class_name,
-          classes.price,
-          classes.capacity,
           studios.id AS studio_id,
           studios.name AS studio_name,
           studios.is_demo,
-          schedules.time,
-          schedules.end_time,
-          COUNT(*) AS alumnos_total,
-          bool_or(bookings.status = 'pasada') AS alguna_pasada,
-          -- Lo que dejo esa fecha en caja: solo las reservas con su propio
-          -- cargo. Las de paquete no suman aqui, se cobraron al comprarlo
-          -- (misma regla que REVENUE_ROWS). Sale NULL, no cero, cuando
-          -- ninguna reserva guardo el monto: son anteriores a la migracion
-          -- 015 y cero diria que la clase fue gratis.
-          SUM(bookings.price_cents)
-            FILTER (WHERE bookings.package_purchase_id IS NULL) AS cobrado_cents,
-          json_agg(
-            json_build_object(
-              'booking_id', bookings.id,
-              'user_id', users.id,
-              'name', users.name,
-              'last_name', users.last_name,
-              'email', users.email,
-              'con_paquete', bookings.package_purchase_id IS NOT NULL,
-              'package_name', package_purchases.name,
-              'price_cents', bookings.price_cents,
-              'service_fee_cents', bookings.service_fee_cents,
-              'reservada_el', to_char(
-                ${localTime("bookings.created_at")}, 'YYYY-MM-DD"T"HH24:MI')
-            )
-            ORDER BY users.name, users.last_name, users.id
-          ) AS alumnos,
-          -- Para el buscador: el nombre y el correo de todos los alumnos de
-          -- esa clase en un solo texto. Se filtra sobre el grupo y no sobre
-          -- la reserva para que buscar a una persona devuelva sus clases con
-          -- la lista completa, no nada mas su renglon.
-          string_agg(
-            users.name || ' ' || users.last_name || ' ' || users.email, ' '
-          ) AS busqueda
+          users.id AS user_id,
+          users.name,
+          users.last_name,
+          users.email,
+          refunds.amount_cents AS refund_cents,
+          refunds.recovered_cents AS refund_recovered_cents,
+          refunds.status AS refund_status,
+          refunds.reason AS refund_reason,
+          to_char(${localTime("refunds.created_at")}, 'YYYY-MM-DD"T"HH24:MI')
+            AS refunded_at,
+          bookings.status = 'pasada' AS alguna_pasada
         FROM bookings
         JOIN schedules ON schedules.id = bookings.schedule_id
         JOIN classes   ON classes.id = schedules.class_id
         JOIN studios   ON studios.id = classes.studio_id
         JOIN users     ON users.id = bookings.user_id
-        LEFT JOIN package_purchases
-          ON package_purchases.id = bookings.package_purchase_id
-        -- 'reubicada' y 'reembolsada' quedan fuera: esa clase no se dio o se
-        -- devolvio el dinero.
-        WHERE bookings.status IN ('activa', 'pasada')
-        GROUP BY bookings.schedule_id, ${FECHA_CLASE}, classes.id,
-                 studios.id, schedules.time, schedules.end_time
+        LEFT JOIN refunds ON refunds.booking_id = bookings.id
+        WHERE bookings.package_purchase_id IS NULL
+          AND bookings.status IN ('activa', 'pasada', 'reembolsada', 'reubicada')
       )
       SELECT
-        schedule_id,
-        class_id,
-        class_name,
-        price,
-        capacity,
-        studio_id,
-        studio_name,
-        is_demo,
-        alumnos_total,
-        cobrado_cents,
-        alumnos,
-        -- La fecha es un DATE: como texto no se corre un dia al convertirla
-        -- a Date con el servidor en UTC.
+        booking_id, status, payment_intent_id, price_cents, service_fee_cents,
+        class_name, studio_id, studio_name, is_demo,
+        user_id, name, last_name, email,
+        refund_cents, refund_recovered_cents, refund_status, refund_reason,
+        refunded_at,
+        -- Fechas como texto: un DATE convertido a Date se corre un dia con el
+        -- servidor en UTC.
         to_char(fecha, 'YYYY-MM-DD') AS class_date,
         to_char(time, 'HH24:MI') AS time,
-        to_char(end_time, 'HH24:MI') AS end_time,
+        to_char(${localTime("created_at")}, 'YYYY-MM-DD"T"HH24:MI') AS paid_at,
         ${YA_PASO} AS ya_paso,
         COUNT(*) OVER () AS total
-      FROM ocurrencias
+      FROM pagos
       WHERE ($1 = ''
-         OR busqueda ILIKE $1
+         OR (name || ' ' || last_name || ' ' || email) ILIKE $1
          OR class_name ILIKE $1
-         OR studio_name ILIKE $1)
+         OR studio_name ILIKE $1
+         OR payment_intent_id ILIKE $1
+         OR booking_id::text = $4)
         ${cuandoFilter}
-      -- Las reservas viejas no tienen fecha; van al final en vez de encabezar
-      -- la lista, que es donde las pone Postgres al ordenar DESC.
-      ORDER BY fecha ${dir} NULLS LAST, time ${dir} NULLS LAST, class_id
+      ORDER BY fecha ${dir} NULLS LAST, time ${dir} NULLS LAST, booking_id DESC
       LIMIT $2 OFFSET $3
       `,
-      [search, CLASES_PAGADAS_PAGE, offset],
+      [search, CLASES_PAGADAS_PAGE, offset, q.replace(/^#/, "")],
     );
 
-    // El total viaja repetido en cada fila; sin filas no hay ninguno.
+    // La tarjeta no se guarda en la base: se le pregunta a Stripe por cada
+    // cobro de la pagina, como en /pagos-suscripciones. Si Stripe falla, el
+    // renglon sale sin tarjeta en vez de tirar la pagina.
+    const pagos = await Promise.all(
+      result.rows.map(async ({ total, ...row }) => {
+        let card = null;
+        if (row.payment_intent_id) {
+          try {
+            const pi = await stripe.paymentIntents.retrieve(
+              row.payment_intent_id,
+              { expand: ["latest_charge"] },
+            );
+            const c = pi.latest_charge?.payment_method_details?.card;
+            if (c) card = { brand: c.brand, last4: c.last4 };
+          } catch (err) {
+            console.error("Sin tarjeta para", row.payment_intent_id, err.message);
+          }
+        }
+        return {
+          ...row,
+          card,
+          refund_blocked: refundBlockedReason({
+            ...row,
+            package_purchase_id: null,
+            stripe_payment_intent_id: row.payment_intent_id,
+          }),
+        };
+      }),
+    );
+
     const total = result.rows.length ? Number(result.rows[0].total) : 0;
 
     res.json({
-      clases: result.rows,
+      pagos,
       total,
       page,
       totalPages: Math.max(1, Math.ceil(total / CLASES_PAGADAS_PAGE)),
@@ -450,6 +455,30 @@ router.get("/clases-pagadas", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Error al obtener las clases pagadas" });
+  }
+});
+
+// Reembolsar una clase suelta por un problema del estudio
+// (services/adminRefund.js): al alumno el precio, sin el 3%; al estudio se le
+// recupera todo lo que recibio. Manda correo a los dos.
+router.post("/bookings/:id/refund", async (req, res) => {
+  const bookingId = Number(req.params.id);
+  if (!Number.isInteger(bookingId) || bookingId <= 0) {
+    return res.status(400).json({ error: "Reserva inválida" });
+  }
+  try {
+    const result = await refundBookingByAdmin({
+      bookingId,
+      adminId: req.user.id,
+      reason: req.body?.reason,
+    });
+    res.json(result);
+  } catch (err) {
+    if (err instanceof RefundError) {
+      return res.status(err.status).json({ error: err.message, code: err.code });
+    }
+    console.error(err);
+    res.status(500).json({ error: "No pudimos hacer el reembolso" });
   }
 });
 

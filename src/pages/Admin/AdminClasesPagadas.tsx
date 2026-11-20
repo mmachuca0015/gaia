@@ -1,53 +1,55 @@
 import { useEffect, useState } from "react";
 import {
   CalendarCheck,
-  ChevronDown,
+  Check,
   ChevronLeft,
   ChevronRight,
+  Copy,
+  ExternalLink,
 } from "lucide-react";
 
-import { api } from "../../lib/api";
+import { api, apiJson, ApiError } from "../../lib/api";
 import AdminSearch from "../../components/AdminSearch";
 
-// Postgres devuelve COUNT y SUM como texto y los montos sin registro como
-// null: nada de esto es un number todavia.
-type Alumno = {
+/* Clases pagadas (GET /admin/clases-pagadas): un renglon por PAGO, cada
+   reserva cobrada con tarjeta. Las reservadas con paquete no van: su cobro
+   fue al comprar el paquete.
+
+   Reembolsar (POST /admin/bookings/:id/refund, services/adminRefund.js) es
+   para cuando hubo un problema con el estudio: al alumno se le devuelve el
+   precio (sin el 3% de servicio) y al estudio se le recupera todo lo que
+   recibio por esa reserva. Les llega correo a los dos. */
+
+type Status = "activa" | "pasada" | "reembolsada" | "reubicada";
+
+type Pago = {
   booking_id: number;
+  status: Status;
+  /** pi_... del cobro en Stripe. NULL en reservas viejas o demo. */
+  payment_intent_id: string | null;
+  price_cents: number | null;
+  service_fee_cents: number | null;
+  class_name: string;
+  studio_id: number;
+  studio_name: string;
+  is_demo: boolean;
   user_id: number;
   name: string;
   last_name: string;
   email: string;
-  /** Reservo con su paquete: no hubo cargo por esta clase. */
-  con_paquete: boolean;
-  package_name: string | null;
-  /** Lo que se le cobro. NULL en las reservas anteriores a la migracion 015. */
-  price_cents: number | null;
-  service_fee_cents: number | null;
-  /** "2026-09-18T14:00", hora local de Mexico. */
-  reservada_el: string;
-};
-
-// Una clase en una fecha concreta: un horario permanente se da cada semana y
-// cada fecha es su propio renglon, con sus alumnos.
-type ClasePagada = {
-  schedule_id: number;
-  class_id: number;
-  class_name: string;
-  /** Precio actual de la clase, en pesos. */
-  price: number;
-  capacity: number;
-  studio_id: number;
-  studio_name: string;
-  is_demo: boolean;
-  alumnos_total: string;
-  /** Centavos cobrados con tarjeta esa fecha; null si ninguna lo guardo. */
-  cobrado_cents: string | null;
-  alumnos: Alumno[];
-  /** "2026-09-19"; null en las reservas viejas, que no guardaban la fecha. */
+  refund_cents: number | null;
+  refund_recovered_cents: number | null;
+  refund_status: "hecho" | "sin_cargo" | "sin_fondos" | "en_proceso" | null;
+  refund_reason: string | null;
+  /** "2026-11-21T10:05", hora de Mexico. */
+  refunded_at: string | null;
   class_date: string | null;
   time: string | null;
-  end_time: string | null;
+  paid_at: string;
   ya_paso: boolean;
+  card: { brand: string; last4: string } | null;
+  /** Por que no se puede reembolsar; null si se puede. */
+  refund_blocked: string | null;
 };
 
 type Cuando = "todas" | "proximas" | "pasadas";
@@ -59,17 +61,20 @@ const CUANDO_LABEL: Record<Cuando, string> = {
 };
 
 const PER_PAGE = 25;
+const REASON_MAX = 500;
 
-function money(cents: number | string | null) {
-  if (cents === null || cents === "") return "—";
-  return `$${(Number(cents) / 100).toLocaleString("es-MX", {
+const BRANDS: Record<string, string> = {
+  visa: "Visa",
+  mastercard: "Mastercard",
+  amex: "Amex",
+};
+
+function money(cents: number | null) {
+  if (cents === null) return "—";
+  return `$${(cents / 100).toLocaleString("es-MX", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
-}
-
-function pesos(value: number) {
-  return `$${Number(value || 0).toLocaleString("es-MX")}`;
 }
 
 // "2026-09-19" -> Date local. A proposito no es new Date(texto): eso lo lee
@@ -100,33 +105,236 @@ function formatDateTime(value: string) {
   return `${label}, ${time}`;
 }
 
-function horario(clase: ClasePagada) {
-  if (!clase.time) return "—";
-  return clase.end_time ? `${clase.time} – ${clase.end_time}` : clase.time;
+function cobrado(p: Pago) {
+  if (p.price_cents === null) return null;
+  return p.price_cents + (p.service_fee_cents ?? 0);
 }
 
-// La llave de un renglon es el horario MAS la fecha: el mismo horario
-// permanente aparece una vez por semana.
-function claseKey(clase: ClasePagada) {
-  return `${clase.schedule_id}-${clase.class_date ?? "sin-fecha"}`;
+/** El id del cobro, con boton de copiar y enlace al pago en Stripe. */
+function PaymentId({ id }: { id: string | null }) {
+  const [copied, setCopied] = useState(false);
+  if (!id) return <span className="text-slate-400">—</span>;
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(id);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Sin permiso de portapapeles: el id se puede seleccionar a mano.
+    }
+  };
+  return (
+    <span className="flex items-center gap-1.5">
+      <code className="text-xs text-slate-600 select-all">{id}</code>
+      <button
+        onClick={copy}
+        aria-label="Copiar id del cobro"
+        title="Copiar"
+        className="text-slate-400 hover:text-ink cursor-pointer"
+      >
+        {copied ? <Check size={14} /> : <Copy size={14} />}
+      </button>
+      <a
+        href={`https://dashboard.stripe.com/payments/${id}`}
+        target="_blank"
+        rel="noreferrer"
+        aria-label="Abrir el cobro en Stripe"
+        title="Abrir en Stripe"
+        className="text-slate-400 hover:text-ink"
+      >
+        <ExternalLink size={14} />
+      </a>
+    </span>
+  );
+}
+
+function StatusCell({ p, onRefund }: { p: Pago; onRefund: () => void }) {
+  if (p.status === "reembolsada") {
+    return (
+      <div>
+        <span className="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 whitespace-nowrap">
+          Reembolsada {money(p.refund_cents)}
+        </span>
+        {p.refunded_at && (
+          <p className="text-xs text-slate-400 mt-1">
+            {formatDateTime(p.refunded_at)}
+          </p>
+        )}
+      </div>
+    );
+  }
+  if (p.status === "reubicada") {
+    return (
+      <span
+        className="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 whitespace-nowrap"
+        title="La sucursal se durmió y se le abonó la clase en otra"
+      >
+        Reubicada
+      </span>
+    );
+  }
+  if (p.refund_blocked) {
+    return (
+      <span
+        className="text-xs text-slate-400"
+        title={p.refund_blocked}
+      >
+        No reembolsable
+      </span>
+    );
+  }
+  return (
+    <button
+      onClick={onRefund}
+      className="text-sm px-3 py-1.5 rounded-full border border-red-200 text-red-600 hover:bg-red-50 transition-colors cursor-pointer whitespace-nowrap"
+    >
+      Reembolsar
+    </button>
+  );
+}
+
+function RefundModal({
+  pago,
+  onClose,
+  onDone,
+}: {
+  pago: Pago;
+  onClose: () => void;
+  onDone: (message: string) => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+
+  const confirmar = async () => {
+    setSending(true);
+    setError("");
+    try {
+      const r = await apiJson<{
+        refunded_cents: number;
+        recovered_cents: number;
+        warning: string | null;
+      }>(`/admin/bookings/${pago.booking_id}/refund`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      });
+      onDone(
+        r.warning ??
+          `Se reembolsaron ${money(r.refunded_cents)} a ${pago.name} y se le descontaron ${money(r.recovered_cents)} al estudio. Les avisamos por correo.`,
+      );
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "No pudimos hacer el reembolso",
+      );
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl p-6 md:p-8 w-full max-w-md flex flex-col gap-4">
+        <p className="font-semibold text-slate-800 text-lg">
+          Reembolsar clase
+        </p>
+
+        <div className="bg-surface rounded-xl p-4 text-sm text-slate-600 flex flex-col gap-1">
+          <p>
+            <span className="text-slate-400">Alumno:</span>{" "}
+            {pago.name} {pago.last_name}
+          </p>
+          <p>
+            <span className="text-slate-400">Clase:</span> {pago.class_name} ·{" "}
+            {pago.studio_name}
+          </p>
+          <p>
+            <span className="text-slate-400">Fecha:</span>{" "}
+            {formatDate(pago.class_date)}
+            {pago.time ? `, ${pago.time}` : ""}
+          </p>
+          {pago.card && (
+            <p>
+              <span className="text-slate-400">Tarjeta:</span>{" "}
+              {BRANDS[pago.card.brand] ?? pago.card.brand} ···{pago.card.last4}
+            </p>
+          )}
+        </div>
+
+        <div className="text-sm text-slate-600 flex flex-col gap-1.5">
+          <p>
+            Al alumno se le devuelven{" "}
+            <strong className="text-ink">{money(pago.price_cents)}</strong>, el
+            precio de la clase. El cargo por servicio de{" "}
+            {money(pago.service_fee_cents)} no se devuelve.
+          </p>
+          <p>
+            Al estudio se le descuenta <strong>todo lo que recibió</strong> por
+            esta reserva.
+          </p>
+          <p className="text-slate-400 text-xs">
+            Los dos reciben correo. La reserva se cancela y libera su lugar.
+          </p>
+        </div>
+
+        <label className="text-sm text-slate-600">
+          <span className="block mb-1.5">
+            Motivo <span className="text-slate-400">(opcional, va en el correo al estudio)</span>
+          </span>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value.slice(0, REASON_MAX))}
+            rows={3}
+            placeholder="Ej. El estudio canceló la clase sin avisar"
+            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-slate-400 transition-colors resize-none"
+          />
+          <span className="block text-right text-xs text-slate-400">
+            {reason.length}/{REASON_MAX}
+          </span>
+        </label>
+
+        {error && (
+          <p role="alert" className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3">
+            {error}
+          </p>
+        )}
+
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            disabled={sending}
+            className="flex-1 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-md hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={confirmar}
+            disabled={sending}
+            className="flex-1 bg-red-600 text-white py-2.5 rounded-xl text-md hover:bg-red-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {sending ? "Reembolsando…" : `Reembolsar ${money(pago.price_cents)}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function AdminClasesPagadas() {
-  const [clases, setClases] = useState<ClasePagada[]>([]);
+  const [pagos, setPagos] = useState<Pago[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
   const [cuando, setCuando] = useState<Cuando>("todas");
-
   const [query, setQuery] = useState("");
+  // Sube tras un reembolso para volver a pedir la pagina.
+  const [reloads, setReloads] = useState(0);
 
-  // Que renglones estan desplegados, por llave de clase.
-  const [abiertas, setAbiertas] = useState<Record<string, boolean>>({});
+  const [refunding, setRefunding] = useState<Pago | null>(null);
+  const [notice, setNotice] = useState("");
 
   // `loading` es derivado, como en el resto del panel: mientras lo cargado no
   // sea lo que se pide, estamos esperando.
   const [loadedKey, setLoadedKey] = useState("");
-  const pedido = `${page}-${cuando}-${query}`;
+  const pedido = `${page}-${cuando}-${query}-${reloads}`;
   const loading = loadedKey !== pedido;
 
   useEffect(() => {
@@ -139,20 +347,22 @@ function AdminClasesPagadas() {
       .then((res) => res.json())
       .then((data) => {
         if (cancelled) return;
-        setClases(data.clases ?? []);
+        setPagos(data.pagos ?? []);
         setTotal(data.total ?? 0);
         setTotalPages(data.totalPages ?? 1);
       })
       .finally(() => {
-        if (!cancelled) setLoadedKey(`${page}-${cuando}-${query}`);
+        if (!cancelled) setLoadedKey(`${page}-${cuando}-${query}-${reloads}`);
       });
     return () => {
       cancelled = true;
     };
-  }, [page, cuando, query]);
+  }, [page, cuando, query, reloads]);
 
   const from = total === 0 ? 0 : (page - 1) * PER_PAGE + 1;
   const to = Math.min(page * PER_PAGE, total);
+
+  const th = "text-left px-4 py-4 text-sm font-semibold text-slate-600 whitespace-nowrap";
 
   return (
     <div className="p-4 md:p-8">
@@ -170,9 +380,22 @@ function AdminClasesPagadas() {
           </span>
         </h1>
         <p className="text-slate-600 mt-2">
-          {total} {total === 1 ? "clase reservada" : "clases reservadas"}
+          {total} {total === 1 ? "pago" : "pagos"} con tarjeta
         </p>
       </div>
+
+      {notice && (
+        <div className="mb-4 flex items-start justify-between gap-3 text-sm text-ink bg-ink/5 rounded-xl px-4 py-3">
+          <p>{notice}</p>
+          <button
+            onClick={() => setNotice("")}
+            className="text-slate-400 hover:text-ink cursor-pointer"
+            aria-label="Cerrar aviso"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div className="flex gap-2">
@@ -197,7 +420,7 @@ function AdminClasesPagadas() {
         {/* Buscar y cambiar de filtro vuelven a la primera pagina: la 3 del
             filtro anterior casi nunca existe en el nuevo. */}
         <AdminSearch
-          placeholder="Buscar alumno, clase o estudio"
+          placeholder="Buscar alumno, clase, estudio o pi_…"
           onSearch={(q) => {
             setQuery(q);
             setPage(1);
@@ -206,184 +429,108 @@ function AdminClasesPagadas() {
       </div>
 
       <div className="bg-white rounded-2xl overflow-hidden">
-        {loading && clases.length === 0 ? (
+        {loading && pagos.length === 0 ? (
           <div className="p-10 text-center text-slate-500">Cargando...</div>
-        ) : clases.length === 0 ? (
+        ) : pagos.length === 0 ? (
           <div className="p-10 flex flex-col items-center gap-4 text-center">
             <CalendarCheck size={36} className="text-slate-300" />
             <p className="text-slate-600 font-medium">
               {query
-                ? "Ninguna clase coincide con la búsqueda"
+                ? "Ningún pago coincide con la búsqueda"
                 : "Todavía no hay clases pagadas"}
             </p>
           </div>
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-100">
-                    <th className="w-10" />
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-slate-600">
-                      Clase
-                    </th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-slate-600">
-                      Estudio
-                    </th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-slate-600">
-                      Precio
-                    </th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-slate-600">
-                      Cuándo
-                    </th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-slate-600">
-                      Alumnos
-                    </th>
+                    <th className={th}>Quién pagó</th>
+                    <th className={th}>Clase · Estudio</th>
+                    <th className={th}>Fecha de la clase</th>
+                    <th className={th}>Pagado el</th>
+                    <th className={th}>Tarjeta</th>
+                    <th className={`${th} text-right`}>Precio</th>
                     <th
-                      className="text-left px-6 py-4 text-sm font-semibold text-slate-600"
-                      title="Lo cobrado con tarjeta esa fecha. Las reservas con paquete se cobraron al comprarlo."
+                      className={`${th} text-right`}
+                      title="Precio + cargo por servicio"
                     >
                       Cobrado
                     </th>
+                    <th className={th}>ID del cobro</th>
+                    <th className={th} />
                   </tr>
                 </thead>
                 <tbody
                   className={`transition-opacity ${loading ? "opacity-40" : ""}`}
                 >
-                  {clases.map((clase) => {
-                    const key = claseKey(clase);
-                    const abierta = abiertas[key] ?? false;
-
-                    return [
-                      <tr
-                        key={key}
-                        onClick={() =>
-                          setAbiertas((prev) => ({ ...prev, [key]: !abierta }))
-                        }
-                        className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors cursor-pointer"
-                      >
-                        <td className="pl-4">
-                          {/* El renglon entero abre y cierra; el boton lleva
-                              el mismo clic para que tambien funcione con el
-                              teclado, y no deja que suba a la fila para no
-                              alternarlo dos veces. */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setAbiertas((prev) => ({
-                                ...prev,
-                                [key]: !abierta,
-                              }));
-                            }}
-                            aria-expanded={abierta}
-                            aria-label={`Ver los alumnos de ${clase.class_name}`}
-                            className="flex items-center justify-center w-7 h-7 rounded-full text-slate-400 hover:text-[#1b2c44] transition-colors cursor-pointer"
-                          >
-                            <ChevronDown
-                              size={16}
-                              className={`transition-transform ${abierta ? "rotate-180" : ""}`}
-                            />
-                          </button>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <p className="text-slate-800 font-medium">
-                            {clase.class_name}
-                          </p>
-                          <p className="text-slate-400 text-xs">
-                            #{clase.class_id}
-                          </p>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <p className="text-slate-600 flex items-center gap-2">
-                            {clase.studio_name}
-                            {clase.is_demo && (
-                              <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-xs">
-                                Demo
-                              </span>
-                            )}
-                          </p>
-                          <p className="text-slate-400 text-xs">
-                            #{clase.studio_id}
-                          </p>
-                        </td>
-                        <td className="px-6 py-4 text-slate-600 whitespace-nowrap">
-                          {pesos(clase.price)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <p className="text-slate-800">
-                            {formatDate(clase.class_date)}
-                          </p>
-                          <p className="text-slate-500 text-xs flex items-center gap-2">
-                            {horario(clase)}
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-xs ${
-                                clase.ya_paso
-                                  ? "bg-slate-100 text-slate-500"
-                                  : "bg-[#1b2c44]/10 text-[#1b2c44]"
-                              }`}
-                            >
-                              {clase.ya_paso ? "Pasada" : "Próxima"}
+                  {pagos.map((p) => (
+                    <tr
+                      key={p.booking_id}
+                      className="border-b border-slate-50 last:border-0 align-top"
+                    >
+                      <td className="px-4 py-4">
+                        <p className="text-slate-800 font-medium whitespace-nowrap">
+                          {p.name} {p.last_name}
+                        </p>
+                        <p className="text-slate-400 text-xs">{p.email}</p>
+                      </td>
+                      <td className="px-4 py-4">
+                        <p className="text-slate-800 whitespace-nowrap">
+                          {p.class_name}
+                        </p>
+                        <p className="text-slate-500 text-xs flex items-center gap-2 whitespace-nowrap">
+                          {p.studio_name}
+                          {p.is_demo && (
+                            <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-xs">
+                              Demo
                             </span>
-                          </p>
-                        </td>
-                        <td className="px-6 py-4 text-slate-600 whitespace-nowrap">
-                          {clase.alumnos_total}
-                          <span className="text-slate-400">
-                            {" "}
-                            / {clase.capacity}
+                          )}
+                        </p>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <p className="text-slate-800">
+                          {formatDate(p.class_date)}
+                        </p>
+                        <p className="text-slate-500 text-xs flex items-center gap-2">
+                          {p.time ?? "—"}
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-xs ${
+                              p.ya_paso
+                                ? "bg-slate-100 text-slate-500"
+                                : "bg-[#1b2c44]/10 text-[#1b2c44]"
+                            }`}
+                          >
+                            {p.ya_paso ? "Pasada" : "Próxima"}
                           </span>
-                        </td>
-                        <td className="px-6 py-4 text-slate-600 whitespace-nowrap">
-                          {money(clase.cobrado_cents)}
-                        </td>
-                      </tr>,
-
-                      abierta && (
-                        <tr key={`${key}-alumnos`} className="bg-slate-50/60">
-                          <td />
-                          <td colSpan={6} className="px-6 py-4">
-                            <p className="text-xs font-semibold text-slate-500 mb-3">
-                              Alumnos que pagaron esta clase
-                            </p>
-                            <ul className="flex flex-col gap-2">
-                              {clase.alumnos.map((alumno) => (
-                                <li
-                                  key={alumno.booking_id}
-                                  className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm"
-                                >
-                                  <span className="text-slate-800 font-medium">
-                                    {alumno.name} {alumno.last_name}
-                                  </span>
-                                  <span className="text-slate-500">
-                                    {alumno.email}
-                                  </span>
-                                  <span className="text-slate-400 text-xs">
-                                    #{alumno.user_id}
-                                  </span>
-                                  {alumno.con_paquete ? (
-                                    <span className="px-2 py-0.5 rounded-full bg-[#1b2c44]/10 text-[#1b2c44] text-xs">
-                                      Paquete
-                                      {alumno.package_name
-                                        ? `: ${alumno.package_name}`
-                                        : ""}
-                                    </span>
-                                  ) : (
-                                    <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs">
-                                      Tarjeta {money(alumno.price_cents)}
-                                    </span>
-                                  )}
-                                  <span className="text-slate-400 text-xs ml-auto">
-                                    Reservó el{" "}
-                                    {formatDateTime(alumno.reservada_el)}
-                                  </span>
-                                </li>
-                              ))}
-                            </ul>
-                          </td>
-                        </tr>
-                      ),
-                    ];
-                  })}
+                        </p>
+                      </td>
+                      <td className="px-4 py-4 text-slate-600 whitespace-nowrap">
+                        {formatDateTime(p.paid_at)}
+                      </td>
+                      <td className="px-4 py-4 text-slate-600 whitespace-nowrap">
+                        {p.card
+                          ? `${BRANDS[p.card.brand] ?? p.card.brand} ···${p.card.last4}`
+                          : "—"}
+                      </td>
+                      <td className="px-4 py-4 text-right text-slate-600 whitespace-nowrap">
+                        {money(p.price_cents)}
+                      </td>
+                      <td className="px-4 py-4 text-right text-slate-800 font-medium whitespace-nowrap">
+                        {money(cobrado(p))}
+                      </td>
+                      <td className="px-4 py-4">
+                        <PaymentId id={p.payment_intent_id} />
+                        <p className="text-slate-400 text-xs mt-0.5">
+                          Reserva #{p.booking_id}
+                        </p>
+                      </td>
+                      <td className="px-4 py-4">
+                        <StatusCell p={p} onRefund={() => setRefunding(p)} />
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -420,6 +567,18 @@ function AdminClasesPagadas() {
           </>
         )}
       </div>
+
+      {refunding && (
+        <RefundModal
+          pago={refunding}
+          onClose={() => setRefunding(null)}
+          onDone={(message) => {
+            setRefunding(null);
+            setNotice(message);
+            setReloads((n) => n + 1);
+          }}
+        />
+      )}
     </div>
   );
 }

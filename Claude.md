@@ -383,6 +383,23 @@ Otras reglas de esta parte:
 - Si una renovación falla (`past_due`/`unpaid`), `/payment-intent` cobra la
   factura abierta de esa misma suscripción. No crea otra: cobraría dos veces.
 
+## Reembolso de una clase desde el admin (migración 024)
+
+- `/admin/clases-pagadas` es **un renglón por pago** (cada reserva cobrada con
+  tarjeta; las de paquete no van): quién pagó, clase, fechas, tarjeta (leída de
+  Stripe por página), precio, cobrado, id `pi_...` y el botón **Reembolsar**.
+  Las reembolsadas siguen en la tabla, con su estado, para rastrear.
+- `POST /admin/bookings/:id/refund` (`services/adminRefund.js`) es para un
+  **problema del estudio**: al alumno el **precio** (sin el 3%); al estudio se
+  le recupera **todo lo que recibió**, no la parte proporcional: primero el
+  reembolso con `reverse_transfer` (atómico) y luego `createReversal` del resto.
+  La comisión de Stripe no regresa y la absorbe Wellco (`stripe_fee_cents`).
+- El renglón de `refunds` se aparta **antes** de Stripe (`en_proceso`), y las
+  dos llamadas llevan llave de idempotencia por reserva: un doble clic o un
+  reintento tras una caída no devuelve dos veces. Si Stripe falla, se suelta.
+- Correo al alumno y al estudio (`services/refundEmail.js`); el motivo
+  opcional del admin solo va en el del estudio.
+
 ## Cambio de plan desde el admin (migración 019)
 
 - Tres puntos en la fila de `/admin/estudios` -> **Cambiar plan**
