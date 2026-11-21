@@ -83,7 +83,7 @@ function ForOwners() {
             href="#demo"
             className="bg-ink text-white px-8 py-4 rounded-full text-sm font-medium hover:bg-ink-soft transition-colors text-center"
           >
-            Agenda un demo gratis
+            Escríbenos
           </a>
           <Link
             to="/login"

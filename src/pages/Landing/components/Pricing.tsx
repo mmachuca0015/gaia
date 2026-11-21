@@ -217,7 +217,7 @@ function Pricing() {
                           : "bg-ink text-white hover:bg-ink-soft"
                       }`}
                     >
-                      Agenda un demo gratis
+                      Escríbenos
                     </a>
                   </div>
                 ))}

@@ -13,7 +13,7 @@ const columns = [
   {
     title: "Empezar",
     links: [
-      { label: "Agenda un demo", href: "#demo" },
+      { label: "Contáctanos", href: "#demo" },
       { label: "Iniciar sesión", href: "/login", internal: true },
       { label: "Registrar mi estudio", href: "/login", internal: true },
     ],

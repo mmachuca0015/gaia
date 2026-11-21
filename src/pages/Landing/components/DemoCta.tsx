@@ -2,15 +2,21 @@ import { useState } from "react";
 
 import { api } from "../../../lib/api";
 
-// Pagina de reservas de Google Calendar. Sale de una variable de entorno y no
-// del codigo porque no existe hasta que Workspace esta contratado y el horario
-// de citas creado.
+// Numero de WhatsApp para que los estudios escriban, en formato internacional
+// y solo digitos (52 + 10 digitos para Mexico). Sale de una variable de entorno
+// para cambiarlo sin tocar codigo; Vite lo integra al compilar, asi que
+// cambiarlo en Render exige reconstruir wellco-web.
 //
-// Mientras este vacia, la seccion se queda como estaba: pide el correo y lo
-// guarda en la waitlist para agendar a mano. Asi la landing en produccion
-// sigue funcionando entre hoy y el dia que se pegue la URL, sin desplegar
-// codigo nuevo: basta con llenar la variable en Render.
-const BOOKING_URL = import.meta.env.VITE_DEMO_BOOKING_URL || "";
+// Mientras este vacia, la seccion pide el correo y lo guarda en la waitlist,
+// para que la landing nunca se quede sin forma de contacto.
+const WHATSAPP_NUMBER = (import.meta.env.VITE_WHATSAPP_NUMBER || "").replace(
+  /\D/g,
+  "",
+);
+const WHATSAPP_TEXT = "Hola, me interesa Wellco para mi estudio.";
+const WHATSAPP_URL = WHATSAPP_NUMBER
+  ? `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_TEXT)}`
+  : "";
 
 function DemoCta() {
   const [email, setEmail] = useState("");
@@ -33,42 +39,39 @@ function DemoCta() {
     <section id="demo" className="bg-ink py-24 px-6">
       <div className="max-w-2xl mx-auto text-center">
         <p className="text-[11px] tracking-[0.25em] text-slate-400 mb-6">
-          DEMO
+          CONTACTO
         </p>
         <h2
           className="text-4xl md:text-5xl font-semibold text-white leading-tight mb-5"
           style={{ fontFamily: "Cormorant Garamond, serif" }}
         >
-          Conoce Wellco
+          ¿Tienes dudas?
           <br />
-          <span className="italic">en 30 minutos</span>
+          <span className="italic">Escríbenos</span>
         </h2>
         <p className="text-slate-400 mb-10 leading-relaxed">
-          Te mostramos el panel con tus propios horarios y resolvemos cualquier
-          duda. Gratis y sin compromiso.
+          Cuéntanos de tu estudio y te explicamos cómo funciona Wellco. Sin
+          compromiso.
         </p>
 
-        {BOOKING_URL ? (
+        {WHATSAPP_URL ? (
           <>
-            {/* Google pide el nombre y el correo en su propia pantalla, crea la
-                videollamada y manda la invitacion a las dos partes. Pedir aqui
-                el correo obligaria a escribirlo dos veces. */}
             <a
-              href={BOOKING_URL}
+              href={WHATSAPP_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-block px-7 py-3.5 rounded-full bg-white text-ink text-sm font-medium hover:bg-slate-200 transition-colors cursor-pointer"
             >
-              Elige el dia y la hora
+              Escríbenos por WhatsApp
             </a>
             <p className="text-slate-500 text-xs mt-5">
-              Se abre el calendario de Wellco. Recibes la invitacion con el
-              enlace de la videollamada en tu correo.
+              Se abre WhatsApp con el mensaje listo. Te respondemos lo antes
+              posible.
             </p>
           </>
         ) : sent ? (
           <p className="text-white font-medium">
-            Listo. Te escribimos para agendar tu demo.
+            Listo. Te escribimos pronto.
           </p>
         ) : (
           <>
@@ -84,7 +87,7 @@ function DemoCta() {
                 onClick={handleDemo}
                 className="px-7 py-3.5 rounded-full bg-white text-ink text-sm font-medium hover:bg-slate-200 transition-colors cursor-pointer whitespace-nowrap"
               >
-                Agenda un demo gratis
+                Quiero que me contacten
               </button>
             </div>
             {error && <p className="text-slate-400 text-sm mt-4">{error}</p>}

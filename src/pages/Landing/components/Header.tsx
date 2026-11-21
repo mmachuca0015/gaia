@@ -46,7 +46,7 @@ function Header() {
             href="#demo"
             className="bg-ink text-white text-sm px-5 py-2.5 rounded-full hover:bg-ink-soft transition-colors"
           >
-            Agenda un demo
+            Contáctanos
           </a>
         </div>
 
@@ -79,7 +79,7 @@ function Header() {
             onClick={() => setOpen(false)}
             className="bg-ink text-white text-sm px-5 py-2.5 rounded-full text-center"
           >
-            Agenda un demo
+            Contáctanos
           </a>
         </div>
       )}
