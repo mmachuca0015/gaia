@@ -47,12 +47,12 @@ function Studiocard({
         >
           {is_open ? "Abierto" : "Cerrado"}
         </span>
-        <div className="absolute -bottom-6 left-4 w-12 h-12 rounded-full border-2 border-white bg-white shadow-sm overflow-hidden flex items-center justify-center">
+        <div className="absolute -bottom-15 left-4 w-30 h-30 rounded-full border-4 border-white bg-white shadow-sm overflow-hidden flex items-center justify-center">
           {logo_url ? (
             <img src={logo_url} alt="" className="w-full h-full object-cover" />
           ) : (
             <span
-              className="text-xl font-semibold text-ink"
+              className="text-5xl font-semibold text-ink"
               style={{ fontFamily: "Cormorant Garamond, serif" }}
             >
               {name.trim().charAt(0).toUpperCase()}
@@ -61,7 +61,7 @@ function Studiocard({
         </div>
       </div>
 
-      <div className="p-4 pt-8">
+      <div className="p-4 pt-18">
         <div className="flex items-center justify-between mb-1">
           <p className="font-medium text-slate-800">{name}</p>
           {/* <div className="flex items-center gap-1 text-sm text-slate-500">

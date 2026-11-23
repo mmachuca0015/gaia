@@ -88,13 +88,13 @@ function UserAppPreview() {
                     {s.open ? "Abierto" : "Cerrado"}
                   </span>
                   <span
-                    className="absolute -bottom-3 left-2.5 w-6 h-6 rounded-full border border-paper bg-paper shadow-sm flex items-center justify-center text-[11px] font-semibold text-ink"
+                    className="absolute -bottom-5 left-2.5 w-10 h-10 rounded-full border-2 border-paper bg-paper shadow-sm flex items-center justify-center text-lg font-semibold text-ink"
                     style={{ fontFamily: "Cormorant Garamond, serif" }}
                   >
                     {s.name.charAt(0)}
                   </span>
                 </div>
-                <div className="p-2.5 pt-4">
+                <div className="p-2.5 pt-7">
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-[11px] font-medium text-ink truncate">{s.name}</p>
                     <span className="flex items-center gap-0.5 text-[9px] text-slate-500">
