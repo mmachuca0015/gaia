@@ -560,6 +560,9 @@ Otras reglas de esta parte:
   visitante (`studioVisibleTo` y `viewerIsDemo` en `services/catalog.js`,
   `demoHiddenFrom` en `routes/studios.js`). Lo decide el servidor con la sesión
   (`optionalAuth`); no hay código secreto que se pueda filtrar.
+- **Un estudio demo tiene que estar completo, menos Stripe** (`STUDIO_FILLED`
+  en `studioVisibleTo`): se salta la suscripción y `stripe_ready` porque sus
+  cobros son simulados, pero uno a medio llenar no sale en el catálogo.
 - **Usuario demo + estudio demo = reserva sin Stripe** (`simulated` en
   `/payments/charge`). Cualquier mezcla se rechaza: un usuario demo no reserva
   en estudios reales. No relajes eso: con llaves live el cobro sería real.
