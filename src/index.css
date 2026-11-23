@@ -27,3 +27,15 @@ html {
   width: auto !important;
   line-height: 1.4;
 }
+
+/* En el iPhone, Safari hace zoom al tocar un campo con letra menor a 16px y
+   ese zoom se queda al cambiar de pantalla: tras iniciar sesion la pagina
+   quedaba mas ancha que el telefono. Va fuera de @layer para ganarle a las
+   utilidades (text-sm) solo en pantallas chicas. */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

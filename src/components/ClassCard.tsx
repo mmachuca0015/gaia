@@ -47,12 +47,6 @@ function ClassCard({
 
   const { time: formattedTime, ampm } = formatTime(hour);
 
-  // "10 AM", "10:30 AM". En punto se omiten los minutos, que no dicen nada.
-  const shortTime = (time: string) => {
-    const { time: t, ampm: p } = formatTime(time);
-    return `${t.endsWith(":00") ? t.slice(0, -3) : t} ${p}`;
-  };
-
   // Sin hora de fin (horarios de antes de que el dueño la pudiera elegir) se
   // supone una hora, que es lo que duraban.
   const endsAt =
@@ -61,7 +55,18 @@ function ClassCard({
       const [h, m] = hour.split(":").map(Number);
       return `${String(((h ?? 0) + 1) % 24).padStart(2, "0")}:${String(m ?? 0).padStart(2, "0")}`;
     })();
-  const range = `de ${shortTime(hour)} a ${shortTime(endsAt)}`;
+  // "50 min", "1 h", "1 h 15 min".
+  const minutesOf = (t: string) => {
+    const [h, m] = t.split(":").map(Number);
+    return (h ?? 0) * 60 + (m ?? 0);
+  };
+  const duration = (minutesOf(endsAt) - minutesOf(hour) + 1440) % 1440 || 60;
+  const durationLabel =
+    duration < 60
+      ? `${duration} min`
+      : duration % 60 === 0
+        ? `${duration / 60} h`
+        : `${Math.floor(duration / 60)} h ${duration % 60} min`;
 
   //Popup para verificar si tiene tarjeta agregada
   const [showPopup, setShowPopup] = useState(false);
@@ -107,7 +112,12 @@ function ClassCard({
     const todasCubren = options.some((o) => o.difference_cents === 0);
     if (options.length === 0 && !isDemo && !user.stripe_customer_id) {
       setShowPopup(true);
-    } else if (options.length > 0 && !todasCubren && !isDemo && !user.stripe_customer_id) {
+    } else if (
+      options.length > 0 &&
+      !todasCubren &&
+      !isDemo &&
+      !user.stripe_customer_id
+    ) {
       setShowPopup(true);
     } else {
       setShowConfirmPopUp(true);
@@ -126,12 +136,16 @@ function ClassCard({
             ? `¡Reserva confirmada! Usamos tu clase a favor y cobramos $${money(res.charged_cents)} MXN de diferencia.`
             : "¡Reserva confirmada! Usamos tu clase a favor, sin ningún cobro."
           : `¡Reserva confirmada! Te ${
-              res.remaining === 1 ? "queda 1 clase" : `quedan ${res.remaining} clases`
+              res.remaining === 1
+                ? "queda 1 clase"
+                : `quedan ${res.remaining} clases`
             } en el paquete.`,
       );
       onReservaExitosa();
     } catch (err) {
-      alert(err instanceof ApiError ? err.message : "No pudimos hacer la reserva");
+      alert(
+        err instanceof ApiError ? err.message : "No pudimos hacer la reserva",
+      );
     }
   };
 
@@ -147,63 +161,68 @@ function ClassCard({
       alert("¡Reserva confirmada!");
       onReservaExitosa();
     } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Error al procesar el pago");
+      alert(
+        err instanceof ApiError ? err.message : "Error al procesar el pago",
+      );
     }
   };
 
   return (
-    <div className="bg-white rounded-2xl p-5 flex items-center gap-4 shadow-sm">
-      {/* Hora */}
-      <div className="min-w-[52px] text-center">
+    <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col gap-2">
+      {/* 1: hora y nombre */}
+      <div className="flex items-baseline gap-3 min-w-0">
         <p
-          className="text-4xl font-semibold text-slate-800"
+          className="text-3xl font-semibold text-slate-800 whitespace-nowrap shrink-0"
           style={{ fontFamily: "Cormorant Garamond, serif" }}
         >
           {formattedTime}
+          <span className="ml-1 text-base">{ampm}</span>
         </p>
-        <p className="text-md font-semibold text-slate-800">{ampm}</p>
+        <p className="font-semibold text-xl text-slate-800 min-w-0 break-words">
+          {name}
+        </p>
       </div>
 
-      {/* Divisor */}
-      <div className="w-px h-16 bg-slate-100" />
-
-      {/* Info */}
-      <div className="flex-1">
-        <div className="flex items-center gap-2 mb-1">
-          <p className="font-semibold text-2xl text-slate-800">{name}</p>
-        </div>
-        <p className="text-md text-slate-600 mb-1">
-          con {instructor} · {range}
-        </p>
-        <div className="flex items-center gap-3 text-md text-slate-600">
-          <div className="flex items-center gap-1">
-            {availablePlaces === 0 ? (
-              <span className="text-red-400 font-medium text-sm">Lleno</span>
-            ) : (
-              <div className="flex items-center gap-1">
-                <Users size={14} />
-                <span>{availablePlaces} lugares restantes</span>
-              </div>
-            )}
-          </div>
-          <span className="font-medium bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full">
-            ${price}
+      {/* 2: instructor, duracion y lugares */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-500">
+        <span>con {instructor}</span>
+        {/* Cada punto va pegado a su dato: si el renglon se parte, no queda
+            un "·" colgando al final. */}
+        <span className="whitespace-nowrap">· {durationLabel}</span>
+        {availablePlaces === 0 ? (
+          <span className="whitespace-nowrap text-red-400 font-medium">
+            · Lleno
           </span>
-        </div>
+        ) : (
+          <span className="flex items-center gap-1 whitespace-nowrap">
+            · <Users size={14} />
+            {availablePlaces === 1 ? "1 lugar" : `${availablePlaces} lugares`}
+            <span className="hidden sm:inline">
+              {availablePlaces === 1 ? "restante" : "restantes"}
+            </span>
+          </span>
+        )}
       </div>
 
-      {/* Botón */}
-      <button
-        onClick={handleReservar}
-        disabled={availablePlaces === 0 || alreadyBooked}
-        className={`... ${availablePlaces === 0 || alreadyBooked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-      >
-        {availablePlaces === 0
-          ? "Lleno"
-          : alreadyBooked
-            ? "Ya reservaste"
-            : "Reservar ahora"}
-      </button>
+      {/* 3: precio y boton */}
+      <div className="flex items-center justify-between gap-3 mt-1">
+        <span className="text-lg font-semibold text-slate-800">${price}</span>
+        <button
+          onClick={handleReservar}
+          disabled={availablePlaces === 0 || alreadyBooked}
+          className={`bg-ink text-white text-sm px-5 py-2.5 rounded-xl hover:bg-ink-soft transition-colors whitespace-nowrap ${
+            availablePlaces === 0 || alreadyBooked
+              ? "opacity-50 cursor-not-allowed"
+              : "cursor-pointer"
+          }`}
+        >
+          {availablePlaces === 0
+            ? "Lleno"
+            : alreadyBooked
+              ? "Ya reservaste"
+              : "Reservar ahora"}
+        </button>
+      </div>
 
       {/* Popup para agregar tarjeta */}
       {showPopup && (
@@ -253,7 +272,9 @@ function ClassCard({
                       className="accent-ink w-4 h-4"
                     />
                     <span className="text-slate-700">
-                      {u.is_credit ? "Usar tu clase a favor" : `Usar «${u.name}»`}
+                      {u.is_credit
+                        ? "Usar tu clase a favor"
+                        : `Usar «${u.name}»`}
                       <span className="block text-xs text-slate-400">
                         {u.is_credit ? (
                           <>
@@ -290,33 +311,38 @@ function ClassCard({
             {/* Desglose completo: el cargo por transaccion no puede aparecer
                 por sorpresa hasta el estado de cuenta. */}
             {payWith === "card" && (
-            <div className="text-sm text-left border border-slate-200 rounded-xl divide-y divide-slate-100">
-              <div className="flex justify-between px-4 py-2.5">
-                <span className="text-slate-600">Clase</span>
-                <span className="text-slate-800">${Number(price).toFixed(2)}</span>
-              </div>
-              {feeCents !== null && (
+              <div className="text-sm text-left border border-slate-200 rounded-xl divide-y divide-slate-100">
                 <div className="flex justify-between px-4 py-2.5">
-                  <span className="text-slate-600">
-                    Cargo por servicio ({feePercent}%)
+                  <span className="text-slate-600">Clase</span>
+                  <span className="text-slate-800">
+                    ${Number(price).toFixed(2)}
                   </span>
-                  <span className="text-slate-800">${fee.toFixed(2)}</span>
                 </div>
-              )}
-              <div className="flex justify-between px-4 py-2.5 font-semibold">
-                <span className="text-slate-800">Total</span>
-                <span className="text-slate-800">
-                  ${(feeCents !== null ? total : Number(price)).toFixed(2)} MXN
-                </span>
+                {feeCents !== null && (
+                  <div className="flex justify-between px-4 py-2.5">
+                    <span className="text-slate-600">
+                      Cargo por servicio ({feePercent}%)
+                    </span>
+                    <span className="text-slate-800">${fee.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between px-4 py-2.5 font-semibold">
+                  <span className="text-slate-800">Total</span>
+                  <span className="text-slate-800">
+                    ${(feeCents !== null ? total : Number(price)).toFixed(2)}{" "}
+                    MXN
+                  </span>
+                </div>
               </div>
-            </div>
             )}
 
             {/* Una clase a favor con diferencia SÍ cobra. Decir "sin ningún
                 cobro" ahí sería mentirle al alumno justo antes del cargo. */}
             {(() => {
               const elegida =
-                payWith === "card" ? null : usable.find((u) => u.id === payWith);
+                payWith === "card"
+                  ? null
+                  : usable.find((u) => u.id === payWith);
               const diferencia = elegida?.difference_cents ?? 0;
               return (
                 <p className="text-xs text-slate-400">

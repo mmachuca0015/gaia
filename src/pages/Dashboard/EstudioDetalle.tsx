@@ -73,10 +73,25 @@ function EstudioDetalle() {
   {
     /*Calendario*/
   }
-  // El calendario empieza HOY y avanza de 7 en 7 dias: no se puede ir a dias
-  // pasados. Todo se cuenta en dias desde hoy.
+  // El calendario empieza HOY y avanza de 7 en 7 dias (de 5 en 5 en el
+  // telefono, donde 7 no caben a lo ancho): no se puede ir a dias pasados.
+  // Todo se cuenta en dias desde hoy.
+  const [pageSize, setPageSize] = useState(() =>
+    window.matchMedia("(min-width: 640px)").matches ? 7 : 5,
+  );
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedOffset, setSelectedOffset] = useState(0);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 640px)");
+    const onChange = () => {
+      setPageSize(mq.matches ? 7 : 5);
+      // Las paginas cambian de tamaño: se vuelve a hoy para no quedar en medio.
+      setWeekOffset(0);
+      setSelectedOffset(0);
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   const days = ["DOM", "LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB"];
   const months = [
@@ -100,8 +115,8 @@ function EstudioDetalle() {
     return date;
   };
 
-  const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const offset = weekOffset * 7 + i;
+  const weekDays = Array.from({ length: pageSize }, (_, i) => {
+    const offset = weekOffset * pageSize + i;
     const date = dateAt(offset);
     return {
       offset,
@@ -120,10 +135,10 @@ function EstudioDetalle() {
   };
   const selectedDate = getSelectedDate();
 
-  // Al cambiar de semana se selecciona su primer dia.
+  // Al cambiar de pagina se selecciona su primer dia.
   const goToWeek = (week: number) => {
     setWeekOffset(week);
-    setSelectedOffset(week * 7);
+    setSelectedOffset(week * pageSize);
   };
 
   {
@@ -234,7 +249,7 @@ function EstudioDetalle() {
         )}
         <div className="min-w-0">
           <h1
-            className="text-5xl font-semibold"
+            className="text-4xl md:text-5xl font-semibold break-words"
             style={{ fontFamily: "Cormorant Garamond, serif" }}
           >
             {studio.name}
@@ -296,25 +311,28 @@ function EstudioDetalle() {
       {/*Clases*/}
       {step === "Clases" && (
         <div>
-          <div className="flex items-center justify-center gap-2 px-6 py-4">
-            {weekOffset > 0 && (
-              <button
-                onClick={() => goToWeek(weekOffset - 1)}
-                className="p-2 rounded-full hover:bg-slate-100 transition-colors"
-              >
-                <ChevronLeft
-                  size={18}
-                  className="text-slate-400 hover:cursor-pointer"
-                />
-              </button>
-            )}
+          <div className="flex items-center justify-center gap-1 sm:gap-2 sm:px-6 py-4">
+            {/* En la primera pagina la flecha no se ve pero guarda su lugar,
+                para que los dias no se muevan al avanzar. */}
+            <button
+              onClick={() => goToWeek(weekOffset - 1)}
+              disabled={weekOffset === 0}
+              className={`p-1.5 sm:p-2 shrink-0 rounded-full hover:bg-slate-100 transition-colors ${
+                weekOffset === 0 ? "invisible" : ""
+              }`}
+            >
+              <ChevronLeft
+                size={18}
+                className="text-slate-400 hover:cursor-pointer"
+              />
+            </button>
 
-            <div className="flex gap-2">
+            <div className="flex flex-1 sm:flex-none gap-1.5 sm:gap-2 min-w-0">
               {weekDays.map((day) => (
                 <button
                   key={day.offset}
                   onClick={() => setSelectedOffset(day.offset)}
-                  className={`flex flex-col items-center px-3 py-2 rounded-xl min-w-[52px] transition-colors border border-slate-200 hover:border-slate-400 cursor-pointer ${
+                  className={`flex flex-1 sm:flex-none flex-col items-center px-1 sm:px-3 py-2 rounded-xl sm:min-w-[52px] transition-colors border border-slate-200 hover:border-slate-400 cursor-pointer ${
                     selectedOffset === day.offset
                       ? "bg-[#1b2c44] text-white"
                       : "bg-white text-slate-600"
@@ -333,7 +351,7 @@ function EstudioDetalle() {
 
             <button
               onClick={() => goToWeek(weekOffset + 1)}
-              className="p-2 rounded-full hover:bg-slate-100 transition-colors"
+              className="p-1.5 sm:p-2 shrink-0 rounded-full hover:bg-slate-100 transition-colors"
             >
               <ChevronRight
                 size={18}
@@ -341,7 +359,7 @@ function EstudioDetalle() {
               />
             </button>
           </div>
-          <div className="flex flex-col gap-4 px-6 max-w-3xl mx-auto">
+          <div className="flex flex-col gap-4 sm:px-6 max-w-3xl mx-auto">
             {classes.map((classItem) => (
               <ClassCard
                 key={classItem.id}
