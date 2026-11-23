@@ -20,7 +20,7 @@ function BottomNav() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-[#ffffff] border-t border-slate-200 flex justify-around items-center py-3 lg:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#ffffff] border-t border-slate-200 flex justify-around items-center py-3 lg:hidden">
       {navItems.map(({ icon: Icon, label, path }) => (
         <NavLink
           key={path}
