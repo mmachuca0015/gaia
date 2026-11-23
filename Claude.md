@@ -619,6 +619,7 @@ marketing. Si migras una pantalla nueva, no le pongas `italic` al encabezado.
 - `lib/api.ts` — cliente HTTP único (cookie de sesión + URL base). Todas las llamadas pasan por aquí.
 - `lib/stripe.ts` — instancia única de Stripe.js, compartida por `main.tsx` y el `<Elements>` anidado del pago de suscripción
 - `lib/plans.ts` — tipos y cálculos de planes; única fuente para landing, registro y admin
+- `lib/mapPin.ts` — pin de la marca, registrado en `main.tsx` como icono por defecto de todos los `<Marker>`. El icono por defecto de Leaflet sale roto con Vite: no lo regreses
 - `layouts/` — layouts usados en el proyecto
 - `pages/` — páginas: dashboard, login, landing, panel del dueño de estudio, panel de administrador, reset password
 - `pages/Landing/components/` — secciones de la landing: `Header`, `Hero`, `ForClients`, `ForOwners`, `Comparison`, `Pricing`, `DemoCta`, `Footer`
