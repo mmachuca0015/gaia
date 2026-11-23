@@ -3,7 +3,9 @@ import { formatDistance } from "../lib/location";
 
 type StudioCardProps = {
   id: number;
-  cover_url: string;
+  cover_url: string | null;
+  /** Imagen de perfil del estudio; sin ella se muestra la inicial. */
+  logo_url?: string | null;
   is_open: boolean;
   name: string;
   rating: number;
@@ -17,6 +19,7 @@ type StudioCardProps = {
 function Studiocard({
   id,
   cover_url,
+  logo_url,
   is_open,
   name,
   price_from,
@@ -28,7 +31,15 @@ function Studiocard({
   return (
     <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
       <div className="relative">
-        <img src={cover_url} alt={name} className="w-full h-48 object-cover" />
+        {cover_url ? (
+          <img
+            src={cover_url}
+            alt={name}
+            className="w-full h-48 object-cover"
+          />
+        ) : (
+          <div className="w-full h-48 bg-surface" />
+        )}
         <span
           className={`absolute top-3 left-3 text-xs px-3 py-1 rounded-full font-medium ${
             is_open ? "bg-white text-[#1b2c44]" : "bg-white text-slate-400"
@@ -36,9 +47,21 @@ function Studiocard({
         >
           {is_open ? "Abierto" : "Cerrado"}
         </span>
+        <div className="absolute -bottom-6 left-4 w-12 h-12 rounded-full border-2 border-white bg-white shadow-sm overflow-hidden flex items-center justify-center">
+          {logo_url ? (
+            <img src={logo_url} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <span
+              className="text-xl font-semibold text-ink"
+              style={{ fontFamily: "Cormorant Garamond, serif" }}
+            >
+              {name.trim().charAt(0).toUpperCase()}
+            </span>
+          )}
+        </div>
       </div>
 
-      <div className="p-4">
+      <div className="p-4 pt-8">
         <div className="flex items-center justify-between mb-1">
           <p className="font-medium text-slate-800">{name}</p>
           {/* <div className="flex items-center gap-1 text-sm text-slate-500">
@@ -60,7 +83,9 @@ function Studiocard({
           {distanceKm != null && (
             <>
               <span>·</span>
-              <span className="text-slate-500">{formatDistance(distanceKm)}</span>
+              <span className="text-slate-500">
+                {formatDistance(distanceKm)}
+              </span>
             </>
           )}
         </div>

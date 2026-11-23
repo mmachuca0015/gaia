@@ -545,6 +545,7 @@ router.get("/favorites/:userId", requireAuth, async (req, res) => {
       favorites.studio_id,
       studios.name,
       studios.cover_url,
+      studios.logo_url,
       studios.neighborhood,
       studios.rating,
       ${STUDIO_PRICE_FROM} AS min_price, ${STUDIO_OPEN_NOW} AS open_now

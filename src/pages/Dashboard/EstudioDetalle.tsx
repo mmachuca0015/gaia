@@ -39,7 +39,9 @@ function EstudioDetalle() {
     id: number;
     name: string;
     street: string;
-    cover_url: string;
+    cover_url: string | null;
+    /** Imagen de perfil del estudio. */
+    logo_url: string | null;
     /** Abierto ahora, segun su horario. */
     open_now: boolean;
     /** Horario de atencion; vacio si el estudio aun no lo captura. */
@@ -191,11 +193,15 @@ function EstudioDetalle() {
 
   return (
     <div className="relative h-72 w-full">
-      <img
-        src={studio.cover_url}
-        alt={studio.name}
-        className="w-full h-full object-cover"
-      />
+      {studio.cover_url ? (
+        <img
+          src={studio.cover_url}
+          alt={studio.name}
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        <div className="w-full h-full bg-ink" />
+      )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
       <button className="absolute top-4 left-4 bg-white rounded-full p-2">
         <ArrowLeft
@@ -218,40 +224,49 @@ function EstudioDetalle() {
           className={`cursor-pointer transition-colors hover:text-[#33506f] ${isFavorite ? "fill-[#1b2c44] text-[#1b2c44]" : "text-slate-400"}`}
         />
       </button>
-      <div className="absolute bottom-4 left-6 text-white">
-        <h1
-          className="text-5xl font-semibold"
-          style={{ fontFamily: "Cormorant Garamond, serif" }}
-        >
-          {studio.name}
-        </h1>
-        <div className="flex items-center gap-3 mt-1 text-sm">
-          {/* <div className="flex items-center gap-1">
+      <div className="absolute bottom-4 left-6 right-6 flex items-end gap-4 text-white">
+        {studio.logo_url && (
+          <img
+            src={studio.logo_url}
+            alt=""
+            className="w-16 h-16 md:w-20 md:h-20 rounded-full border-2 border-white object-cover bg-white shrink-0"
+          />
+        )}
+        <div className="min-w-0">
+          <h1
+            className="text-5xl font-semibold"
+            style={{ fontFamily: "Cormorant Garamond, serif" }}
+          >
+            {studio.name}
+          </h1>
+          <div className="flex items-center gap-3 mt-1 text-sm">
+            {/* <div className="flex items-center gap-1">
             <Star size={14} className="fill-white" />
             <span>{studio.rating}</span>
           </div> */}
-          <span
-            className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
-              studio.open_now
-                ? "bg-white text-[#1b2c44]"
-                : "bg-white/80 text-slate-500"
-            }`}
-          >
-            {studio.open_now ? "Abierto ahora" : "Cerrado ahora"}
-          </span>
-          {coords &&
-            distanceKm(coords, studio.latitude, studio.longitude) != null && (
-              <div className="flex items-center gap-1">
-                <MapPin size={14} />
-                <span>
-                  A{" "}
-                  {formatDistance(
-                    distanceKm(coords, studio.latitude, studio.longitude)!,
-                  )}{" "}
-                  de ti
-                </span>
-              </div>
-            )}
+            <span
+              className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
+                studio.open_now
+                  ? "bg-white text-[#1b2c44]"
+                  : "bg-white/80 text-slate-500"
+              }`}
+            >
+              {studio.open_now ? "Abierto ahora" : "Cerrado ahora"}
+            </span>
+            {coords &&
+              distanceKm(coords, studio.latitude, studio.longitude) != null && (
+                <div className="flex items-center gap-1">
+                  <MapPin size={14} />
+                  <span>
+                    A{" "}
+                    {formatDistance(
+                      distanceKm(coords, studio.latitude, studio.longitude)!,
+                    )}{" "}
+                    de ti
+                  </span>
+                </div>
+              )}
+          </div>
         </div>
       </div>
 

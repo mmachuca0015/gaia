@@ -29,7 +29,7 @@ function Explorar() {
     name: string;
     street: string;
     cover_url: string;
-    /** Foto de perfil del estudio; la tarjeta del mapa la usa. */
+    /** Foto de perfil del estudio (tarjeta del catalogo y del mapa). */
     logo_url: string | null;
     /** Abierto ahora, segun su horario (o el interruptor viejo). */
     open_now: boolean;
@@ -241,6 +241,7 @@ function Explorar() {
               <StudioCard
                 id={studio.id}
                 cover_url={studio.cover_url}
+                logo_url={studio.logo_url}
                 is_open={studio.open_now}
                 name={studio.name}
                 rating={studio.rating}

@@ -7,11 +7,12 @@ const pool = require("../db");
 // `OnboardingChecklist`) y no lo publica hasta que lo llene. `int_number` no
 // cuenta, no todos los locales tienen.
 //
-// `stripe_ready` es la cuenta Connect que ya puede recibir transferencias: sin
-// ella un alumno no tiene como pagarle la clase al estudio.
+// Se arma en dos partes: lo que el dueño captura (`STUDIO_FILLED`) y la cuenta
+// de Stripe. Un estudio demo solo necesita la primera, porque sus reservas son
+// simuladas y no le pagan nada.
 //
-// Es un fragmento de WHERE que espera la tabla `studios` en la consulta.
-const STUDIO_COMPLETE = `(
+// Son fragmentos de WHERE que esperan la tabla `studios` en la consulta.
+const STUDIO_FILLED = `(
   btrim(COALESCE(studios.name, '')) <> ''
   AND btrim(COALESCE(studios.description, '')) <> ''
   AND btrim(COALESCE(studios.street, '')) <> ''
@@ -26,8 +27,11 @@ const STUDIO_COMPLETE = `(
   AND btrim(COALESCE(studios.logo_url, '')) <> ''
   AND btrim(COALESCE(studios.cover_url, '')) <> ''
   AND EXISTS (SELECT 1 FROM studio_hours h WHERE h.studio_id = studios.id)
-  AND studios.stripe_ready
 )`;
+
+// `stripe_ready` es la cuenta Connect que ya puede recibir transferencias: sin
+// ella un alumno no tiene como pagarle la clase al estudio.
+const STUDIO_COMPLETE = `(${STUDIO_FILLED} AND studios.stripe_ready)`;
 
 // Una sucursal borrada sale del catalogo, pero no de la base: las reservas y
 // los ingresos cuelgan de ella.
@@ -123,11 +127,13 @@ const STUDIO_PUBLISHED = `${STUDIO_LIVE} AND ${STUDIO_WITHIN_PLAN} AND ${STUDIO_
 // usuarios demo, sin importar su suscripcion; nunca se publican para nadie
 // mas. `param` es el placeholder ($n) con el resultado de viewerIsDemo.
 function studioVisibleTo(param) {
-  // El estudio demo se salta la suscripcion y lo de estar completo, que es
-  // justo lo que se esta probando, pero borrado es borrado para todos, y el
-  // limite de sucursales es del plan, no del pago: aplica igual.
+  // El estudio demo se salta la suscripcion y la cuenta de Stripe, porque sus
+  // cobros son simulados. Lo demas aplica igual: tiene que estar completo (uno
+  // a medio llenar se veria roto en el catalogo, sin imagen ni direccion),
+  // borrado es borrado para todos, y el limite de sucursales es del plan, no
+  // del pago.
   return `(${STUDIO_LIVE} AND ${STUDIO_WITHIN_PLAN}
-           AND CASE WHEN studios.is_demo THEN ${param}::boolean
+           AND CASE WHEN studios.is_demo THEN ${param}::boolean AND ${STUDIO_FILLED}
                ELSE ${STUDIO_PUBLISHED} END)`;
 }
 
