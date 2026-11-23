@@ -10,6 +10,8 @@ import {
 } from "react-leaflet";
 import { useNavigate } from "react-router-dom";
 
+import { PIN, PIN_ACTIVE } from "../lib/mapPin";
+
 import type { Coords } from "../lib/location";
 
 export type MapStudio = {
@@ -33,24 +35,6 @@ const FALLBACK_CENTER: [number, number] = [20.6767, -103.3475];
 // tarjeta y darle a "Ver más" sin que se cierre en el camino.
 const HIDE_DELAY_MS = 250;
 
-// Pin propio en vez del icono por defecto de Leaflet: con Vite las imagenes
-// del icono no se resuelven y el pin sale roto. Ademas va con el color de la
-// marca.
-function pinIcon(active: boolean) {
-  const fill = active ? "#33506f" : "#1b2c44";
-  return L.divIcon({
-    className: "",
-    html: `<svg width="30" height="40" viewBox="0 0 30 40" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 3px rgba(27,44,68,.35))">
-      <path d="M15 0C6.7 0 0 6.6 0 14.8 0 25.9 15 40 15 40s15-14.1 15-25.2C30 6.6 23.3 0 15 0z" fill="${fill}"/>
-      <circle cx="15" cy="14.5" r="5.5" fill="#fff"/>
-    </svg>`,
-    iconSize: [30, 40],
-    iconAnchor: [15, 40],
-    popupAnchor: [0, -38],
-  });
-}
-const PIN = pinIcon(false);
-const PIN_ACTIVE = pinIcon(true);
 
 function toNumber(v: string | number | null) {
   const n = typeof v === "string" ? parseFloat(v) : v;
